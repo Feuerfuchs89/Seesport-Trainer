@@ -1,0 +1,26 @@
+{
+ "name": "Regattakoje · Leipziger Seesportclub",
+ "short_name": "Regattakoje",
+ "description": "Regatta-Taktiktrainer des Leipziger Seesportclub e.V.",
+ "start_url": "./",
+ "scope": "./",
+ "display": "fullscreen",
+ "orientation": "any",
+ "background_color": "#0b2d4a",
+ "theme_color": "#0b2d4a",
+ "lang": "de",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  }
+ ]
+}
