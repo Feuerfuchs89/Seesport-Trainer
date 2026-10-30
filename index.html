@@ -219,6 +219,7 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 .keys{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:baseline;font-size:14px}
 kbd{font-family:var(--f-display);font-weight:600;font-size:14px;background:#0b2531;border:1px solid var(--rule);border-bottom-width:2px;border-radius:5px;padding:1px 7px;white-space:nowrap}
 .rules{color:var(--ink-dim);font-size:13px;line-height:1.5;margin:0;padding-left:18px}
+.legalFoot{margin-top:18px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12);color:var(--ink-dim);font-size:12.5px;line-height:1.6}.legalFoot a,.legal a{color:inherit;text-decoration:underline}.legal p{font-size:14px;line-height:1.55;margin:0 0 12px;color:var(--ink-dim)}.legal p b{color:var(--ink)}.legal h2{margin:4px 0 12px}.legal section+section{margin-top:22px}
 .rules b{color:var(--ink);font-weight:600}
 h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;font-size:15px;color:var(--mark);margin:0 0 8px}
 .res{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;margin-top:12px}
@@ -360,6 +361,33 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
         <p class="rules" style="padding:0;margin-top:8px">Bahnformen: Up-and-Down, mit Leetor, mit Ablauftonne oder Dreieck; Ziel auf der Startlinie oder in Luv. Tonnen an Backbord runden, durchs Leetor zwischen den Tonnen hindurch.</p>
       </div>
     </div>
+    <div class="legalFoot">© 2026 Michael Assmann · entwickelt für den Leipziger Seesportclub e.V. · <a href="#" data-legal="imp">Impressum</a> · <a href="#" data-legal="ds">Datenschutz</a></div>
+  </div>
+</div>
+
+<div id="legalOv" class="overlay" hidden style="z-index:60">
+  <div class="card legal" style="max-width:760px">
+    <section id="legImp">
+    <h2>Impressum</h2>
+    <p><b>Angaben gemäß § 5 DDG</b><br>Michael Assmann<br>Hans-Driesch-Straße 45<br>04179 Leipzig</p>
+    <p><b>Kontakt</b><br>E-Mail: <a href="mailto:Knotenpunktmassagen@googlemail.com">Knotenpunktmassagen@googlemail.com</a></p>
+    <p><b>Verantwortlich für den Inhalt</b><br>Michael Assmann, Anschrift wie oben</p>
+    <p><b>Zweck</b><br>Die Regattakoje ist ein privates, nicht kommerzielles Trainingsspiel. Sie wurde entwickelt für den Leipziger Seesportclub e.V. (Am Stausee 4, 04249 Leipzig, Cospudener See) und dessen Vereinsfreunde. Der Verein ist nicht Betreiber dieses Angebots.</p>
+    <p><b>Urheberrecht</b><br>Das Spiel mit Programmcode, Grafiken, 3D-Modellen, Texten und Gestaltung ist urheberrechtlich geschützt und Eigentum von Michael Assmann. Alle Rechte vorbehalten. Vervielfältigung, Verbreitung, Bearbeitung und jede Verwertung außerhalb der privaten Nutzung im Browser sind ohne schriftliche Zustimmung nicht gestattet. Ausgenommen ist das Vereinswappen: Es gehört dem Leipziger Seesportclub e.V.</p>
+    <p><b>Haftung</b><br>Das Spiel dient der Übung von Taktik und Regeln. Es ersetzt keine Ausbildung auf dem Wasser und keine verbindliche Auslegung der Wettfahrtregeln. Für Inhalte externer Links sind deren Betreiber verantwortlich.</p>
+    </section>
+    <section id="legDs">
+    <h2>Datenschutz</h2>
+    <p><b>Verantwortlicher</b><br>Michael Assmann, Hans-Driesch-Straße 45, 04179 Leipzig, <a href="mailto:Knotenpunktmassagen@googlemail.com">Knotenpunktmassagen@googlemail.com</a></p>
+    <p><b>Kein Konto, keine Auswertung</b><br>Das Spiel braucht keine Anmeldung. Es gibt keine Werbung, kein Tracking und keine Analyse-Werkzeuge. Ich erhebe selbst keine personenbezogenen Daten.</p>
+    <p><b>Speicherung auf deinem Gerät</b><br>Einstellungen, Bestzeiten, Lektionsfortschritt, dein Bootsdesign, gespeicherte Fahrten, ein geladenes GPX-Ufer und dein Mehrspieler-Name werden nur im lokalen Speicher deines Browsers abgelegt (localStorage, Schlüssel „regattakoje.…“). Für die Offline-Nutzung legt die App die Spieldateien im Browser-Cache ab (Service Worker). Diese Daten verlassen dein Gerät nicht. Du kannst sie jederzeit über die Website-Daten deines Browsers löschen. Geladene GPX- und Fahrt-Dateien werden nur im Browser verarbeitet und nicht hochgeladen.</p>
+    <p><b>Hosting</b><br>Die Seite liegt bei GitHub Pages (GitHub Inc., USA, Teil der Microsoft-Gruppe). Beim Aufruf verarbeitet GitHub technisch notwendige Zugriffsdaten wie deine IP-Adresse, Zeitpunkt und Browserkennung, um die Seite auszuliefern und abzusichern. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einer sicheren Bereitstellung). Die Übermittlung in die USA stützt sich auf den EU-US Data Privacy Framework. Näheres: <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">Datenschutzerklärung von GitHub</a>.</p>
+    <p><b>Externe Bibliotheken und Schriften</b><br>Beim Start lädt das Spiel die 3D-Bibliothek three.js von cdnjs (Cloudflare Inc.) und Schriftarten von Google Fonts (Google Ireland Ltd.). Dabei wird deine IP-Adresse an diese Anbieter übertragen. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (zuverlässige und schnelle Bereitstellung).</p>
+    <p><b>Mehrspieler</b><br>Nur wenn du den Mehrspieler nutzt, lädt das Spiel die Bibliothek Trystero (über jsDelivr) und verbindet die Geräte direkt per WebRTC. Für den Verbindungsaufbau werden öffentliche Vermittlungs-Server (Relays und STUN-Server) genutzt. Dabei sehen die Mitspieler und diese Server deine IP-Adresse. Übertragen werden dein gewählter Name, der Raumname sowie Position und Kurs deines Bootes. Nichts davon wird von mir gespeichert. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (von dir gewünschte Funktion).</p>
+    <p><b>Deine Rechte</b><br>Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch sowie das Recht, dich bei einer Aufsichtsbehörde zu beschweren, z. B. bei der Sächsischen Datenschutz- und Transparenzbeauftragten.</p>
+    <p class="rules" style="padding:0">Stand: Oktober 2026</p>
+    </section>
+    <div class="actions"><button class="btn" id="legalClose" type="button">Schließen</button></div>
   </div>
 </div>
 
@@ -3641,4 +3669,11 @@ hbInitUi();
 newRace(null);applyGfx();renderBest();updateTouch();
 requestAnimationFrame(loop);
 })();
+</script>
+<script>
+(function(){const ov=document.getElementById('legalOv');if(!ov)return;
+ document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('[data-legal]');if(!a)return;e.preventDefault();ov.hidden=false;
+   const t=document.getElementById(a.dataset.legal==='ds'?'legDs':'legImp');ov.scrollTop=0;setTimeout(()=>{try{t.scrollIntoView({block:'start'});}catch(_){}} ,0);});
+ document.getElementById('legalClose').onclick=()=>{ov.hidden=true;};
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!ov.hidden){ov.hidden=true;e.stopPropagation();}},true);})();
 </script>
