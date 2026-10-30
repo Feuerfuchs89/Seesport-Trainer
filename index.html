@@ -2627,7 +2627,7 @@ function updateHud(){
   if(b.rib){hudRib(b);$('tTack').textContent='Kehre';return;}
   $('rowPad').hidden=!G.row;
   if(G.row){hudRow(b);return;}
-  $('tTack').textContent=CL.key==='zk10'&&!G.lesson?cmdLabel(b):'Wende';
+  {const tl=CL.key==='zk10'&&!G.lesson?cmdLabel(b):(Math.abs(wrap180((b.W!=null?b.W:G.wind.cur)-b.h))>90?'Halse':'Wende');const tt=$('tTack');if(tt.textContent!==tl)tt.textContent=tl;}
   el.clock.textContent=fmtT(G.t);el.clock.classList.toggle('pre',G.t<0);
   let leg='';
   if(G.lesson){leg=G.lesson.def.hb?G.lesson.def.leg(G.lesson):'Lektion '+(curLesson+1)+' · <b>'+G.lesson.def.rule+'</b>';}
