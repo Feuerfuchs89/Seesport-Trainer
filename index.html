@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b2d4a">
+<meta name="theme-color" content="#0f195e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Regattakoje">
@@ -245,6 +245,21 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
 .verdict.ok{color:var(--stb)}.verdict.no{color:var(--port)}
 @media (max-width:620px){.lesgrid{grid-template-columns:1fr}.card{padding:18px 16px}}
 @media (prefers-reduced-motion:reduce){#flash,.msg{transition:none}}
+
+#chat{position:absolute;left:max(8px,env(safe-area-inset-left,0px));top:50%;transform:translateY(-55%);width:min(310px,calc(100vw - 16px));max-height:44vh;display:flex;flex-direction:column;background:var(--plate-hi);border:1px solid var(--rule);border-radius:8px;pointer-events:auto;z-index:25;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+#chat[hidden]{display:none}
+#chatHead{display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid var(--rule);font-family:var(--f-display);letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+#chatHead #chatWho{flex:1;color:var(--ink-dim);text-transform:none;letter-spacing:0;font-family:inherit;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#chatLog{flex:1;min-height:70px;overflow-y:auto;padding:4px 6px;display:flex;flex-direction:column;gap:3px;-webkit-overflow-scrolling:touch}
+#chatLog .cl{line-height:1.3;overflow-wrap:anywhere}
+#chatLog .cl b{color:var(--sky);font-weight:600}
+#chatLog .cl.me b{color:#ffd23f}
+#chatLog .cl.sys{color:var(--ink-dim);font-style:italic}
+#chatQuick{display:flex;flex-wrap:wrap;gap:4px;padding:4px 6px 0}
+#chatQuick:empty{display:none}
+#chatRow{display:flex;gap:4px;padding:5px 6px}
+#chatRow input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--ink);background:rgba(0,0,0,.35);border:1px solid var(--rule);border-radius:5px;padding:4px 6px}
+#bChat .bdg{background:#ff6a1a;color:#fff;border-radius:8px;padding:0 5px;margin-left:4px;font-size:11px}
 </style>
 
 <div id="stage"></div>
@@ -264,6 +279,12 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
   <div id="wlBar" hidden><button class="tbtn" data-wl="ap" title="Startverschiebung (1)">AP</button><button class="tbtn" data-wl="x" title="Einzelrückruf (2)">X</button><button class="tbtn" data-wl="fs" title="Allgemeiner Rückruf (3)">1. Ersatz</button><button class="tbtn" data-wl="s" title="Bahnabkürzung (4)">S</button><button class="tbtn" data-wl="wm" title="Luvtonne zum Schlauchboot verlegen (5)">Luvtonne hier</button><button class="tbtn" data-wl="lm" title="Leetonne zum Schlauchboot verlegen (6)">Leetonne hier</button><button class="tbtn" data-wl="wind" title="Luvtonne in den aktuellen Wind drehen (7)">Luv → Wind</button><button class="tbtn" data-wl="mark" title="Situation fürs Nachbesprechen markieren (8)">Markieren</button></div>
   <div id="specBar" hidden><button class="tbtn" data-sp="-1">◀ Boot</button><button class="tbtn" data-sp="1">Boot ▶</button><button class="tbtn" data-sp="m">Markieren</button></div>
   <div id="flash" hidden></div>
+  <div id="chat" hidden>
+    <div id="chatHead"><b>Chat</b><span id="chatWho"></span><button type="button" class="tbtn" id="chatClose" title="Schließen (Esc)">✕</button></div>
+    <div id="chatLog" aria-live="polite"></div>
+    <div id="chatQuick"></div>
+    <div id="chatRow"><input id="chatIn" type="text" maxlength="140" autocomplete="off" placeholder="Nachricht … (Enter = senden)"><button type="button" class="tbtn" id="chatSend">Senden</button></div>
+  </div>
   <div class="tr">
     <div class="plate mapbox"><canvas id="map"></canvas><div class="mapfoot"><span id="windInfo"></span><span id="shiftInfo"></span></div></div>
     <div class="tools ia">
@@ -273,6 +294,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
       <button class="tbtn" id="bSound" title="Ton an/aus">Ton an</button>
       <button class="tbtn" id="bFan" title="Kursfächer an/aus">Fächer</button>
       <button class="tbtn" id="bTrack" title="Eigene Spur auf der Karte an/aus">Spur</button>
+      <button class="tbtn" id="bChat" title="Chat (Enter)" hidden>Chat</button>
       <button class="tbtn" id="bPause" title="Pause (P)">Pause</button>
     </div>
   </div>
@@ -307,11 +329,12 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
       <img src="data:image/png;base64,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" width="78" height="52" alt="Stander des Leipziger Seesportclub" style="flex:none;object-fit:contain;filter:drop-shadow(0 0 1.5px rgba(255,255,255,.75))">
       <div><h1>Regattakoje</h1><div style="color:var(--ink-dim);font-family:var(--f-display);letter-spacing:.14em;text-transform:uppercase;font-size:14px;margin-top:4px">Taktiktraining · Leipziger Seesportclub</div></div>
     </div>
-    <p class="lede">Regatta gegen CPU-Boote oder im Mehrspieler – mit Jolle, Ixylon, Opti, Topcat, Kutter ZK 10, Moth, IMOCA 60 oder Wikingerschiff. Startverfahren, Winddreher, Böen, Abdeckung und Wettfahrtregeln, auf dem Cospudener See mit unserem Hafen oder auf offenem Wasser. Dazu An- und Ablegen, Mann über Bord, Rudern und das Regel-Tutorial.</p>
+    <p class="lede">Regatta gegen CPU-Boote oder im Mehrspieler – mit Jolle, Ixylon, Opti, Topcat, Kutter ZK 10, Moth, IMOCA 60 oder Wikingerschiff. Startverfahren, Winddreher, Böen, Abdeckung und Wettfahrtregeln, auf dem Cospudener See mit unserem Hafen oder auf offenem Wasser. Dazu An- und Ablegen, Mann über Bord, Rudern, das Regel-Tutorial und ein freies Training mit Trainer im Motorboot und Chat.</p>
     <form id="setForm" class="groups" autocomplete="off"></form>
     <div class="actions">
       <button class="btn" id="startBtn" type="button">Regatta starten</button>
       <button class="btn blue" id="drillBtn" type="button">Startübung</button>
+      <button class="btn blue" id="freeBtn" type="button">Freies Training</button>
       <button class="btn blue" id="mpBtn" type="button">Mehrspieler</button>
       <button class="btn blue" id="hbBtn" type="button">Hafen &amp; MOB</button>
       <button class="btn blue" id="rowBtn" type="button">Rudern</button>
@@ -337,6 +360,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
           <span><kbd>R</kbd> / <kbd>G</kbd></span><span>Vorsegel einrollen (bremsen) / ausrollen (Gas)</span>
           <span><kbd>Leertaste</kbd> beim Kutter</span><span>Kommandos: Klar zur Wende → Ree → Fock über</span>
           <span><kbd>W</kbd> <kbd>S</kbd> · <kbd>1</kbd>–<kbd>7</kbd></span><span>Schlauchboot: Gas · Signale der Wettfahrtleitung</span>
+          <span><kbd>Enter</kbd></span><span>Chat öffnen/schließen (Freies Training &amp; Mehrspieler)</span>
           <span><kbd>T</kbd> · <kbd>Q</kbd> <kbd>E</kbd></span><span>Autotrimm aus/an · Schoten dicht/fieren</span>
           <span><kbd>C</kbd> · <kbd>L</kbd> · <kbd>P</kbd></span><span>Kamera (Verfolger, Bord, Frei, Draufsicht) · Laylines · Pause</span>
           <span><kbd>V</kbd></span><span>Windpfeile: wahrer Wind, Fahrtwind, scheinbarer Wind</span>
@@ -464,6 +488,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
       <div class="row"><label for="mpRole">Rolle</label><select id="mpRole"><option value="join">Mitsegeln</option><option value="host">Wettfahrtleitung (startet)</option><option value="coach">Trainer (zuschauen)</option></select></div>
       <div class="row mphost"><label for="mpFan">Kursfächer für alle erlaubt</label><input type="checkbox" id="mpFan" checked></div>
       <div class="row mphost"><label for="mpRib">Wettfahrtleitung fährt Schlauchboot</label><input type="checkbox" id="mpRib" checked></div>
+      <div class="row mphost"><label for="mpFree">Freies Training (ohne Start &amp; Wertung, Wettfahrtleitung = Trainer)</label><input type="checkbox" id="mpFree"></div>
       <div class="row mphost"><label for="mpFill">CPU-Boote dazu</label><span><output id="mpFillO">0</output> <input type="range" id="mpFill" min="0" max="30" step="1" value="0" style="vertical-align:middle;accent-color:var(--mark)"></span></div>
     </div>
     <p class="rules" id="mpStatus" style="padding:0"></p>
@@ -483,6 +508,19 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
     <div id="dsPrev"></div>
     <div id="dsBox"></div>
     <div class="actions"><button class="btn" id="dsDone" type="button">Fertig</button><button class="btn ghost" id="dsReset" type="button">Zurücksetzen</button></div>
+  </div>
+</div>
+<div id="freeOv" class="overlay" hidden>
+  <div class="card narrow">
+    <h2>Freies Training</h2>
+    <p class="lede" style="margin-top:4px">Segeln ohne Startverfahren, ohne Strafen und ohne Wertung – wie ein Trainingstag auf dem See. Ein Trainer im Motorboot fährt direkt bei der Crew mit. Per Chat (Enter oder Chat-Knopf) tauscht ihr euch während der Fahrt aus.</p>
+    <fieldset style="margin-top:12px"><legend>Training</legend>
+      <div class="row"><label for="frRole">Ich bin</label><select id="frRole"><option value="sail">Segler · CPU-Trainer im Motorboot</option><option value="coach">Trainer im Motorboot · CPU-Crews segeln</option><option value="solo">Segler · ohne Trainer</option></select></div>
+      <div class="row"><label for="frCpu">CPU-Segler</label><output id="frCpuO" for="frCpu">2</output><input type="range" id="frCpu" min="0" max="8" step="1" value="2"></div>
+    </fieldset>
+    <p class="menuhint" id="frInfo"></p>
+    <p class="menuhint">Boot, Wind, Kurs und Revier nimmst du aus den Einstellungen im Hauptmenü. Mehrspieler: Die Wettfahrtleitung kann dort „Freies Training“ für den Raum aktivieren – dann fährt sie als Trainer im Motorboot.</p>
+    <div class="actions"><button class="btn" id="frGo" type="button">Training starten</button><button class="btn ghost" id="frBack" type="button">Zurück</button></div>
   </div>
 </div>
 <div id="pauseOv" class="overlay" hidden>
@@ -696,7 +734,7 @@ const RIG=()=>RIGS[CL.key];
 /* ================= Einstellungen ================= */
 const DEFAULTS={tws:10,shiftAmp:8,shiftPeriod:70,puffs:2,puffStrength:25,dirtyAir:true,waveH:0,legLength:450,laps:2,startTime:60,zone:3,
   boatClass:'jolle',sailNo:'GER 1',headsail:'fock',autoTrim:true,gameSpeed:1.5,laylines:true,showZone:true,roundArrow:true,vectors:true,cpuCount:6,cpuSkill:1,
-  rules:true,markRules:true,markTouch:true,ocs:true,penaltyMode:'one',allMsgs:false,gfx:isTouch?'mittel':'hoch',courseType:'wl',finishUp:false,series:1,revier:'open',mapTrack:false,ladder:true,count10:true,startSound:'horn',rowBoat:'zk10',courseFan:true,windFrom:225,rowDist:500,current:0,currentDir:'lee',coach:true,ghost:true,touchMode:'slider'};
+  rules:true,markRules:true,markTouch:true,ocs:true,penaltyMode:'rrs',allMsgs:false,gfx:isTouch?'mittel':'hoch',courseType:'wl',finishUp:false,series:1,revier:'open',mapTrack:false,ladder:true,count10:true,startSound:'horn',rowBoat:'zk10',courseFan:true,windFrom:225,rowDist:500,current:0,currentDir:'lee',coach:true,ghost:true,touchMode:'slider'};
 let S=Object.assign({},DEFAULTS),S_main=null;
 try{const raw=localStorage.getItem('regattakoje.v1');if(raw)Object.assign(S,JSON.parse(raw));}catch(e){}
 if(!CLASSES[S.boatClass])S.boatClass='jolle';
@@ -1432,7 +1470,7 @@ function loftHull(sh,xOff){const len=sh.len,NS=40,NP=12,cols=NP*2+1,pos=[],idx=[
   for(let i=0;i<=NS;i++){const u=sh.uS?sh.uS(i/NS):i/NS,z=-len/2+u*len;const [B,Ys,Yk]=sh.dims(u);
     for(let j=0;j<cols;j++){const t=j/NP-1;const q=secPt(sh,u,Math.abs(t));pos.push(xOff+(t<0?-1:1)*B*q[0],Yk+(Ys-Yk)*q[1],z);}}
   for(let i=0;i<NS;i++)for(let j=0;j<cols-1;j++){const a=i*cols+j,b=a+1,c=a+cols,d=c+1;idx.push(a,b,c,b,d,c);}
-  const cap=(row,u,z)=>{const [B,Ys,Yk]=sh.dims(u);const ci=pos.length/3;pos.push(xOff,(Ys+Yk)/2,z);for(let j=0;j<cols-1;j++)idx.push(ci,row*cols+j,row*cols+j+1);};
+  const cap=(row,u,z)=>{const [B,Ys,Yk]=sh.dims(u);const ci=pos.length/3;pos.push(xOff,(Ys+Yk)/2,z);for(let j=0;j<cols-1;j++)idx.push(ci,row*cols+j,row*cols+j+1);if(sh.closeTop)idx.push(ci,row*cols+cols-1,row*cols);};
   cap(NS,1,len/2);if(sh.bowTransom)cap(0,0,-len/2);
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();return g;}
 function deckGeo(sh,xOff,u0,u1,tw,lift,yFix){const NS=30,NK=8,pp=[],ii=[];for(let i=0;i<=NS;i++){const u=u0+(u1-u0)*i/NS,z=-sh.len/2+u*sh.len;const [B,Ys]=sh.dims(u);
@@ -1808,25 +1846,29 @@ function newRace(lesson,opts){
   C.buoys=[];for(const m of C.marks){if(m.kind==='gate')C.buoys.push({x:m.a.x,y:m.a.y,m},{x:m.b.x,y:m.b.y,m});else C.buoys.push({x:m.x,y:m.y,m});}
   if(lesson)C.buoys=C.buoys.filter(bu=>lesson.mark==='wind'?bu.m===C.wm:lesson.mark?bu.m===C.lm:false);
   const ob=(q,r,name)=>({ax:q.x,ay:q.y,bx:q.x,by:q.y,r,name});
-  C.obst=C.buoys.map(bu=>ob(bu,0.9,bu.m.kind==='gate'?'Tor-Tonne':bu.m.name));
-  if(!lesson){C.obst.push(ob(C.pin,0.7,'Pin-Tonne'),{ax:C.cb.x-U[0]*5.3,ay:C.cb.y-U[1]*5.3,bx:C.cb.x+U[0]*5.3,by:C.cb.y+U[1]*5.3,r:1.8,name:'Startschiff'});
-    if(C.finishUp)C.obst.push(ob(C.fin.a,0.7,'Zieltonne'),{ax:C.fin.b.x-U[0]*5.3,ay:C.fin.b.y-U[1]*5.3,bx:C.fin.b.x+U[0]*5.3,by:C.fin.b.y+U[1]*5.3,r:1.8,name:'Zielschiff'});}
+  C.obst=C.buoys.map(bu=>Object.assign(ob(bu,0.9,bu.m.kind==='gate'?'Tor-Tonne':bu.m.name),{mk:bu.m}));
+  if(!lesson){C.obst.push(Object.assign(ob(C.pin,0.7,'Pin-Tonne'),{mk:'start'}),{ax:C.cb.x-U[0]*5.3,ay:C.cb.y-U[1]*5.3,bx:C.cb.x+U[0]*5.3,by:C.cb.y+U[1]*5.3,r:1.8,name:'Startschiff',mk:'start'});
+    if(C.finishUp)C.obst.push(Object.assign(ob(C.fin.a,0.7,'Zieltonne'),{mk:'fin'}),{ax:C.fin.b.x-U[0]*5.3,ay:C.fin.b.y-U[1]*5.3,bx:C.fin.b.x+U[0]*5.3,by:C.fin.b.y+U[1]*5.3,r:1.8,name:'Zielschiff',mk:'fin'});}
   if(S.revier==='cospu'&&SHORE.lsc)for(const o of SHORE.lsc.obst)C.obst.push(o);
   const cdir={lee:W0+180,luv:W0,links:W0-90,rechts:W0+90}[S.currentDir];const cd=dirv(cdir==null?W0+180:cdir);const cs=(lesson?0:S.current)*KN;CUR=[cd[0]*cs,cd[1]*cs];waterMat.uniforms.uCur.value.set(CUR[0],-CUR[1]);
   const ST=opts&&opts.drill?60:S.startTime;
-  G={t:lesson?0:-ST,course:C,boats:[],msgs:[],hits:{},running:false,paused:false,over:false,sigIdx:0,hudT:0,endT:null,lesson:null,noRefl:[],drill:!!(opts&&opts.drill),rec:[],windRec:[],events:[],ghostRec:[],flags:{},ana:{side:null,tacks:0,gybes:0,dirtyT:0,dirtyTot:0,hdrT:0,checkLay:0}};
-  const sigs=[];if(!lesson){const main=ST>=300?[-300,-240,-60]:ST>=180?[-180,-120,-60]:ST>=120?[-120,-60]:[-ST];main.forEach(v=>sigs.push(v));if(S.count10!==false)for(let k=-10;k<0;k++)if(k>-ST)sigs.push(k);sigs.push(0);sigs.sort((a,b)=>a-b);}G.sigs=sigs;
+  G={t:(lesson||(opts&&opts.free))?0:-ST,course:C,boats:[],msgs:[],hits:{},running:false,paused:false,over:false,sigIdx:0,hudT:0,endT:null,lesson:null,noRefl:[],drill:!!(opts&&opts.drill),rec:[],windRec:[],events:[],ghostRec:[],flags:{},ana:{side:null,tacks:0,gybes:0,dirtyT:0,dirtyTot:0,hdrT:0,checkLay:0}};
+  const sigs=[];if(!lesson&&!(opts&&opts.free)){const main=ST>=300?[-300,-240,-60]:ST>=180?[-180,-120,-60]:ST>=120?[-120,-60]:[-ST];main.forEach(v=>sigs.push(v));if(S.count10!==false)for(let k=-10;k<0;k++)if(k>-ST)sigs.push(k);sigs.push(0);sigs.sort((a,b)=>a-b);}G.sigs=sigs;
+  G.free=!!(opts&&opts.free);G.fb=G.free?{pend:[],cool:{},lastAny:-99,stats:{tacks:0,gybes:0,luff:0,stall:0,pinch:0,tot:0},luffT:0,stallT:0,pinchT:0,trimT:0,cleanT:0,side:null,vAvg:0,tk:null,lastSh:0,lastStatus:0,greeted:false}:null;
   G.wind=new Wind(W0);
   setupWaves();
   const M=opts&&opts.mp;let base=1;
   if(M){G.mp=true;G.byNet={};const me=M.roster.find(r=>r[0]===MP.self)||M.roster[0];const order=[me].concat(M.roster.filter(r=>r!==me));
     order.forEach((r,k)=>{const b=makeBoat(k,r===me,r[1],r[2]);b.netId=r[0];b.human=true;b.rib=!!r[3];b.spec=r[3]===2;b.hullColor=/^#[0-9a-f]{6}$/i.test(r[4]||'')?r[4]:'';if(r===me){applyDesign(b);b.hullColor=b.hullColor||'';}if(r!==me){b.remote=true;b.ai=null;}
       const sp=mpSpot(M.roster.indexOf(r),lineLen,U,R,W0,b.rib,C);b.x=sp[0];b.y=sp[1];b.h=sp[2];G.boats.push(b);G.byNet[b.netId]=b;});base=order.length;}
-  else{const pl=makeBoat(0,true,S.sailNo||'GER 1','#ffd23f');applyDesign(pl);pl.x=0;pl.y=-55;pl.h=wrap360(W0-90);G.boats.push(pl);}
-  const cpuN=lesson?(lesson.hb?0:1):M?M.cpu:S.cpuCount;G.hbm=!!(lesson&&lesson.hb);
+  else{const pl=makeBoat(0,true,S.sailNo||'GER 1','#ffd23f');if(opts&&opts.free&&opts.trainer){pl.rib=true;pl.name='Trainer';pl.color='#ff6a1a';}else applyDesign(pl);pl.x=0;pl.y=-55;pl.h=wrap360(W0-90);G.boats.push(pl);}
+  const cpuN=lesson?(lesson.hb?0:1):M?M.cpu:(opts&&opts.free&&opts.cpu!=null)?opts.cpu:S.cpuCount;G.hbm=!!(lesson&&lesson.hb);
   for(let j=0;j<cpuN;j++){const b=makeBoat(j+base,false,NAMES[j]||('CPU '+(j+1)),COLS[j%COLS.length]);if(M){b.netId='c'+j;G.byNet[b.netId]=b;if(!MP.host){b.remote=true;b.ai=null;}}
     for(let k=0;k<40;k++){const al=rnd(-95,-30),lt=rnd(-0.8,0.8)*lineLen;b.x=U[0]*al+R[0]*lt;b.y=U[1]*al+R[1]*lt;if(G.boats.every(o=>Math.hypot(o.x-b.x,o.y-b.y)>Math.max(14,L*1.7)))break;}
     b.h=wrap360(W0+(Math.random()<0.5?90:-90));G.boats.push(b);}
+  if(opts&&opts.free){
+    if(!M&&opts.bot){const p0=G.boats[0];const tb=makeBoat(G.boats.length,false,'Trainer','#ff6a1a');tb.rib=true;tb.cpuTrainer=true;tb.ai=null;tb.x=p0.x+10;tb.y=p0.y-9;tb.h=p0.h;tb.v=0;tb.trainDist=12;G.boats.push(tb);}
+    for(const b of G.boats)if(!b.rib){b.started=true;b.legT=0;b.startT=0;}}
   if(opts&&opts.row){const lw=22;G.row={dist:Number(S.rowDist)||500};const lanes=[2,0,1,3,4];
     G.boats.forEach((b,k)=>{b.lane=(lanes[k%5]-2)*lw;b.x=b.lane;b.y=-L*0.6-1;b.h=W0;b.v=0;if(b.ai){b.ai.rowRate=27+S.cpuSkill*1.6+rnd(-1.5,1.5);b.ai.rowJit=0.3-0.08*S.cpuSkill;}});
     C.lineLen=5*lw+12;C.pin={x:-C.lineLen/2,y:0};C.cb={x:C.lineLen/2,y:0};C.finishUp=true;const dd=G.row.dist;C.fin={c:{x:0,y:dd},len:C.lineLen,a:{x:-C.lineLen/2,y:dd},b:{x:C.lineLen/2,y:dd}};
@@ -1834,7 +1876,7 @@ function newRace(lesson,opts){
   if(lesson){G.lesson={def:lesson,t:0,done:false};lesson.setup(G);}
   for(const b of G.boats){b.prevH=b.h;b.a=wrap180(W0-b.h);b.side=b.a>=0?1:-1;b.sailSide=b.side;buildBoat(b);}
   G.rec=G.boats.map(()=>[]);
-  buildCourse3D();if(G.row)buildRowCourse();birdsInit();
+  buildCourse3D();if(G.free&&C3.line)C3.line.visible=false;if(G.row)buildRowCourse();birdsInit();
   G.msgs=[];renderLog();updateChips();
 }
 const P=()=>G.boats[0];
@@ -1877,12 +1919,12 @@ function flagTex(k){const c=document.createElement('canvas');c.width=96;c.height
   else if(k==='blue'){R(0,0,96,64,'#2d6cdf');}
   return new THREE.CanvasTexture(c);}
 let CBG=null;
-const CBSHAPE={len:10.5,n:0.85,crown:0.06,dims(u){u=clamp(u,0,1);const B=1.68*Math.pow(Math.sin(Math.PI/2*Math.min(1,u/0.5)),0.6)*(u>0.5?1-0.1*(u-0.5):1);const Ys=1.22+0.42*Math.pow(1-u,2);let Yk=-0.62+0.22*u;if(u<0.24){const f=1-u/0.24;Yk+=(Ys-0.12-Yk)*f*f;}return [B,Ys,Yk];}};
+const CBSHAPE={len:10.5,n:0.85,crown:0.06,closeTop:true,dims(u){u=clamp(u,0,1);const B=1.68*Math.pow(Math.sin(Math.PI/2*Math.min(1,u/0.5)),0.6)*(u>0.5?1-0.1*(u-0.5):1);const Ys=1.22+0.42*Math.pow(1-u,2);let Yk=-0.62+0.22*u;if(u<0.24){const f=1-u/0.24;Yk+=(Ys-0.12-Yk)*f*f;}return [B,Ys,Yk];}};
 function cbParts(){if(CBG)return CBG;const sh=CBSHAPE;const geo=loftHull(sh,0);const p=geo.attributes.position;const col=new Float32Array(p.count*3);
   const cw=new THREE.Color('#f1f2ee'),cb=new THREE.Color('#1d3557'),ca=new THREE.Color('#7a2a25');
   for(let i=0;i<p.count;i++){const y=p.getY(i);const c=y<-0.04?ca:y<0.16?cb:cw;col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;}
   geo.setAttribute('color',new THREE.BufferAttribute(col,3));
-  const deck=deckGeo(sh,0,0.02,0.985,0.97,0);
+  const deck=deckGeo(sh,0,0.02,0.998,0.985,0);
   const rail=[];for(let i=0;i<=40;i++){const u=0.04+0.94*i/40;const [B,Ys]=sh.dims(u);rail.push(new THREE.Vector3(B*0.95,Ys+0.62,-sh.len/2+u*sh.len));}
   const railR=rail.slice().reverse().map(v=>new THREE.Vector3(-v.x,v.y,v.z));const railPts=railR.concat(rail);
   const railG=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(railPts),120,0.022,5,false);
@@ -2126,20 +2168,51 @@ function aiControl(b,dt){
 function clearAstern(A,B){const fB=dirv(B.h),fA=dirv(A.h);const sx=B.x-fB[0]*L/2,sy=B.y-fB[1]*L/2,bx=A.x+fA[0]*L/2,by=A.y+fA[1]*L/2;return (bx-sx)*fB[0]+(by-sy)*fB[1]<0;}
 function markZone(A,B){if(!S.markRules||!A.started||!B.started||A.leg!==B.leg)return null;const m=G.course.seq[A.leg];if(!isMark(m))return null;
   const mp=b=>m.kind==='gate'?(Math.hypot(b.x-m.a.x,b.y-m.a.y)<Math.hypot(b.x-m.b.x,b.y-m.b.y)?m.a:m.b):m;const qa=mp(A),qb=mp(B);if(qa!==qb)return null;
-  const R=S.zone*L+1,dA=Math.hypot(A.x-qa.x,A.y-qa.y),dB=Math.hypot(B.x-qa.x,B.y-qa.y);if(dA>R||dB>R)return null;if(m.kind==='wind'&&A.side!==B.side)return null;return {m,dA,dB};}
+  const R=S.zone*L+L/2,dA=Math.hypot(A.x-qa.x,A.y-qa.y),dB=Math.hypot(B.x-qa.x,B.y-qa.y);if(Math.min(dA,dB)>R)return null;if(m.kind==='wind'&&A.side!==B.side)return null;return {m,dA,dB,R};}
+const tackOf=b=>Math.abs(b.a)>165?(b.sailSide||b.side):b.side;
 function keepClear(A,B){
   const aSp=A.doing||A.ocs,bSp=B.doing||B.ocs;
-  if(aSp&&!bSp)return {who:A,rule:A.ocs?'22.1':'22.2',txt:A.ocs?'zurückkehrender Frühstarter':'Boot beim Kringeln'};
-  if(bSp&&!aSp)return {who:B,rule:B.ocs?'22.1':'22.2',txt:B.ocs?'zurückkehrender Frühstarter':'Boot beim Kringeln'};
+  if(aSp&&!bSp)return {who:A,rule:A.ocs?'21.1':'21.2',txt:A.ocs?'zurückkehrender Frühstarter':'Boot beim Kringeln'};
+  if(bSp&&!aSp)return {who:B,rule:B.ocs?'21.1':'21.2',txt:B.ocs?'zurückkehrender Frühstarter':'Boot beim Kringeln'};
   if(A.tackFlag&&!B.tackFlag)return {who:A,rule:'13',txt:'wendendes Boot'};
   if(B.tackFlag&&!A.tackFlag)return {who:B,rule:'13',txt:'wendendes Boot'};
+  if(A.tackFlag&&B.tackFlag){if(clearAstern(A,B))return {who:A,rule:'13',txt:'beide wenden – das Boot achtern'};if(clearAstern(B,A))return {who:B,rule:'13',txt:'beide wenden – das Boot achtern'};
+    const rB=dirv(B.h+90);return ((A.x-B.x)*rB[0]+(A.y-B.y)*rB[1])<0?{who:A,rule:'13',txt:'beide wenden – das Boot an Backbord'}:{who:B,rule:'13',txt:'beide wenden – das Boot an Backbord'};}
   const mz=markZone(A,B);
-  if(mz){const ins=mz.dA<mz.dB?A:B,out=ins===A?B:A;if(clearAstern(ins,out))return {who:ins,rule:'18.2(b)',txt:'klar achteraus an der Zone'};return {who:out,rule:'18.2',txt:'kein Bahnmarkenraum'};}
-  if(A.side!==B.side)return A.side<0?{who:A,rule:'10',txt:'Backbordbug'}:{who:B,rule:'10',txt:'Backbordbug'};
+  if(mz){const ins=mz.dA<mz.dB?A:B,out=ins===A?B:A,dOut=ins===A?mz.dB:mz.dA;
+    if(dOut>mz.R)return {who:out,rule:'18.2(a)',txt:'noch nicht in der Zone – Bahnmarkenraum geben'};
+    if(clearAstern(ins,out))return {who:ins,rule:'18.2(a)',txt:'nicht überlappt, achteraus – Bahnmarkenraum geben'};return {who:out,rule:'18.2(a)',txt:'Außenboot – Bahnmarkenraum geben'};}
+  const tA=tackOf(A),tB=tackOf(B);
+  if(tA!==tB)return tA<0?{who:A,rule:'10',txt:'Backbordbug'}:{who:B,rule:'10',txt:'Backbordbug'};
   if(clearAstern(A,B))return {who:A,rule:'12',txt:'klar achteraus'};
   if(clearAstern(B,A))return {who:B,rule:'12',txt:'klar achteraus'};
   const u=dirv((A.W+B.W)/2);return (A.x*u[0]+A.y*u[1])>(B.x*u[0]+B.y*u[1])?{who:A,rule:'11',txt:'Luvboot'}:{who:B,rule:'11',txt:'Luvboot'};
 }
+
+/* ---- Wegerechtsboot-Pflichten: Regeln 15, 16.1, 16.2, 17 ---- */
+function ruleTrack(dt){if(!S.rules||!G.boats)return;G.rtAcc=(G.rtAcc||0)+dt;
+  for(const b of G.boats){if(b.rib||b.gone)continue;if(b._tf&&!b.tackFlag)b.tackEnd=G.t;b._tf=b.tackFlag;}
+  if(G.rtAcc<0.25)return;G.rtAcc=0;const bs=G.boats,now=G.t;G.ast=G.ast||{};
+  for(const b of bs){if(b.rib||b.gone)continue;const h=b.rh||(b.rh=[]);h.push({t:now,h:b.h,a:b.a});while(h.length&&now-h[0].t>3.2)h.shift();}
+  for(let i=0;i<bs.length;i++){const A=bs[i];if(A.rib||A.gone||A.finished)continue;
+    for(let j=i+1;j<bs.length;j++){const B=bs[j];if(B.rib||B.gone||B.finished)continue;
+      const dx=A.x-B.x,dy=A.y-B.y;if(dx*dx+dy*dy>64*L*L)continue;if(tackOf(A)!==tackOf(B))continue;
+      if(clearAstern(A,B))G.ast[A.i+'-'+B.i]=now;else if(clearAstern(B,A))G.ast[B.i+'-'+A.i]=now;}}}
+function courseChg(b,w){const h=b.rh;if(!h||!h.length)return {dh:0,da:0};const t0=G.t-w;let o=h[0];for(const q of h)if(q.t>=t0){o=q;break;}return {dh:wrap180(b.h-o.h),da:Math.abs(b.a)-Math.abs(o.a)};}
+function turnedToward(R,K,dh){return dh*wrap180(brg(R.x,R.y,K.x,K.y)-R.h)>0;}
+function ruleFault(R,K,rule){const now=G.t,cR=courseChg(R,2),cK=courseChg(K,2);
+  if(Math.abs(cK.dh)>=8&&turnedToward(K,R,cK.dh))return null;               // das ausweichpflichtige Boot hat selbst den Kurs auf das andere zu geändert
+  if(R.tackEnd!=null&&now-R.tackEnd>=0&&now-R.tackEnd<4)return {rule:'15',txt:'Wegerecht durch eigene Wende erworben – erst Raum zum Freihalten geben'};
+  const d=Math.hypot(R.x-K.x,R.y-K.y);
+  if(rule==='11'&&d<3*L&&G.ast&&now-(G.ast[R.i+'-'+K.i]??-99)<5&&Math.abs(cR.dh)>=6&&turnedToward(R,K,cR.dh)){
+    const tp=targetPoint(R),ap=clamp(Math.abs(wrap180(R.W-brg(R.x,R.y,tp.x,tp.y))),38,175);
+    if(Math.abs(R.a)<ap-5)return {rule:'17',txt:'Lee-Boot luvt über den richtigen Kurs an'};}
+  if(rule==='10'&&Math.abs(R.a)<85&&Math.abs(K.a)<85&&cR.da>=6&&turnedToward(R,K,cR.dh))return {rule:'16.2',txt:'Steuerbordboot fällt auf der Kreuz ab – Backbordboot muss sofort reagieren'};
+  if(Math.abs(cR.dh)>=12&&turnedToward(R,K,cR.dh))return {rule:'16.1',txt:'Wegerechtboot ändert den Kurs ohne Raum zum Freihalten'};
+  return null;}
+function rowFault(A,B){const k=keepClear(A,B);if(!['10','11','12'].includes(k.rule))return k;
+  const K=k.who,R=K===A?B:A;if(R.doing||R.ocs||R.tackFlag)return k;
+  const f=ruleFault(R,K,k.rule);return f?{who:R,rule:f.rule,txt:f.txt}:k;}
 function givePenalty(b,rule,txt,part2,other){if(G.boats)(G.incidents=G.incidents||[]).push({t:G.t,rule,txt,a:G.boats.indexOf(b),b:other?G.boats.indexOf(other):null,x:b.x,y:b.y});
   if(b.isPlayer&&G.events)ev('pen','Strafe: Regel '+rule+' ('+txt+')'+(other?' ggü. '+other.name:''),false);
   const deg=part2&&S.penaltyMode==='rrs'?720:360;b.penalty+=deg;b.penCount++;
@@ -2156,14 +2229,18 @@ function collisions(dt){
       if(sd<BEAM){const d=Math.hypot(dx,dy)||1;const push=(BEAM-sd)*0.5+0.02;const pa=B.remote?2*push:push,pb=A.remote?2*push:push;if(!A.remote){A.x+=dx/d*pa;A.y+=dy/d*pa;A.v*=1-2*dt;}if(!B.remote){B.x-=dx/d*pb;B.y-=dy/d*pb;B.v*=1-2*dt;}
         if(G.lesson)G.lesson.contact=true;
         const key=A.i+'-'+B.i;if(G.t-(G.hits[key]??-99)>6){G.hits[key]=G.t;
-          if(S.rules){const k=keepClear(A,B);const other=k.who===A?B:A;if(!k.who.remote)givePenalty(k.who,k.rule,k.txt,true,other);else if(bs[0].rib)(G.incidents=G.incidents||[]).push({t:G.t,rule:k.rule,txt:k.txt,a:bs.indexOf(k.who),b:bs.indexOf(other),x:k.who.x,y:k.who.y});}
+          if(S.rules){const k=rowFault(A,B);const other=k.who===A?B:A;if(!k.who.remote)givePenalty(k.who,k.rule,k.txt,true,other);else if(bs[0].rib)(G.incidents=G.incidents||[]).push({t:G.t,rule:k.rule,txt:k.txt,a:bs.indexOf(k.who),b:bs.indexOf(other),x:k.who.x,y:k.who.y});}
           else if(A.isPlayer||B.isPlayer)msg('Berührung','warn');}}}
     if(A.remote)continue;
     for(let k=0;k<G.course.obst.length;k++){const ob=G.course.obst[k];if(ob.pier){hbPierHit(A,ob,k,dt,fA,hl);continue;}
       const d=segDist(A.x+fA[0]*hl,A.y+fA[1]*hl,A.x-fA[0]*hl,A.y-fA[1]*hl,ob.ax,ob.ay,ob.bx,ob.by);
       if(d<ob.r+BEAM/2-0.25){const cx=(ob.ax+ob.bx)/2,cy=(ob.ay+ob.by)/2;const ex=A.x-cx,ey=A.y-cy,e=Math.hypot(ex,ey)||1;A.x+=ex/e*0.08;A.y+=ey/e*0.08;A.v*=1-2.5*dt;
-        const key='m'+A.i+'-'+k;if(G.t-(G.hits[key]??-99)>10){G.hits[key]=G.t;if(S.markTouch)givePenalty(A,'31',ob.name+' berührt',false,null);else if(A.isPlayer)msg('Tonne berührt','warn');}}}}
+        const key='m'+A.i+'-'+k;if(G.t-(G.hits[key]??-99)>10){G.hits[key]=G.t;if(S.markTouch&&ruleMark31(A,ob))givePenalty(A,'31',ob.name+' berührt',false,null);else if(A.isPlayer)msg(S.markTouch?'Tonne berührt – kein Verstoß, sie begrenzt deinen Schlag nicht (Regel 31)':'Tonne berührt','warn');}}}}
 }
+function ruleMark31(A,ob){const mk=ob.mk;if(mk===undefined)return true;const C=G.course,tg=C.seq[A.leg];
+  if(mk==='start')return !A.started||(!C.finishUp&&tg==='finish');
+  if(mk==='fin')return tg==='finish';
+  return mk===tg||mk===C.seq[A.leg-1];}
 function penTrack(b){
   if(b.penalty<=0){b.doing=false;b.penAcc=0;return;}
   const dh=wrap180(b.h-b.prevH);if(Math.abs(dh)<1e-5)return;
@@ -2221,9 +2298,9 @@ function step(dt){
   if(G.row){rowStep(dt);return;}
   for(const b of G.boats){if(b.remote){remoteStep(b,dt);continue;}if(b.rib){if(!b.spec)ribPhysics(b,dt);if(SHORE.kind==='poly')shoreKeepIn(b,dt);continue;}if(b.isPlayer)playerControl(b,dt);else aiControl(b,dt);physics(b,dt);if(b.isPlayer&&CL.key==='zk10')cmdUpdate(b,dt);if(SHORE.kind==='poly')shoreKeepIn(b,dt);}
   for(const b of G.boats)if(!b.remote&&!b.rib)raceChecks(b);
-  collisions(dt);
+  ruleTrack(dt);collisions(dt);
   for(const b of G.boats)if(!b.remote&&!b.rib)penTrack(b);
-  if(!G.lesson&&!G.drill)cpTrack();
+  if(G.free){freeStep(dt);return;}if(!G.lesson&&!G.drill)cpTrack();
   if(G.lesson){lessonStep(dt);return;}
   const pl=P();
   if(!G.mp){recStep(dt);ghostRecStep(dt);analyzePlayer(dt);}else{recStep(dt);if(!pl.rib)analyzePlayer(dt);}
@@ -2335,7 +2412,7 @@ function renderLessonList(){const el=document.getElementById('lessonList');el.in
   LESSONS.forEach((l,i)=>{const b=document.createElement('button');b.type='button';b.className='lesson';
     b.innerHTML='<span class="no">'+(i+1)+'</span><span class="rl">'+l.rule+'</span><span class="ck">'+(lessonDone[l.id]?'✓ geschafft':'')+'</span><span class="tt">'+l.title+'</span>';
     b.onclick=()=>openLesson(i);el.appendChild(b);});el.appendChild(qb);}
-function hideAllOv(){for(const id of ['menu','tutOv','lesOv','lesResOv','pauseOv','resOv','drillOv','anaOv','quizOv','mpOv','dsOv','hbOv','hbResOv'])document.getElementById(id).hidden=true;}
+function hideAllOv(){for(const id of ['freeOv','menu','tutOv','lesOv','lesResOv','pauseOv','resOv','drillOv','anaOv','quizOv','mpOv','dsOv','hbOv','hbResOv'])document.getElementById(id).hidden=true;}
 function openTutorial(){restoreS();if(G){G.running=false;G.paused=false;}hideAllOv();hudEl.hidden=true;renderLessonList();tutOv.hidden=false;}
 function openLesson(i){curLesson=i;const l=LESSONS[i];hideAllOv();hudEl.hidden=true;
   document.getElementById('lesNo').textContent='Lektion '+(i+1)+' von '+LESSONS.length+' · '+l.rule;
@@ -2371,7 +2448,8 @@ window.addEventListener('keydown',e=>{
   if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'))return;
   const k=e.key.toLowerCase();
   if(!inGame())return;
-  if(k==='p'||k==='escape'){togglePause();e.preventDefault();return;}
+  if(k==='enter'&&chatAvail()){if(!e.repeat)chatShow(!CHAT.open);e.preventDefault();return;}
+  if(k==='p'||k==='escape'){if(k==='escape'&&CHAT.open){chatShow(false);e.preventDefault();return;}togglePause();e.preventDefault();return;}
   if(G.paused){if(k==='c')cycleCam();return;}
   if(G&&G.boats&&G.boats[0]&&G.boats[0].spec){if(k==='arrowleft'||k==='a'){specNext(-1);e.preventDefault();return;}if(k==='arrowright'||k==='d'||k===' '){specNext(1);e.preventDefault();return;}if(k==='m'){trainerMark();return;}}
   if(G&&G.boats&&G.boats[0]&&G.boats[0].rib&&/^[1-8m]$/.test(k)){wlAction(k==='m'?'mark':['ap','x','fs','s','wm','lm','wind','mark'][+k-1]);return;}
@@ -2416,7 +2494,7 @@ $('bCam').addEventListener('click',cycleCam);
 $('bMenu').addEventListener('click',toMenu);
 $('bVec').addEventListener('click',()=>{S.vectors=!S.vectors;saveS();});
 const bSound=$('bSound');const sndLbl=()=>{bSound.textContent=isTouch?(muted?'🔇':'🔊'):(muted?'Ton aus':'Ton an');};bSound.addEventListener('click',()=>{muted=!muted;sndLbl();});
-if(isTouch){const ic={bMenu:'☰',bVec:'↗',bCam:'◉',bFan:'◠',bTrack:'〰',bPause:'❚❚'};for(const k in ic){const e=$(k);e.textContent=ic[k];e.classList.add('ico');e.setAttribute('aria-label',e.title);}bSound.classList.add('ico');bSound.setAttribute('aria-label','Ton an/aus');sndLbl();}
+if(isTouch){const ic={bMenu:'☰',bVec:'↗',bCam:'◉',bFan:'◠',bTrack:'〰',bPause:'❚❚',bChat:'💬'};for(const k in ic){const e=$(k);e.textContent=ic[k];e.classList.add('ico');e.setAttribute('aria-label',e.title);}bSound.classList.add('ico');bSound.setAttribute('aria-label','Ton an/aus');sndLbl();}
 $('bPause').addEventListener('click',togglePause);
 if(isTouch)document.body.classList.add('touch');
 function updateChips(){{const j=!!RIG().jib&&!(G&&G.row);$('tFurlIn').hidden=!j;$('tFurlOut').hidden=!j;}$('cHead').hidden=!CL.genua;$('cSpi').hidden=!CL.spi;$('tSpi').hidden=!CL.spi;$('tSpi').textContent=CL.spi==='genn'?'Genn.':'Spi';}
@@ -2441,9 +2519,9 @@ $('lrAgain').addEventListener('click',startLesson);
 $('lrList').addEventListener('click',openTutorial);
 $('resetBtn').addEventListener('click',()=>{S=Object.assign({},DEFAULTS);saveS();buildForm();applyGfx();if(G&&!G.running)newRace(null);});
 $('resumeBtn').addEventListener('click',togglePause);
-$('restartBtn').addEventListener('click',()=>{if(G&&G.lesson){if(G.lesson.def.hb)startHarb();else startLesson();}else if(false)startLesson();else if(G&&G.row)startRow();else startRace();});
+$('restartBtn').addEventListener('click',()=>{if(G&&G.lesson){if(G.lesson.def.hb)startHarb();else startLesson();}else if(G&&G.free)startFree();else if(G&&G.row)startRow();else startRace();});
 $('toMenuBtn').addEventListener('click',toMenu);
-$('quitBtn').addEventListener('click',()=>{pauseEl.hidden=true;G.paused=false;if(G.lesson){if(G.lesson.def.hb)openHarb();else openTutorial();}else showResults();});
+$('quitBtn').addEventListener('click',()=>{pauseEl.hidden=true;G.paused=false;if(G.lesson){if(G.lesson.def.hb)openHarb();else openTutorial();}else if(G.free)toMenu();else showResults();});
 $('againBtn').addEventListener('click',()=>{if(G&&G.row)startRow();else startRace(!!(SERIES&&!SERIES.done));});
 $('drillBtn').addEventListener('click',startDrill);$('drAgain').addEventListener('click',startDrill);$('drMenu').addEventListener('click',toMenu);
 $('drAna').addEventListener('click',()=>openAnalysis('drillOv'));$('anaBtn').addEventListener('click',()=>openAnalysis('resOv'));
@@ -2851,14 +2929,14 @@ function resize(){const w=window.innerWidth,h=window.innerHeight;renderer.setSiz
 window.addEventListener('resize',resize);
 
 /* ================= Schlauchboot der Wettfahrtleitung ================= */
-const RIBSHAPE={len:4.6,n:1.15,crown:0,dims(u){u=clamp(u,0,1);const B=u<0.42?0.74*Math.pow(Math.sin(Math.PI/2*u/0.42),0.7):0.74;const Ys=0.34+0.14*Math.pow(1-u,3);let Yk=-0.2;if(u<0.28){const f=1-u/0.28;Yk=Yk+(Ys-0.06+0.2)*f*f;}return [B,Ys,Yk];}};
+const RIBSHAPE={len:4.6,n:1.15,crown:0,closeTop:true,dims(u){u=clamp(u,0,1);const B=u<0.42?0.74*Math.pow(Math.sin(Math.PI/2*u/0.42),0.7):0.74;const Ys=0.34+0.14*Math.pow(1-u,3);let Yk=-0.2;if(u<0.28){const f=1-u/0.28;Yk=Yk+(Ys-0.06+0.2)*f*f;}return [B,Ys,Yk];}};
 let RIBGEO=null;
 function ribGeo(){if(RIBGEO)return RIBGEO;const o={};
   const pts=[[0.86,0.4,2.2],[0.88,0.4,0.6],[0.84,0.42,-0.7],[0.62,0.48,-1.72],[0,0.6,-2.32],[-0.62,0.48,-1.72],[-0.84,0.42,-0.7],[-0.88,0.4,0.6],[-0.86,0.4,2.2]].map(V3);
   o.tube=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),72,0.26,12,false);
   o.rub=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(v=>new THREE.Vector3(v.x*1.27,v.y+0.02,v.z*1.03))),72,0.035,6,false);
   o.cap=new THREE.SphereGeometry(0.26,12,8);
-  o.hull=loftHull(RIBSHAPE,0);o.floor=deckGeo(RIBSHAPE,0,0.1,0.97,0.92,0,0.14);
+  o.hull=loftHull(RIBSHAPE,0);o.floor=deckGeo(RIBSHAPE,0,0.02,1.0,0.96,0,0.24);
   o.console=new THREE.BoxGeometry(0.62,0.82,0.5);o.console.translate(0,0.55,0.05);
   o.screen=new THREE.PlaneGeometry(0.62,0.32);o.screen.rotateX(-0.45);o.screen.translate(0,1.06,-0.24);
   o.wheel=new THREE.TorusGeometry(0.15,0.022,6,16);o.wheel.rotateX(-0.6);o.wheel.translate(0,1.0,0.36);
@@ -2891,10 +2969,11 @@ function buildRib(b){const cg=ribGeo();const g=new THREE.Group();g.rotation.orde
   b.m={g,label,lc,lt,wake,wp,wa,tr:[],tAcc:0,spAcc:0,penShown:0,pitch:0,roll:0,flagP,flag,crew:[{seat,p:sp}],side:1};
   labelCanvas(b);}
 function ribPhysics(b,dt){
+  if(b.cpuTrainer)trainerAI(b,dt);else{
   playerControl(b,dt);
-  b.thr=clamp((b.thr||0)+((keys.up||keys.q)?0.45*dt:0)-((keys.down||keys.e)?0.6*dt:0),0,1);
-  const vmax=b.thr*11.3;b.v+=clamp(vmax-b.v,-2.6*dt,(1.2+b.thr*1.6)*dt);if(b.v<0)b.v=0;
-  const turn=b.rudder*(22+Math.min(b.v,9)*5.5)*clamp(b.v/1.0,0.15,1);b.prevH=b.h;b.h=wrap360(b.h+turn*dt);
+  b.thr=clamp((b.thr||0)+((keys.up||keys.q)?0.45*dt:0)-((keys.down||keys.e)?0.6*dt:0),-0.35,1);}
+  const vmax=b.thr*11.3;b.v+=clamp(vmax-b.v,-2.6*dt,(1.2+Math.max(b.thr,0)*1.6)*dt);
+  const av=Math.abs(b.v),turn=b.rudder*(22+Math.min(av,9)*5.5)*clamp(av/1.0,0.15,1)*(b.v<-0.3?-1:1);b.prevH=b.h;b.h=wrap360(b.h+turn*dt);
   const f=dirv(b.h);b.x+=(f[0]*b.v+CUR[0])*dt;b.y+=(f[1]*b.v+CUR[1])*dt;
   const w=G.wind.sample(b.x,b.y);b.W=w.dir;b.twsL=w.tws;b.a=wrap180(b.W-b.h);b.side=b.a>=0?1:-1;
   const tow=dirv(b.W+180),tw=b.twsL*KN;const ax=tow[0]*tw-f[0]*b.v,ay=tow[1]*tw-f[1]*b.v;b.aws=Math.hypot(ax,ay)/KN;b.awa=wrap180(brg(0,0,-ax,-ay)-b.h);
@@ -2905,7 +2984,7 @@ function ribPhysics(b,dt){
 function renderRib(b,dt,now,live0){const m=b.m,g=m.g;if(b.spec){g.visible=false;m.label.visible=false;m.wake.visible=false;return;}if(b.gone){g.visible=false;m.label.visible=false;m.wake.visible=false;return;}
   const live=live0;const tx=b.x,tz=-b.y,f=dirv(b.h);const gf=gustAt(tx,tz);const vk=b.v/KN;
   const hc=waveSurf(tx,tz,now,gf),hb=waveSurf(tx+f[0]*2,tz-f[1]*2,now,gf),hs=waveSurf(tx-f[0]*2,tz+f[1]*2,now,gf);
-  g.position.set(tx,(hc*2+hb+hs)/4+0.02+clamp(vk/14,0,1)*0.12,tz);g.rotation.y=-b.h*DEG;
+  g.position.set(tx,(hc*2+hb+hs)/4+0.08+clamp(vk/14,0,1)*0.12,tz);g.rotation.y=-b.h*DEG;
   const plane=0.085*clamp(vk/7,0,1)*(1-0.6*clamp((vk-7)/12,0,1));
   m.pitch+=((Math.atan((hb-hs)/4)*0.8+plane)-m.pitch)*Math.min(1,dt*3);g.rotation.x=m.pitch;
   m.roll+=((-b.rudder*0.15*clamp(vk/10,0,1))-m.roll)*Math.min(1,dt*3);g.rotation.z=m.roll;
@@ -2913,7 +2992,7 @@ function renderRib(b,dt,now,live0){const m=b.m,g=m.g;if(b.spec){g.visible=false;
   const d=camera.position.distanceTo(g.position);const ls=clamp(d*0.022,0.45,7);
   m.label.visible=!(b.isPlayer&&cam.mode!=='top'&&cam.mode!=='orbit')&&d>8;m.label.position.set(tx,g.position.y+3.0+ls*0.4,tz);m.label.scale.set(3.6*ls,0.9*ls,1);
   if(live&&dt>0&&vk>3){m.spAcc+=dt*(vk-3)*2.2;let gd=0;while(m.spAcc>=1&&gd++<20){m.spAcc-=1;emitSpray(b,tx+f[0]*1.9,hb,tz-f[1]*1.9,f,vk>14);}}
-  if(live){m.tAcc+=dt;if(m.tAcc>0.11){m.tAcc=0;m.tr.unshift({sx:tx-f[0]*2.5,sz:tz+f[1]*2.5,bx:tx+f[0]*1.8,bz:tz-f[1]*1.8,px:f[1],pz:f[0],v:Math.min(b.v,6),t:now,fo:false});if(m.tr.length>WN)m.tr.pop();}}
+  if(live){m.tAcc+=dt;if(m.tAcc>0.11){m.tAcc=0;m.tr.unshift({sx:tx-f[0]*2.5,sz:tz+f[1]*2.5,bx:tx+f[0]*1.8,bz:tz-f[1]*1.8,px:f[1],pz:f[0],v:Math.min(Math.abs(b.v),6),t:now,fo:false});if(m.tr.length>WN)m.tr.pop();}}
   if(m.tr.length)writeWake(m,now,gf);}
 function hudRib(b){const C=G.course;
   el.clock.textContent=fmtT(G.t);el.clock.classList.toggle('pre',G.t<0);
@@ -2922,11 +3001,11 @@ function hudRib(b){const C=G.course;
   el.rank.innerHTML=ocs.length?'<span class="ocs">Frühstart: '+ocs.slice(0,4).join(', ')+(ocs.length>4?' …':'')+'</span>':'';el.rank.hidden=!el.rank.innerHTML;
   el.bsp.innerHTML=(b.v/KN).toFixed(1)+'<small>kn</small>';
   el.twa.innerHTML=Math.round(Math.abs(b.a))+'°<small>Wind</small>';
-  el.vmg.innerHTML=Math.round((b.thr||0)*100)+'<small>% Gas</small>';
+  el.vmg.innerHTML=(b.thr<0?Math.round(-b.thr*100)+'<small>% rückw.</small>':Math.round((b.thr||0)*100)+'<small>% Gas</small>');
   el.hdg.innerHTML=String(Math.round(wrap360(b.h+HOFF()))%360).padStart(3,'0')+'°';
   el.tws.innerHTML=b.twsL.toFixed(1)+'<small>kn</small>';
-  el.trim.textContent=isTouch?'Gas: Knöpfe':'Gas W / S';el.trim.classList.add('on');
-  el.zone.style.width='0%';el.needle.style.left=((b.thr||0)*100)+'%';el.tstate.textContent='';
+  el.trim.textContent=isTouch?'Gas: Knöpfe':'Gas W · S (rückwärts)';el.trim.classList.add('on');
+  el.zone.style.width='0%';el.needle.style.left=(clamp(b.thr||0,0,1)*100)+'%';el.tstate.textContent=b.thr<-0.02?'Rückwärts':'';
   const sh=wrap180(G.wind.cur-C.W0);
   el.wind.textContent=String(Math.round(wrap360(G.wind.cur+HOFF()))).padStart(3,'0')+'° · '+S.tws+' kn · '+HS.toFixed(1).replace('.',',')+' m';
   el.shift.textContent=(Math.abs(sh)<0.5?'Mittel':(sh>0?'rechts ':'links ')+Math.abs(sh).toFixed(0)+'°');
@@ -2971,7 +3050,8 @@ async function mpConnect(){
   mpLeave(true);
   let room;try{room=MP.lib.joinRoom({appId:'regattakoje-seesport-lsc'},'rk-'+MP.code.toLowerCase());}catch(e){mpStatus('Raum konnte nicht geöffnet werden: '+e.message);return;}
   MP.room=room;MP.self=MP.lib.selfId;MP.on=true;MP.peers={};
-  for(const n of ['hi','go','st','wd','sg'])MP.act[n]=mpAction(room,n);
+  for(const n of ['hi','go','st','wd','sg','ch'])MP.act[n]=mpAction(room,n);
+  MP.act.ch.on((d,id)=>chatRecv(d,id));
   MP.act.sg.on((d,id)=>{if(id===MP.hostId&&!MP.host)wlApply(d);});
   const hello=()=>({n:MP.name,h:MP.host?1:0,t:MP.coach?1:0,c:DESIGN.hull||''});
   MP.act.hi.on((d,id)=>{if(!d)return;MP.peers[id]=Object.assign(MP.peers[id]||{},{name:String(d.n||'?').slice(0,14),host:!!d.h,coach:!!d.t,hull:/^#[0-9a-f]{6}$/i.test(d.c||'')?d.c:''});mpRender();});
@@ -2984,20 +3064,21 @@ async function mpConnect(){
   setTimeout(()=>{if(MP.on&&MP.room===room&&!Object.keys(MP.peers).length)mpStatus('Raum „'+MP.code+'“ ist offen, aber noch niemand da. Die anderen brauchen denselben Raumcode. Bleibt es leer, blockiert evtl. das Netz (Firmen-WLAN, manche Mobilfunknetze) die Direktverbindung.');},15000);}
 function mpLeave(silent){if(MP.room){try{MP.room.leave();}catch(e){}}MP.room=null;MP.on=false;MP.peers={};MP.hostId=null;if(!silent){mpStatus('Raum verlassen.');mpRender();}}
 function mpStart(){if(!MP.on||!MP.host)return;
-  const roster=[MP.rib?[MP.self,'Wettfahrtleitung','#ff6a1a',1]:[MP.self,MP.name,MPCOL[0],0,DESIGN.hull||'']];
+  const roster=[MP.rib?[MP.self,$('mpFree').checked?'Trainer':'Wettfahrtleitung','#ff6a1a',1]:[MP.self,MP.name,MPCOL[0],0,DESIGN.hull||'']];
   for(const [id,p] of Object.entries(MP.peers)){if(p.host)continue;if(roster.filter(r=>!r[3]).length>=50)break;roster.push([id,p.name,p.coach?'#ffffff':MPCOL[roster.length%MPCOL.length],p.coach?2:0,p.hull||'']);}
   const sailors=roster.filter(r=>!r[3]).length;const cpu=Math.min(Number($('mpFill').value)||0,Math.max(0,50-sailors));
   if(sailors+cpu<1){mpStatus('Es segelt noch niemand mit. Warte auf Mitspieler oder nimm CPU-Boote dazu.');return;}
   const raceS={};for(const k in S)if(!MP_LOCAL.includes(k))raceS[k]=S[k];raceS.cpuCount=cpu;
-  const d={v:1,S:raceS,R:roster,cpu,fan:$('mpFan').checked};if(S.revier==='gpx'&&GPXLAKE)d.lake=GPXLAKE;MP.act.go.send(d);mpBegin(d,MP.self);}
+  const d={v:1,S:raceS,R:roster,cpu,fan:$('mpFan').checked,free:$('mpFree').checked};if(S.revier==='gpx'&&GPXLAKE)d.lake=GPXLAKE;MP.act.go.send(d);mpBegin(d,MP.self);}
 function mpBegin(d,from){if(!d||!Array.isArray(d.R)||!d.R.some(r=>r[0]===MP.self))return;
-  MP.hostId=from;if(d.lake&&Array.isArray(d.lake.pts))GPXLAKE=d.lake;audioInit();if(!S_main)S_main=S;S=Object.assign({},S_main,d.S||{});SERIES=null;
+  MP.hostId=from;if(d.lake&&Array.isArray(d.lake.pts))GPXLAKE=d.lake;audioInit();if(!S_main)S_main=S;S=Object.assign({},S_main,d.S||{},d.free?FREE_S:{});SERIES=null;
   const sailors=d.R.filter(r=>!r[3]).length;S._mpN=Math.max(1,sailors+(d.cpu|0));
-  newRace(null,{mp:{roster:d.R,cpu:d.cpu|0,total:Math.max(1,sailors+(d.cpu|0))}});
+  newRace(null,{free:!!d.free,mp:{roster:d.R,cpu:d.cpu|0,total:Math.max(1,sailors+(d.cpu|0))}});
+  chatReset();
   G.running=true;G.fanLock=d.fan===false;if(G.fanLock)msg('Die Wettfahrtleitung hat den Kursfächer für diese Wettfahrt gesperrt.','info');hideAllOv();hudEl.hidden=false;$('touch').hidden=!isTouch;updateTouch();updateChips();
   const pl=P();if(pl.spec){$('touch').hidden=true;msg('Trainer-Ansicht: mit ◀ ▶ zwischen den Booten wechseln, „Markieren“ merkt dir eine Situation für die Analyse.','info');}else if(pl.rib){$('cHead').hidden=true;$('cSpi').hidden=true;$('tSpi').hidden=true;$('tPen').hidden=true;}else{$('tPen').hidden=false;}
   cam.mode='chase';cam.yaw=0;cam.h=pl.h;cam.dist=pl.rib?14:clamp(L*3.6,12,60);camera.up.set(0,1,0);snapCam=true;
-  msg(pl.rib?'Wettfahrtleitung im Schlauchboot · Gas mit W/S bzw. Gas-Knöpfen. '+sailors+' Boote am Start.':CL.name+' · Mehrspieler mit '+(sailors+(d.cpu|0))+' Booten. Tonnen an Backbord runden.','info');}
+  msg(pl.rib?(G.free?'Freies Training – Trainer im Motorboot':'Wettfahrtleitung im Schlauchboot')+' · Gas mit W/S bzw. Gas-Knöpfen. '+sailors+' Boote auf dem Wasser.':G.free?CL.name+' · Freies Training – ohne Start und Wertung. Enter = Chat.':CL.name+' · Mehrspieler mit '+(sailors+(d.cpu|0))+' Booten. Tonnen an Backbord runden.','info');}
 function mpPack(b){const r1=v=>Math.round(v*10)/10,r2=v=>Math.round(v*100)/100;
   const f=(b.started?1:0)|(b.finished?2:0)|(b.ocs?4:0)|(b.doing?8:0)|(b.dsq?16:0)|(b.luff?32:0)|(b.stall?64:0)|(b.spiWant?128:0)|(b.tackFlag?256:0)|(b.side>0?512:0)|(b.dirty?2048:0);
   return [b.netId,r1(b.x),r1(b.y),r1(b.h),r2(b.v),r1(b.a),r1(b.awa),r1(b.twsL),r2(b.trim),r2(b.spi),b.headsail==='genua'?1:0,f,b.leg,b.penalty,r1(b.finishT||0),r2(b.rudder),r2(b.foil||0),r1(b.W||0),r1(Math.max(0,b.hsChange||0)),b.penCount,r2(b.thr||0),r1(b.aws||0),r2(b.furl||0)];}
@@ -3028,6 +3109,180 @@ function mpTick(dtR){
 $('mpBtn').addEventListener('click',openMP);$('mpBack').addEventListener('click',toMenu);$('mpConnect').addEventListener('click',mpConnect);
 $('mpLeaveBtn').addEventListener('click',()=>mpLeave(false));$('mpStart').addEventListener('click',mpStart);
 $('mpRole').addEventListener('change',mpRoleUi);$('mpFill').addEventListener('input',()=>{$('mpFillO').textContent=$('mpFill').value;});
+
+/* ================= Freies Training: Trainer im Motorboot & Chat ================= */
+const FREE_S={laps:99,finishUp:false,rules:false,markRules:false,markTouch:false,ocs:false,coach:false,ghost:false};
+const FREE_SET={role:'sail',cpu:2};
+try{const j=JSON.parse(localStorage.getItem('regattakoje.free')||'null');if(j&&typeof j==='object'){if(['sail','coach','solo'].includes(j.role))FREE_SET.role=j.role;FREE_SET.cpu=clamp(Math.round(Number(j.cpu))||0,0,8);}}catch(e){}
+const FR_INFO={
+  sail:'Du segelst. Der CPU-Trainer fährt im Motorboot neben dir, beobachtet Trimm, Kurs, Wenden und Wind und antwortet im Chat (z. B. „Feedback?“, „Wind?“, „komm näher“).',
+  coach:'Du fährst das Motorboot (W/S Gas, A/D Ruder, C Kamera). Die CPU-Crews segeln den Kurs und befolgen deine Chat-Kommandos: „Wende!“, „Anluven!“, „Abfallen!“, „Alle zu mir!“. Nennst du den Namen eines Bootes, ist nur dieses gemeint.',
+  solo:'Du segelst allein und frei, ohne Trainer. Der Chat ist in dieser Variante nicht verfügbar.'};
+function openFree(){if(G){G.running=false;G.paused=false;}hideAllOv();hudEl.hidden=true;$('touch').hidden=true;
+  $('frRole').value=FREE_SET.role;$('frCpu').value=FREE_SET.cpu;$('frCpuO').textContent=FREE_SET.cpu;$('frInfo').textContent=FR_INFO[FREE_SET.role]||'';$('freeOv').hidden=false;}
+function startFree(){audioInit();restoreS();S_main=S;S=Object.assign({},S_main,FREE_S);
+  const role=FREE_SET.role,trainer=role==='coach';
+  const cpu=trainer?Math.max(2,FREE_SET.cpu):FREE_SET.cpu;
+  newRace(null,{free:true,trainer,bot:role==='sail',cpu});
+  G.running=true;hideAllOv();hudEl.hidden=false;$('touch').hidden=!isTouch;updateTouch();
+  const pl=P();$('tPen').hidden=true;
+  if(pl.rib){$('cHead').hidden=true;$('cSpi').hidden=true;$('tSpi').hidden=true;}
+  cam.mode='chase';cam.yaw=0;cam.h=pl.h;cam.dist=pl.rib?14:clamp(L*3.6,12,60);camera.up.set(0,1,0);snapCam=true;
+  chatReset();
+  msg('Freies Training: keine Startsignale, keine Strafen, keine Wertung.','info');
+  if(role==='sail')msg('Dein Trainer fährt im Motorboot mit. Enter oder „Chat“ öffnet den Chat.','coach');
+  else if(trainer){msg('Du bist Trainer im Motorboot: W/S Gas, A/D Ruder. Enter öffnet den Chat mit den Crews.','coach');chatAdd('System','Du bist Trainer. Schreib Kommandos wie „Wende!“, „Anluven!“, „Abfallen!“ oder „Alle zu mir!“ – die Crews antworten und fahren das Manöver.','sys');}}
+
+/* ---------- Chat ---------- */
+const CHAT={open:false,unread:0,lines:[],rx:{}};
+const chatAvail=()=>!!(G&&G.running&&!hudEl.hidden&&(G.mp||(G.free&&G.boats.some(o=>o.rib))));
+function chatRole(){const p=G&&G.boats&&G.boats[0];if(!p)return '';return p.rib?(G.free?'Trainer':'Wettfahrtleitung'):p.spec?'Trainer':'';}
+function chatMeName(){const r=chatRole();if(G&&G.mp&&MP.on)return MP.name+(r?' · '+r:'');return r?'Trainer (du)':'Du';}
+function chatWhoText(){if(G&&G.mp&&MP.on)return 'Raum '+MP.code;const p=G&&G.boats&&G.boats[0];return p&&p.rib?'mit den Crews':'mit deinem Trainer';}
+function chatBadge(){const b=$('bChat');if(!b)return;b.innerHTML=(isTouch?'💬':'Chat')+(CHAT.unread?'<span class="bdg">'+CHAT.unread+'</span>':'');}
+function chatAdd(who,text,kind){kind=kind||'them';CHAT.lines.push({who,text,kind});if(CHAT.lines.length>60)CHAT.lines.shift();
+  if(kind==='them'){beep(760,0.07,'sine',0.03);}
+  if(kind!=='me'&&!CHAT.open){CHAT.unread++;chatBadge();if(G&&G.msgs)msg((kind==='sys'?'':who+': ')+text,'coach');}
+  chatRender();}
+function chatRender(){const box=$('chatLog');if(!box||$('chat').hidden)return;box.innerHTML='';
+  for(const l of CHAT.lines){const d=document.createElement('div');d.className='cl '+l.kind;if(l.kind!=='sys'){const b=document.createElement('b');b.textContent=l.who+': ';d.appendChild(b);}d.appendChild(document.createTextNode(l.text));box.appendChild(d);}
+  box.scrollTop=box.scrollHeight;}
+function chatChips(){const p=G&&G.boats&&G.boats[0];if(!p)return [];
+  if(p.rib)return G.free?['Wende!','Halse!','Anluven!','Abfallen!','Schot dichter!','Schot fieren!','Gut so!','Alle zu mir!']:['Achtung, gleich Start','Bitte Abstand halten','Danke'];
+  if(G.mp)return ['Verstanden','Moment …','Danke'];
+  return ['Feedback?','Wind?','Wo ist die Tonne?','Wie war meine Wende?','Hilfe'];}
+function chatQuickRender(){const q=$('chatQuick');q.innerHTML='';for(const t of chatChips()){const b=document.createElement('button');b.type='button';b.className='tbtn';b.textContent=t;b.addEventListener('click',()=>chatSend(t));q.appendChild(b);}}
+function chatShow(on){if(on&&!chatAvail())return;CHAT.open=!!on;$('chat').hidden=!on;
+  if(on){CHAT.unread=0;chatBadge();for(const k in keys)keys[k]=false;chatQuickRender();$('chatWho').textContent=chatWhoText();chatRender();if(!isTouch)setTimeout(()=>{try{$('chatIn').focus();}catch(e){}},30);}
+  else{try{$('chatIn').blur();}catch(e){}}}
+function chatReset(){CHAT.lines=[];CHAT.unread=0;CHAT.rx={};chatShow(false);chatBadge();}
+function chatSend(t){t=String(t||'').trim().slice(0,140);if(!t||!chatAvail())return;
+  chatAdd(chatMeName(),t,'me');
+  if(G.mp&&MP.on){try{MP.act.ch.send({n:MP.name,r:chatRole(),t});}catch(e){}}
+  else if(G.free){const p=P();if(p&&p.rib)freeCrewReply(t);else freeBotReply(t);}}
+function chatRecv(d,id){if(!d||typeof d!=='object'||!G||!G.running)return;const t=String(d.t||'').trim().slice(0,140);if(!t)return;
+  const now=Date.now(),r=CHAT.rx[id]||(CHAT.rx[id]=[]);while(r.length&&now-r[0]>6000)r.shift();if(r.length>=6)return;r.push(now);
+  const p=MP.peers[id];const nm=String(d.n||(p&&p.name)||'?').slice(0,14),ro=String(d.r||'').slice(0,16);
+  chatAdd(ro?nm+' · '+ro:nm,t,'them');}
+{const inp=$('chatIn');
+  inp.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();const v=inp.value;inp.value='';chatSend(v);}else if(e.key==='Escape'){e.preventDefault();chatShow(false);}});
+  inp.addEventListener('keyup',e=>e.stopPropagation());
+  $('chatSend').addEventListener('click',()=>{const v=inp.value;inp.value='';chatSend(v);if(!isTouch)inp.focus();});
+  $('chatClose').addEventListener('click',()=>chatShow(false));
+  $('bChat').addEventListener('click',()=>chatShow(!CHAT.open));}
+
+/* ---------- CPU-Trainer im Motorboot ---------- */
+function trainerAI(b,dt){
+  const T=G.boats[0];
+  if(!T||T===b||T.rib||T.gone){b.rudder*=0.9;b.thr=Math.max(0,(b.thr||0)-0.3*dt);return;}
+  const f=dirv(T.h),dw=dirv(T.W+180),Rr=dirv(T.h+90),Ll=dirv(T.h-90);
+  const side=(Rr[0]*dw[0]+Rr[1]*dw[1])>=0?Rr:Ll;            // auf der Leeseite des Seglers bleiben
+  const D=b.trainDist||12;
+  const tx=T.x+side[0]*D*0.85-f[0]*D*0.6,ty=T.y+side[1]*D*0.85-f[1]*D*0.6;
+  const dist=Math.hypot(tx-b.x,ty-b.y);
+  const hd=dist>D*0.5?brg(b.x,b.y,tx,ty):T.h;               // nah dran: Kurs des Seglers übernehmen
+  const e=wrap180(hd-b.h);
+  b.rudder+=clamp(clamp(e/22,-1,1)-b.rudder,-3*dt,3*dt);
+  let vt=T.v+(dist>D*0.5?clamp((dist-D*0.4)*0.35,0,9):clamp((dist-D*0.4)*0.2,-1.5,0));
+  if(Math.abs(e)>70&&dist<D*2)vt=Math.min(vt,2.5);          // erst eindrehen, dann Gas
+  vt=clamp(vt,0,11);
+  b.thr=clamp((b.thr||0)+(vt/11.3-(b.thr||0))*Math.min(1,dt*1.6),0,1);
+}
+function fbSay(text,delay,who,kind){const fb=G&&G.fb;if(!fb)return;fb.pend.push({at:G.t+(delay||0),who:who||'Trainer',text,kind:kind||'them'});fb.pend.sort((a,b)=>a.at-b.at);}
+function fbTip(key,text,cool,force){const fb=G.fb;if(fb.cool[key]!=null&&G.t-fb.cool[key]<cool)return false;if(!force&&G.t-fb.lastAny<7)return false;fb.cool[key]=G.t;fb.lastAny=G.t;fbSay(text,0.4);return true;}
+const fbHdg=h=>String(Math.round(wrap360(h+HOFF()))%360).padStart(3,'0')+'°';
+function fbWindText(p){const sh=wrap180(G.wind.cur-G.course.W0);return 'Wind '+(p.twsL||S.tws).toFixed(0)+' kn aus '+fbHdg(G.wind.cur)+(Math.abs(sh)<3?', bisher ohne nennenswerten Dreher':', um '+Math.round(Math.abs(sh))+'° nach '+(sh>0?'rechts':'links')+' gedreht')+'.';}
+function fbMarkText(p){const tp=targetPoint(p);const d=Math.round(Math.hypot(tp.x-p.x,tp.y-p.y));if(!tp.name)return 'Gerade ist keine Tonne als Ziel gesetzt – segel frei.';
+  const rel=wrap180(brg(p.x,p.y,tp.x,tp.y)-p.h);return 'Nächste Marke: '+tp.name+', '+d+' m, Peilung '+fbHdg(brg(p.x,p.y,tp.x,tp.y))+(Math.abs(rel)<15?' – liegt etwa voraus.':' – '+Math.round(Math.abs(rel))+'° '+(rel>0?'Steuerbord':'Backbord')+' vom Bug.');}
+function fbStatsText(){const st=G.fb.stats;if(st.tot<20)return 'Ich habe noch zu wenig gesehen – segel noch ein Stück, dann gebe ich dir ein ehrliches Feedback.';
+  const pc=v=>Math.round(v/st.tot*100);const parts=['Nach '+fmtT(st.tot)+': '+st.tacks+' Wende'+(st.tacks===1?'':'n')+', '+st.gybes+' Halse'+(st.gybes===1?'':'n')+'.'];
+  parts.push('Segel killte '+pc(st.luff)+' % der Zeit, überzogen '+pc(st.stall)+' %, zu hoch am Wind '+pc(st.pinch)+' %.');
+  const worst=Math.max(st.luff,st.stall,st.pinch);
+  parts.push(worst/st.tot<0.05?'Insgesamt sehr sauber – weiter so!':worst===st.pinch?'Größter Hebel: nicht so hoch am Wind kleben, lieber Fahrt aufbauen.':worst===st.luff?'Größter Hebel: Segel dichter fahren oder rechtzeitig abfallen, damit es nicht killt.':'Größter Hebel: Trimm und Kurs aufeinander abstimmen, damit die Strömung nicht abreißt.');
+  return parts.join(' ');}
+function freeBotReply(t){const p=P(),tb=G.boats.find(o=>o.cpuTrainer);if(!p||!tb||p.rib)return;const q=t.toLowerCase();let a;const fb=G.fb;
+  if(/n(ä|ae)her|komm her|komm ran|bleib (bei|nah)|dicht(er)? (bei|ran)/.test(q)){tb.trainDist=7;a='Alles klar, ich komme näher heran.';}
+  else if(/abstand|weiter weg|geh weg|mehr platz|entfern/.test(q)){tb.trainDist=24;a='Okay, ich gebe dir mehr Platz.';}
+  else if(/wende|halse|man(ö|oe)ver/.test(q)){const st=fb.stats;a='Bisher '+st.tacks+' Wende'+(st.tacks===1?'':'n')+' und '+st.gybes+' Halse'+(st.gybes===1?'':'n')+'. '+(fb.lastTk||'Bei der nächsten Wende schaue ich genau hin.')+' Tipp: vorher Fahrt aufbauen, Ruder zügig aber weich, danach erst abfallen und beschleunigen, dann anluven.';}
+  else if(/feedback|bewert|auswert|analy|wie (war|lief|l(ä|ae)uft)|wie mach|wie segel/.test(q))a=fbStatsText();
+  else if(/wind|dreher|b(ö|oe)e|shift/.test(q))a=fbWindText(p);
+  else if(/trimm|schot|segel|killt|flatter/.test(q))a=p.luff?'Gerade killt dein Segel – Schot dichter oder etwas abfallen.':p.stall?'Das Segel ist überzogen – Schot etwas fieren und den Kurs prüfen.':S.autoTrim?'Dein Segel steht gut, Autotrimm ist an. Zum Selbsttrimmen schaltest du ihn mit T aus (Q dichter, E fieren).':Math.abs(p.trim-p.trimOpt)>0.12?(p.trim>p.trimOpt?'Du fährst zu offen – Schot dichter holen (Q).':'Du fährst zu dicht – Schot fieren (E).'):'Dein Trimm passt gerade gut.';
+  else if(/tonne|kurs|ziel|layline|wohin|n(ä|ae)chst|marke/.test(q))a=fbMarkText(p);
+  else if(/speed|schnell|tempo|fahrt|langsam|vmg/.test(q))a='Du machst '+(p.v/KN).toFixed(1).replace('.',',')+' kn bei '+Math.round(Math.abs(p.a))+'° zum Wind.'+(Math.abs(p.a)<34?' Das ist zu hoch – etwas abfallen.':p.luff?' Das Segel killt, hier geht Fahrt verloren.':' Das sieht ordentlich aus.');
+  else if(/spi|gennaker|spinnaker/.test(q))a=CL.spi?'Setz den '+(CL.spi==='genn'?'Gennaker':'Spi')+' (X) auf Raumschots- und Vorwindkursen, aber nicht zu hoch am Wind. Vor der Tonne rechtzeitig bergen.':'Dein Boot fährt keinen Spinnaker.';
+  else if(/start|linie/.test(q))a='Im freien Training gibt es keinen Start und keine Wertung – wiederhole Manöver, so oft du willst. Startübungen findest du im Hauptmenü.';
+  else if(/danke|super|top|prima|cool|klasse/.test(q))a='Gern geschehen – weiter so!';
+  else if(/hilfe|help|tipps?|was kann/.test(q))a='Frag mich nach: Wind, Trimm/Schot, Wende/Halse, Kurs/Tonne, Speed, Spi oder „Feedback“. Mit „komm näher“ bzw. „Abstand“ steuere ich meine Position.';
+  else if(/^(hallo|hi|hey|moin|servus|tag)/.test(q))a='Moin! Schön, dass du da bist. Wie läuft’s?';
+  else a=['Verstanden. Frag mich gern nach Wind, Trimm, Kurs oder Feedback.','Alles klar. Konzentrier dich auf Trimm und Kurs, ich beobachte weiter.','Notiert. Wenn du Tipps willst, schreib „Hilfe“.'][Math.floor(Math.random()*3)];
+  fbSay(a,rnd(0.8,1.8),'Trainer');}
+function trainerWatch(dt){const fb=G.fb,p=P();if(!p||p.rib||p.gone)return;const st=fb.stats,C=G.course,up=Math.abs(p.a)<70;
+  if(!fb.greeted&&G.t>2){fb.greeted=true;fbSay('Moin! Ich bin dein Trainer im Motorboot und fahre bei dir mit. Segel einfach los – ich melde mich bei Auffälligkeiten. Du kannst mich jederzeit anschreiben (Enter), z. B. „Hilfe“.',0);}
+  st.tot+=dt;
+  const pinch=up&&Math.abs(p.a)<34&&Math.abs(p.a)>3&&!p.luff;
+  if(p.luff){st.luff+=dt;fb.luffT+=dt;}else fb.luffT=0;
+  if(p.stall){st.stall+=dt;fb.stallT+=dt;}else fb.stallT=0;
+  if(pinch){st.pinch+=dt;fb.pinchT+=dt;}else fb.pinchT=0;
+  const trimBad=!S.autoTrim&&p.trimOpt!=null&&Math.abs(p.trim-p.trimOpt)>0.15&&!p.luff;
+  if(trimBad)fb.trimT+=dt;else fb.trimT=0;
+  if(p.luff||p.stall||pinch||trimBad)fb.cleanT=0;else fb.cleanT+=dt;
+  fb.vAvg+=(p.v-fb.vAvg)*Math.min(1,dt*0.25);
+  if(fb.side==null)fb.side=p.side;
+  else if(p.side!==fb.side){fb.side=p.side;const isUp=Math.abs(p.a)<90;if(isUp)st.tacks++;else st.gybes++;fb.tk={t:G.t,v0:fb.vAvg,up:isUp};}
+  if(fb.tk&&G.t-fb.tk.t>=6){const r=fb.tk.v0>0.5?p.v/fb.tk.v0:1,w=fb.tk.up?'Wende':'Halse';fb.tk=null;
+    fb.lastTk=r>=0.9?'Die letzte '+w+' war sauber – kaum Fahrt verloren.':r>=0.7?'Die letzte '+w+' war okay, du bist aber etwas eingebrochen.':'Die letzte '+w+' hat viel Fahrt gekostet ('+Math.round((1-r)*100)+' %).';
+    fbTip('tk',r>=0.9?w+' sauber – du hast fast die ganze Fahrt mitgenommen.':r>=0.7?w+' okay, aber du bist etwas eingebrochen. Ruder weicher legen und erst dichtholen, wenn das Boot Fahrt hat.':w+' mit viel Fahrtverlust ('+Math.round((1-r)*100)+' %). Gleichmäßig durch den Wind drehen und erst auf neuem Bug abfallen und beschleunigen.',10,true);}
+  const tg=C.seq[p.leg],tp=targetPoint(p),dist=Math.hypot(tp.x-p.x,tp.y-p.y);
+  if(fb.luffT>2.5)fbTip('luff',S.autoTrim?'Dein Segel killt. Fall ein Stück ab, dann steht es wieder.':'Dein Segel killt – Schot dichter (Q) oder etwas abfallen.',14);
+  else if(fb.stallT>3)fbTip('stall',S.autoTrim?'Das Segel ist überzogen – prüf deinen Kurs zum Wind.':'Das Segel ist überzogen – Schot ein Stück fieren (E).',16);
+  else if(fb.pinchT>5)fbTip('pinch','Du fährst zu hoch am Wind. Fall ein paar Grad ab – mit mehr Fahrt kommst du am Ende höher und schneller voran.',18);
+  else if(fb.trimT>5)fbTip('trim',p.trim>p.trimOpt?'Schot dichter holen (Q) – das Segel steht zu weit auf.':'Schot fieren (E) – du hast zu dicht getrimmt.',16);
+  const sh=wrap180(G.wind.cur-C.W0);
+  if(Math.abs(sh-fb.lastSh)>=7){const hdr=up&&p.side*sh<-5;const txt='Der Wind ist nach '+(sh>fb.lastSh?'rechts':'links')+' gedreht ('+Math.round(Math.abs(sh))+'° gegenüber dem Kursmittel).'+(up?(hdr?' Du bist gerade im Header – eine Wende bringt dich in den Lift.':' Du liegst im Lift – bleib auf diesem Bug, solange es trägt.'):'');if(fbTip('shift',txt,25))fb.lastSh=sh;}
+  if(CL.spi&&!p.spiWant&&Math.abs(p.a)>115&&dist>60)fbTip('spi','Raumschots-Kurs – setz '+(CL.spi==='genn'?'den Gennaker':'den Spi')+' (X).',30);
+  if(p.spiWant&&isMark(tg)&&tg.kind!=='wind'&&tg.kind!=='wing'&&dist<45)fbTip('drop','Tonne kommt – '+(CL.spi==='genn'?'Gennaker':'Spi')+' jetzt bergen (X).',20);
+  for(const o of G.boats){if(o===p||o.rib||o.gone)continue;if(Math.hypot(o.x-p.x,o.y-p.y)<L*2.2){fbTip('near',(o.name||'Ein Boot')+' ist dicht bei dir – Abstand halten und Wasser lesen.',25);break;}}
+  if(fb.cleanT>25&&fbTip('good','Das läuft rund – saubere Fahrt mit '+(p.v/KN).toFixed(1).replace('.',',')+' kn. So weitermachen.',70))fb.cleanT=0;
+  if(G.t-fb.lastStatus>90&&fbTip('status',fbWindText(p)+' '+fbMarkText(p),0))fb.lastStatus=G.t;}
+
+/* ---------- Du bist Trainer: CPU-Crews befolgen Kommandos ---------- */
+function aiForce(b,until,fn){if(!b.ai)return;b.ai.script=bb=>{if(G.t>until){delete bb.ai.script;return aiDecide(bb);}return fn(bb);};b.ai.tick=0;}
+function freeCrewReply(t){const rib=P(),q=t.toLowerCase();if(!rib||!rib.rib)return;
+  const crew=G.boats.filter(b=>!b.rib&&!b.remote&&!b.gone&&b.ai&&Math.hypot(b.x-rib.x,b.y-rib.y)<160).sort((a,b)=>Math.hypot(a.x-rib.x,a.y-rib.y)-Math.hypot(b.x-rib.x,b.y-rib.y));
+  if(!crew.length){fbSay('Niemand in Rufweite – fahr näher an die Crews heran.',0.3,'System','sys');return;}
+  let tg=crew.filter(b=>b.name&&q.includes(String(b.name).toLowerCase()));if(!tg.length)tg=crew;
+  const pick=a=>a[Math.floor(Math.random()*a.length)];let say;
+  const sgnA=b=>b.a>=0?1:-1;
+  if(/wende|halse/.test(q)){say=['Klar zur Wende!','Wende – ree!','Wir wenden!'];
+    for(const b of tg){const a=b.a,upw=Math.abs(a)<90;const na=upw?-sgnA(b)*Math.max(Math.abs(a),42):-a;const hd=wrap360(b.W-na);aiForce(b,G.t+7,()=>hd);}}
+  else if(/anluv|h(ö|oe)her/.test(q)){say=['Luve an.','Gehe höher.'];
+    for(const b of tg){const hd=wrap360(b.W-sgnA(b)*Math.max(32,Math.abs(b.a)-12));aiForce(b,G.t+6,()=>hd);}}
+  else if(/abfall|tiefer/.test(q)){say=['Falle ab.','Gehe tiefer.'];
+    for(const b of tg){const hd=wrap360(b.W-sgnA(b)*Math.min(165,Math.abs(b.a)+12));aiForce(b,G.t+6,()=>hd);}}
+  else if(/zu mir|sammeln|komm|heran/.test(q)){say=['Wir kommen zu dir.','Sammeln beim Trainer!'];
+    for(const b of tg)aiForce(b,G.t+14,bb=>brg(bb.x,bb.y,rib.x,rib.y));}
+  else if(/schot|dicht|fier|trimm/.test(q))say=['Schot angepasst.','Trimm läuft.'];
+  else if(/gut|super|top|prima|danke|klasse/.test(q))say=['Danke, Trainer!','Weiter so!'];
+  else if(/wind|kurs|tonne|wo /.test(q)){const b=tg[0];fbSay(b.name+': Wind '+(b.twsL||S.tws).toFixed(0)+' kn aus '+fbHdg(G.wind.cur)+'. '+(isMark(G.course.seq[b.leg])?'Nächste Marke: '+G.course.seq[b.leg].name+'.':''),0.9,b.name);return;}
+  else say=['Verstanden, Trainer.','Ok!','Alles klar.'];
+  tg.slice(0,2).forEach((b,k)=>fbSay(pick(say),rnd(0.6,1.4)+k*0.8,b.name));}
+
+/* ---------- Steuerung des Modus ---------- */
+function freeStep(dt){const fb=G.fb;if(!fb)return;
+  while(fb.pend.length&&fb.pend[0].at<=G.t){const m=fb.pend.shift();chatAdd(m.who,m.text,m.kind);}
+  if(G.mp)return;
+  if(G.boats.some(o=>o.cpuTrainer))trainerWatch(dt);}
+function freeHud(){const b=P();if(!b||b.spec)return;
+  if(b.rib){const n=G.boats.filter(o=>!o.rib&&!o.gone).length;el.leg.innerHTML='Freies Training · Trainer · <b>'+n+'</b> Segler';el.rank.innerHTML='<b>Enter</b> = Chat';}
+  else{const tp=targetPoint(b);el.leg.innerHTML='Freies Training · <b>'+(tp.name||'frei')+'</b> '+Math.round(Math.hypot(tp.x-b.x,tp.y-b.y))+' m';
+    el.rank.innerHTML=G.boats.some(o=>o.cpuTrainer)?'Trainer im Motorboot · <b>Enter</b> = Chat':'';}
+  el.rank.hidden=!el.rank.innerHTML;el.clock.textContent=fmtT(G.t);el.clock.classList.remove('pre');}
+const _updateHudBase=updateHud;
+updateHud=function(){_updateHudBase();if(!G)return;const bc=$('bChat'),av=chatAvail();if(bc.hidden===av)bc.hidden=!av;if(CHAT.open&&!av)chatShow(false);if(G.free)freeHud();};
+$('freeBtn').addEventListener('click',openFree);$('frBack').addEventListener('click',toMenu);
+$('frRole').addEventListener('change',()=>{$('frInfo').textContent=FR_INFO[$('frRole').value]||'';});
+$('frCpu').addEventListener('input',()=>{$('frCpuO').textContent=$('frCpu').value;});
+$('frGo').addEventListener('click',()=>{FREE_SET.role=$('frRole').value;FREE_SET.cpu=clamp(Number($('frCpu').value)||0,0,8);try{localStorage.setItem('regattakoje.free',JSON.stringify(FREE_SET));}catch(e){}startFree();});
 
 /* ================= Crew-Kommandos (Kutter ZK 10) ================= */
 function crewSay(t,cls){msg(t,cls||'info');}
@@ -3191,7 +3446,7 @@ function wlApply(d){if(!G||!d)return;const F=G.flags||(G.flags={});const C=G.cou
   else if(d.k==='mv'&&C[d.m]){moveMark(d.m,d.x,d.y);F.c=G.t+90;hornN(1);msg('Wettfahrtleitung: Bahnänderung (C) – '+(d.m==='wm'?'Luvtonne':'Leetonne')+' verlegt.','warn');}
   renderFlags();}
 function wlSend(d){wlApply(d);if(MP.on&&MP.host&&MP.act.sg)try{MP.act.sg.send(d);}catch(e){}}
-function wlAction(k){if(!G||!G.running)return;const b=P();if(!b.rib)return;if(k==='mark'){trainerMark();return;}if(b.spec)return;const C=G.course;
+function wlAction(k){if(!G||!G.running||G.free)return;const b=P();if(!b.rib)return;if(k==='mark'){trainerMark();return;}if(b.spec)return;const C=G.course;
   if(k==='ap'){if(G.t>=0&&!(G.flags&&G.flags.ap)){msg('AP geht nur vor dem Start.','info');return;}wlSend({k:'ap',v:!(G.flags&&G.flags.ap)});}
   else if(k==='x'){if(G.t<0||G.t>240){msg('Einzelrückruf gibt es nur kurz nach dem Start.','info');return;}wlSend({k:'x'});}
   else if(k==='fs'){if(G.t<0||G.t>240){msg('Allgemeiner Rückruf geht nur kurz nach dem Start.','info');return;}wlSend({k:'fs'});}
@@ -3203,7 +3458,7 @@ function wlAction(k){if(!G||!G.running)return;const b=P();if(!b.rib)return;if(k=
     if(k==='lm'&&(y>C.wm.y-150||y<-250||Math.abs(x)>350)){msg('Die Leetonne muss zwischen Startgebiet und Luvtonne liegen.','info');return;}
     wlSend({k:'mv',m:k,x:Math.round(x),y:Math.round(y)});}
   else if(k==='wind'){const leg=Math.hypot(C.wm.x,C.wm.y);const d=dirv(G.wind.cur);wlSend({k:'mv',m:'wm',x:Math.round(d[0]*leg),y:Math.round(d[1]*leg)});}}
-function wlUi(){const bar=$('wlBar');if(!bar)return;const pl=G&&G.boats&&P();const on=!!(G&&G.running&&!G.over&&pl&&pl.rib);bar.hidden=!on||pl.spec;$('specBar').hidden=!(on&&pl.spec);
+function wlUi(){const bar=$('wlBar');if(!bar)return;const pl=G&&G.boats&&P();const on=!!(G&&G.running&&!G.over&&pl&&pl.rib);bar.hidden=!on||pl.spec||G.free;$('specBar').hidden=!(on&&pl.spec);
   $('bFan').classList.toggle('on',!!S.courseFan&&!(G&&G.fanLock));$('bTrack').classList.toggle('on',!!S.mapTrack);}
 
 /* ---- App-Installation (nur auf eigener Domain, z. B. GitHub Pages) ---- */
