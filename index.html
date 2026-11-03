@@ -1262,6 +1262,7 @@ function buildCospu(){const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,ke
   if(LSCI>=0)lscBuild(P,nrm,at,hAt,LSCI);
   try{windFarm3D(P);}catch(e){console.error('Windpark',e);}
   try{horizon3D(P);}catch(e){console.error('Horizont',e);}
+  try{highwayA38(P);}catch(e){console.error('A38',e);}
   // Aussichtsturm Bistumshöhe (SO)
   let ti=0,tb=1e9;for(let i=0;i<n;i++){const p=P[i];if(p.side>0){const e=Math.abs(p.s+0.75);if(e<tb){tb=e;ti=i;}}}
   if(S.revier==='cospu'){const [x,y]=at(ti,450);const y0=hAt(ti,450);const tw=new THREE.Group();const st=new THREE.MeshLambertMaterial({color:'#6b6f73'});
@@ -1636,6 +1637,91 @@ function windFarm3D(P){
       top.rotation.y=-st.yaw*DEG;
       const kn=Number(S.tws)||8,rpm=clamp(4+0.9*kn,3,16);st.rot+=rpm*Math.PI/30*dt;rotor.rotation.z=st.rot;
       const on=(now%1.5)<0.6;lamp.visible=on;sp.visible=on;const kk=1+1.7*NIGHT;sp.scale.set(34*kk,34*kk,1);lamp.scale.setScalar(1+0.8*NIGHT);});
+  });
+}
+
+/* ---- Autobahn A38 mit Bogenbrücke „Neue Harth“: 219 m südlich vom Südufer (Messung aus Google Maps), Verlauf ca. 5° gegen Ost ----
+   Zwei Richtungsfahrbahnen (Rechtsverkehr) auf Damm, drei rote Stahl-Bogenträger mit Hängern, Lkw und Pkw, nachts mit Scheinwerfern/Rücklichtern */
+function highwayA38(P){
+  if(S.revier!=='cospu'||!SHORE.fwd||!shoreG)return;
+  const anim=SHORE.anim||(SHORE.anim=[]);
+  const BR={E:63,N:-2213,ang:5.1*DEG};                       // Brückenmitte (reale E/N), Fahrbahnrichtung
+  const p0=SHORE.fwd(BR.E,BR.N),p1=SHORE.fwd(BR.E+Math.cos(BR.ang)*100,BR.N+Math.sin(BR.ang)*100);
+  const g=new THREE.Group();g.position.set(p0[0],0,-p0[1]);g.rotation.y=Math.atan2(p1[1]-p0[1],p1[0]-p0[0]);shoreG.add(g);
+  // Lokales System: +X = Fahrtrichtung Ost, -Z = Seeseite (Norden), +Z = Süden, Y = Höhe über Wasser
+  const sm=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
+  const HB=10,SPAN=62,RISE=19,HS=SPAN/2,XE=3000;
+  // Fahrbahnhöhe: an der Brücke 10 m, steigt mit dem ansteigenden Gelände auf 16 m und taucht an den Enden ins Gelände ab
+  const deckY=x=>{const a=Math.abs(x);return HB+6*sm(150,1800,a)-9*sm(2450,3000,a);};
+  const hz=[];   // [Material, Grundfarbe] – Dunst nach Kameraabstand, jeden Frame
+  const M=(hex,o)=>{const m=new THREE.MeshLambertMaterial(Object.assign({color:hex,fog:false,side:THREE.DoubleSide},o||{}));hz.push([m,new THREE.Color(hex)]);return m;};
+  const mAsph=M('#45484d'),mVerge=M('#7b786c'),mMed=M('#8c9086'),mSlope=M('#5b7243'),mConc=M('#9a9da0'),mRail=M('#b3b9bd'),
+        mRed=M('#b4484f'),mHang=M('#d9d3b0'),mLine=M('#e8eaec',{polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3});
+  // Stationen längs der Straße
+  const xs=[];for(let x=-XE;x<=XE;x+=60)if(Math.abs(x)>60)xs.push(x);[-60,-31,-16,0,16,31,60].forEach(x=>xs.push(x));xs.sort((a,b)=>a-b);
+  const sweep=(list,prof,mat)=>{const pos=[],idx=[];let K=0;
+    list.forEach(x=>{const pts=prof(x,deckY(x));K=pts.length;for(const q of pts)pos.push(x,q[1],q[0]);});
+    for(let i=0;i<list.length-1;i++)for(let j=0;j<K-1;j++){const a=i*K+j,b=a+1,c=a+K,d=c+1;idx.push(a,c,b,b,c,d);}
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setIndex(idx);geo.computeVertexNormals();
+    const m=new THREE.Mesh(geo,mat);g.add(m);return m;};
+  const onBr=x=>Math.abs(x)<=HS;
+  const brXs=xs.filter(x=>Math.abs(x)<=HS+0.01),posXs=xs.filter(x=>x>=HS-0.01),negXs=xs.filter(x=>x<=-HS+0.01);
+  // Fahrbahnen, Mittelstreifen, Seitenstreifen (Flächen überlappen sich nicht -> kein Z-Fighting auf große Entfernung)
+  sweep(xs,(x,h)=>[[-13.5,h],[-1.5,h]],mAsph);sweep(xs,(x,h)=>[[1.5,h],[13.5,h]],mAsph);
+  sweep(xs,(x,h)=>[[-1.5,h],[1.5,h]],mMed);
+  for(const list of [negXs,posXs]){sweep(list,(x,h)=>[[-15.2,h],[-13.5,h]],mVerge);sweep(list,(x,h)=>[[13.5,h],[15.2,h]],mVerge);}
+  sweep(brXs,(x,h)=>[[-14.6,h],[-13.5,h]],mVerge);sweep(brXs,(x,h)=>[[13.5,h],[14.6,h]],mVerge);   // auf der Brücke endet der Seitenstreifen am Randträger
+  // Damm (Böschungen) beidseits der Brücke, Stirnwand = Widerlager
+  for(const list of [negXs,posXs])for(const sd of [-1,1])sweep(list,(x,h)=>{const zb=15.2+2.2*(h+2.5);return sd<0?[[-zb,-2.5],[-15.2,h]]:[[15.2,h],[zb,-2.5]];},mSlope);
+  for(const [xc,sg] of [[-HS,-1],[HS,1]]){const h=deckY(xc),zb=15.2+2.2*(h+2.5);const p=[-zb,-2.5,-15.2,h,15.2,h,zb,-2.5];const pos=[];for(let i=0;i<4;i++)pos.push(xc,p[i*2+1],p[i*2]);
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setIndex([0,1,2,0,2,3]);geo.computeVertexNormals();g.add(new THREE.Mesh(geo,mConc));}
+  // Brückenunterseite (Fahrbahnplatte)
+  sweep(brXs,(x,h)=>[[-15.2,h],[-15.2,h-1.4],[15.2,h-1.4],[15.2,h]],mConc);
+  // Leitplanken außen, Mittelschutzwand (nur auf dem Damm; auf der Brücke trägt der rote Mittelträger)
+  for(const z of [-13.9,13.9])sweep(xs,(x,h)=>[[z-0.12,h],[z-0.12,h+0.8],[z+0.12,h+0.8],[z+0.12,h]],mRail);
+  sweep(negXs,(x,h)=>[[-0.7,h],[-0.7,h+0.9],[0.7,h+0.9],[0.7,h]],mConc);sweep(posXs,(x,h)=>[[-0.7,h],[-0.7,h+0.9],[0.7,h+0.9],[0.7,h]],mConc);
+  // Markierungen: Randlinien durchgehend, Mittellinien gestrichelt
+  for(const z of [-10,-2.5,2.5,10])sweep(xs,(x,h)=>[[z-0.15,h],[z+0.15,h]],mLine);
+  {const pos=[],idx=[];let n=0;for(const z of [-6.25,6.25])for(let x=-XE+9;x<XE-9;x+=18){const x2=x+6;const y1=deckY(x),y2=deckY(x2);pos.push(x,y1,z-0.15,x,y1,z+0.15,x2,y2,z-0.15,x2,y2,z+0.15);idx.push(n,n+1,n+2,n+1,n+3,n+2);n+=4;}
+   const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setIndex(idx);geo.computeVertexNormals();g.add(new THREE.Mesh(geo,mLine));}
+  // ---- Bogenbrücke: drei rote Stahl-Bogenträger (Seeseite, Mitte, Südseite) mit Hängern ----
+  {const h=deckY(0),box=(w,hh,d,x,y,z,m)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(d,hh,w),m);b.position.set(x,y,z);g.add(b);return b;};   // w quer (Z), hh hoch, d längs (X)
+   for(const z of [-15,15])box(0.8,1.7,SPAN,0,h-0.85,z,mRed);                  // rote Randträger (Kastenträger)
+   box(1.2,2.6,SPAN,0,h-0.4,0,mRed);                                              // roter Mittelträger unter der Mittelschutzwand
+   const hg=new THREE.CylinderGeometry(0.1,0.1,1,5);
+   for(const z of [-15,0,15]){
+     const arch=x=>h+0.6+RISE*(1-Math.pow(x/HS,2));
+     const pts=[];for(let i=0;i<=40;i++){const x=-HS+SPAN*i/40;pts.push(new THREE.Vector3(x,arch(x),z));}
+     g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),60,0.8,8,false),mRed));
+     for(const sx of [-1,1])box(1.6,1.6,2.4,sx*(HS-0.6),h+0.4,z,mRed);        // Kämpfer
+     for(let x=-27.5;x<=27.5;x+=5){const y0=h+(z===0?0.9:0),y1=arch(x)-0.5;const c=new THREE.Mesh(hg,mHang);c.scale.set(1,y1-y0,1);c.position.set(x,(y0+y1)/2,z);g.add(c);}
+   }}
+  // ---- Verkehr ----
+  const VS=1.5,XW=2700;
+  const gCar=[new THREE.BoxGeometry(4.4,1.0,1.8),new THREE.BoxGeometry(2.4,0.8,1.6)],gCab=new THREE.BoxGeometry(2.4,3.0,2.5),gTrl=new THREE.BoxGeometry(12.6,3.5,2.5);
+  const carCols=['#d4d8dc','#23272b','#8e949b','#a8322f','#2c4f8f','#c9ccd0','#3a3f45','#d9d9d2'].map(c=>M(c)),
+        trlCols=['#e9ebed','#2d5ba8','#c8c9cc','#8b1f26','#37873d','#dfe1e3'].map(c=>M(c)),cabCols=['#e6e8ea','#2f66b3','#c0392b','#2a2e33','#e0b32e'].map(c=>M(c)),
+        mGlass=M('#2a3138'),mDark=M('#202428');
+  const pick=a=>a[Math.floor(Math.random()*a.length)];
+  const glowT=navGlowTex(),veh=[];
+  const light=(par,x,y,col,size)=>{const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowT,color:col,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0,fog:false}));sp.scale.set(size,size,1);sp.position.set(x,y,0);par.add(sp);return sp;};
+  const mkVeh=(truck)=>{const v=new THREE.Group(),b=new THREE.Group();b.scale.setScalar(VS);v.add(b);let hd,tl;
+    if(truck){const cab=new THREE.Mesh(gCab,pick(cabCols));cab.position.set(7.6,1.9,0);const tr=new THREE.Mesh(gTrl,pick(trlCols));tr.position.set(-0.6,2.25,0);const ch=new THREE.Mesh(new THREE.BoxGeometry(14.8,0.5,2.2),mDark);ch.position.set(0.5,0.45,0);b.add(cab,tr,ch);hd=light(b,8.9,1.0,0xfff1cf,6.5);tl=light(b,-7.0,0.9,0xff2a1a,5.5);}
+    else{const bd=new THREE.Mesh(gCar[0],pick(carCols));bd.position.set(0,0.75,0);const cb=new THREE.Mesh(gCar[1],mGlass);cb.position.set(-0.2,1.65,0);b.add(bd,cb);hd=light(b,2.25,0.8,0xfff1cf,6);tl=light(b,-2.25,0.85,0xff2a1a,4.5);}
+    g.add(v);return {v,hd,tl,truck};};
+  // Spuren: [z, Richtung, Tempo m/s, Anzahl, Lkw-Anteil] – Süd = Fahrtrichtung Ost (rechts), Nord = West
+  for(const [z,dir,spd,n,tf] of [[4.375,1,34,11,0],[8.125,1,24,16,0.55],[-4.375,-1,35,11,0],[-8.125,-1,25,16,0.55]]){
+    const step=2*XW/n,off=Math.random()*step;
+    for(let i=0;i<n;i++){const o=mkVeh(Math.random()<tf);o.z=z;o.dir=dir;o.spd=spd;o.x0=-XW+off+i*step+rnd(-0.3,0.3)*step;o.v.rotation.y=dir<0?Math.PI:0;veh.push(o);}}
+  const cl=new THREE.Vector3();
+  anim.push(now=>{
+    const d=Math.hypot(camera.position.x-g.position.x,camera.position.z-g.position.z),f=clamp((d-450)/2550,0,1)*0.75,nt=typeof NIGHT==='number'?NIGHT:0;
+    for(const [m,c] of hz)m.color.copy(c).lerp(FOG,f);
+    cl.copy(camera.position);g.worldToLocal(cl);
+    for(const o of veh){let x=o.x0+o.dir*o.spd*now;x=((x+XW)%(2*XW)+2*XW)%(2*XW)-XW;o.v.position.set(x,deckY(x),o.z);
+      const dx=(cl.x-x)*o.dir,dz=cl.z-o.z,dist=Math.hypot(dx,dz)||1,fr=dx/dist;   // fr>0: Kamera liegt vor dem Fahrzeug
+      o.hd.material.opacity=nt*(0.3+0.7*clamp(fr*2.2+0.15,0,1))*0.95;o.tl.material.opacity=nt*(0.3+0.7*clamp(-fr*2.2+0.15,0,1))*0.9;
+      const k=1+0.8*nt,sz=(o.truck?6.5:6)*k;o.hd.scale.set(sz,sz,1);}
   });
 }
 
@@ -2498,7 +2584,7 @@ function achimBoat(kind){const G=achimGeo(),g0=new THREE.Group(),g=new THREE.Gro
   {const w=new THREE.Mesh(new THREE.TorusGeometry(0.13,0.012,6,20),dark);w.position.copy(V(1900,820,0));w.rotation.x=-1.0;g.add(w);}
   box(120,70,80,330,710,0,grey);box(120,70,80,6050,610,0,grey);                  // Poller
   box(300,60,450,600,690,0,grey);                                                 // Anker
-  {const r=new THREE.Mesh(new THREE.TorusGeometry(0.19,0.05,8,24),mat('#e8553f'));r.position.copy(V(6050,665,0));r.rotation.x=Math.PI/2;g.add(r);}   // Rettungsring
+  {const r=new THREE.Mesh(new THREE.TorusGeometry(0.19,0.05,8,24),mat('#e8553f'));r.position.copy(V(6458,860,0));g.add(r);}   // Rettungsring: außen an der geschlossenen Heckwand
   for(const sd of [1,-1])cyl(0.125,0.3,6200,570,sd*560,mat('#2b3135'),14);       // Heckfender
   {const pts=[];for(let x=700;x>=130;x-=60)pts.push(new THREE.Vector3(-achB(x)+0.02,achY(x)+0.035,achZ(x)));for(let x=130;x<=700;x+=60)pts.push(new THREE.Vector3(achB(x)-0.02,achY(x)+0.035,achZ(x)));
    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),40,0.032,6,false),dark));}   // Bugfender
@@ -2528,7 +2614,7 @@ function achimBoat(kind){const G=achimGeo(),g0=new THREE.Group(),g=new THREE.Gro
      fan([Q(xf,0,hF),Q(xf,sg*SW,eF),Q(xh,sg*SW,eH),Q(xh,0,hH)],tarp);
      fan([Q(xu,sg*SW,-20),Q(xw,sg*SW,-20),Q(xw,sg*SW,ed(xw)),Q(xe,sg*SW,eV)],tarp);
      fan([Q(xw,sg*SW,90),Q(xh-20,sg*SW,90),Q(xh-20,sg*SW,ed(xh-20)-30),Q(xf,sg*SW,ed(xf)-30),Q(xw,sg*SW,ed(xw)-30)],glass);}
-   fan([Q(xh,-SW,90),Q(xh,SW,90),Q(xh,SW,eH-30),Q(xh,0,hH-30),Q(xh,-SW,eH-30)],glass);
+   fan([Q(xh,-SW,-20),Q(xh,SW,-20),Q(xh,SW,eH),Q(xh,0,hH),Q(xh,-SW,eH)],tarp);   // Heckwand geschlossen: blaue Persenning vom Deck bis zum Dach
    for(const sg of [1,-1])for(const x of [xe,xf,xh-30]){const h=ed(x)/1000,p=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,h,6),steel);p.position.set(sg*SW/1000,achY(x)+h/2,achZ(x));g.add(p);}}   // Stützen
   // Anker-Leine
   {const anc=new THREE.Mesh(GEO.unitCyl,MAT.dark);anc.scale.set(0.02,5,0.02);anc.position.set(0,-0.7,-L/2000-1.2);anc.rotation.x=0.75;g.add(anc);}
