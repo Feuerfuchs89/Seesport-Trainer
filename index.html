@@ -1162,6 +1162,16 @@ function buildCospu(){const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,ke
     for(let k=0;k<6000&&added<1100;k++){const a=rnd(-170,170),o=rnd(-170,40);if(Math.abs(a)<68&&o>-58)continue;if(Math.abs(a)<68&&o<-58&&Math.random()<0.25)continue;const x=pL.x+tx*a+ox*o,y=pL.y+ty*a+oy*o;if(polyInside(P,x,y)||polyDist(P,x,y)[0]<5)continue;
       const y0=-o<75?0.8:hAt(LSCI,Math.max(0,-o));const tall=rnd(8,17);if(-o<80){const r=Math.random();if(r<0.5)T2.push([x,y0,y,rnd(8,14),'b']);else if(r<0.85)T1.push([x,y0,y,rnd(8,14)]);else T2.push([x,y0,y,rnd(5,9),'o']);}else if(Math.random()<0.15)T2.push([x,y0,y,rnd(10,16),'b']);else T2.push([x,y0,y,rnd(15,24),'o']);added++;}}
   const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),sc=new THREE.Vector3(),pp=new THREE.Vector3(),c=new THREE.Color();
+  // Ostufer ab der Seemitte nordwärts: dichter Wald direkt am Ufer (nach Uferlänge)
+  if(cospuR){const lo=S.gfx==='niedrig'?0.6:1;
+    for(let i=0;i<n;i++){const j=(i+1)%n,a=P[i],b=P[j];if(!(a.side>0&&b.side>0&&a.s>0&&b.s>0)||(a.s>0.8&&b.s>0.8))continue;
+      const L=segL[i];if(L<6)continue;const cnt=Math.round(L*1.0*lo);
+      for(let k=0;k<cnt;k++){const t=Math.random(),d=Math.random()<0.6?3+Math.random()*45:48+Math.pow(Math.random(),1.5)*420;
+        const p0=ringPt(i,d),p1=ringPt(j,d),x=p0[0]+(p1[0]-p0[0])*t,y=p0[1]+(p1[1]-p0[1])*t;
+        if(polyInside(P,x,y)||polyDist(P,x,y)[0]<2.5)continue;
+        const y0=hAt(i,d)*(1-t)+hAt(j,d)*t,pAu=clamp((d-40)/60,0,1);
+        if(Math.random()<pAu){if(Math.random()<0.12)T2.push([x,y0,y,rnd(10,16),'b']);else T2.push([x,y0,y,rnd(16,27),'o']);}
+        else{const r=Math.random();if(r<0.55)T2.push([x,y0,y,rnd(8,15),'b']);else if(r<0.8)T1.push([x,y0,y,rnd(8,14)]);else T2.push([x,y0,y,rnd(5,9),'o']);}}}}
   if(cospuR&&SHORE.fwd){try{cospuRundweg(P,n,pos,idx,offs,HBI,T1,T2,ringPt);}catch(e){console.error('Rundweg',e);}}
   const im=new THREE.InstancedMesh(cone,new THREE.MeshLambertMaterial({color:0xffffff}),T1.length);T1.forEach((t,k)=>{pp.set(t[0],t[1]-0.3,-t[2]);sc.set(t[3]*0.24,t[3],t[3]*0.24);m4.compose(pp,q,sc);im.setMatrixAt(k,m4);c.setHSL(rnd(0.27,0.36),rnd(0.25,0.45),rnd(0.1,0.19));im.setColorAt(k,c);});
   const im2=new THREE.InstancedMesh(blob,new THREE.MeshLambertMaterial({color:0xffffff}),T2.length);T2.forEach((t,k)=>{const r=t[3]*0.32;pp.set(t[0],t[1]+t[3]*0.62,-t[2]);sc.set(r,r*rnd(0.85,1.15),r);m4.compose(pp,q,sc);im2.setMatrixAt(k,m4);c.setHSL(rnd(0.19,0.29),rnd(0.3,0.5),rnd(0.15,0.27));im2.setColorAt(k,c);});
@@ -1239,7 +1249,7 @@ function buildCospu(){const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,ke
     const [gx,gy]=at(hi,35);const glass=new THREE.Mesh(new THREE.BoxGeometry(26,7,14),new THREE.MeshPhongMaterial({color:'#9fb7c4',shininess:90,specular:0x667788}));glass.position.set(gx,hAt(hi,35)+3.2,-gy);glass.rotation.y=ang;shoreG.add(glass);
     const rf=new THREE.Mesh(new THREE.BoxGeometry(28,0.6,16),new THREE.MeshLambertMaterial({color:'#e8e8e4'}));rf.position.set(gx,hAt(hi,35)+7,-gy);rf.rotation.y=ang;shoreG.add(rf);}
   if(S.revier==='cospu'){const F=SHORE.fwd,dk2=new THREE.MeshLambertMaterial({color:'#8a7a63'});const [a0,b0]=F(COSPU_N22[0],COSPU_N22[1]),[a1,b1]=F(COSPU_N22[2],COSPU_N22[3]);const L=Math.hypot(a1-a0,b1-b0),pr=new THREE.Mesh(new THREE.BoxGeometry(2,0.35,L),dk2);pr.position.set((a0+a1)/2,1.2,-(b0+b1)/2);pr.rotation.y=Math.atan2((a1-a0)/L,-(b1-b0)/L);shoreG.add(pr);SHORE.piersX.push([a0,b0,a1,b1,2,'#c9b48f']);}
-  if(S.revier==='cospu'){SHORE.buoysX=[];const F=SHORE.fwd,yel=new THREE.MeshLambertMaterial({color:'#fdd835'}),rd=new THREE.MeshLambertMaterial({color:'#e53935'}),wh=new THREE.MeshLambertMaterial({color:'#f4f4f0'}),pl=new THREE.MeshLambertMaterial({color:'#333b40'});
+  if(S.revier==='cospu'){SHORE.buoysX=[];const tagL=SHORE.tagL=[];(SHORE.anim||(SHORE.anim=[])).push(now=>{for(const lb of tagL){const d=camera.position.distanceTo(lb.sp.position.set(lb.x,lb.y0,lb.z)||lb.sp.position),ls=clamp(d*0.022,0.45,7);lb.sp.visible=d>12;lb.sp.position.y=lb.y0+ls*0.4;lb.sp.scale.set(lb.w*ls,0.9*ls,1);}});const F=SHORE.fwd,yel=new THREE.MeshLambertMaterial({color:'#fdd835'}),rd=new THREE.MeshLambertMaterial({color:'#e53935'}),wh=new THREE.MeshLambertMaterial({color:'#f4f4f0'}),pl=new THREE.MeshLambertMaterial({color:'#333b40'});
     for(const t of COSPU_TONNEN){const [x,y]=F(t[0],t[1]);SHORE.buoysX.push([x,y]);const g=new THREE.Group();let body;
       if(t[2]==='spherical')body=new THREE.Mesh(new THREE.SphereGeometry(0.6,12,8),yel),body.position.y=0.35;
       else if(t[2]==='conical')body=new THREE.Mesh(new THREE.ConeGeometry(0.6,1.4,10),yel),body.position.y=0.5;
@@ -1248,7 +1258,7 @@ function buildCospu(){const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,ke
       g.add(body);const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,1.6,5),pl);pole.position.y=1.5;g.add(pole);
       if(t[3]==='Sondertonne')[[rd,2.55],[wh,2.3],[rd,2.05]].forEach(([m,h])=>{const c=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.25,8),m);c.position.y=h;g.add(c);});
       else{const c=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.3,8),yel);c.position.y=2.4;g.add(c);}
-      g.scale.setScalar(2.6);g.position.set(x,0,-y);shoreG.add(g);}}
+      g.scale.setScalar(2.6);g.position.set(x,0,-y);shoreG.add(g);{const T=tagSprite(t[3],'#fdd835');shoreG.add(T.sp);tagL.push({sp:T.sp,w:T.w,x,y0:7.2,z:-y});}}}
   if(LSCI>=0)lscBuild(P,nrm,at,hAt,LSCI);
   try{windFarm3D(P);}catch(e){console.error('Windpark',e);}
   try{horizon3D(P);}catch(e){console.error('Horizont',e);}
@@ -2352,8 +2362,8 @@ function newRace(lesson,opts){
   if(lesson)C.buoys=C.buoys.filter(bu=>lesson.mark==='wind'?bu.m===C.wm:lesson.mark?bu.m===C.lm:false);
   const ob=(q,r,name)=>({ax:q.x,ay:q.y,bx:q.x,by:q.y,r,name});
   C.obst=C.buoys.map(bu=>Object.assign(ob(bu,0.9,bu.m.kind==='gate'?'Tor-Tonne':bu.m.name),{mk:bu.m}));
-  if(!lesson){C.obst.push(Object.assign(ob(C.pin,0.7,'Pin-Tonne'),{mk:'start'}),{ax:C.cb.x-U[0]*5.3,ay:C.cb.y-U[1]*5.3,bx:C.cb.x+U[0]*5.3,by:C.cb.y+U[1]*5.3,r:1.8,name:'Startschiff',mk:'start'});
-    if(C.finishUp)C.obst.push(Object.assign(ob(C.fin.a,0.7,'Zieltonne'),{mk:'fin'}),{ax:C.fin.b.x-U[0]*5.3,ay:C.fin.b.y-U[1]*5.3,bx:C.fin.b.x+U[0]*5.3,by:C.fin.b.y+U[1]*5.3,r:1.8,name:'Zielschiff',mk:'fin'});}
+  if(!lesson){C.obst.push(Object.assign(ob(C.pin,0.7,'Pin-Tonne'),{mk:'start'}),{ax:C.cb.x-U[0]*3.4,ay:C.cb.y-U[1]*3.4,bx:C.cb.x+U[0]*3.4,by:C.cb.y+U[1]*3.4,r:1.75,name:'Startschiff',mk:'start'});
+    if(C.finishUp)C.obst.push(Object.assign(ob(C.fin.a,0.7,'Zieltonne'),{mk:'fin'}),{ax:C.fin.b.x-U[0]*3.4,ay:C.fin.b.y-U[1]*3.4,bx:C.fin.b.x+U[0]*3.4,by:C.fin.b.y+U[1]*3.4,r:1.75,name:'Zielschiff',mk:'fin'});}
   if(S.revier==='cospu'&&SHORE.lsc)for(const o of SHORE.lsc.obst)C.obst.push(o);
   const cdir={lee:W0+180,luv:W0,links:W0-90,rechts:W0+90}[S.currentDir];const cd=dirv(cdir==null?W0+180:cdir);const cs=(lesson?0:S.current)*KN;CUR=[cd[0]*cs,cd[1]*cs];waterMat.uniforms.uCur.value.set(CUR[0],-CUR[1]);
   const ST=opts&&opts.drill?60:S.startTime;
@@ -2435,7 +2445,109 @@ function cbParts(){if(CBG)return CBG;const sh=CBSHAPE;const geo=loftHull(sh,0);c
   const railG=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(railPts),120,0.022,5,false);
   const posts=[];for(let i=0;i<14;i++){const u=0.06+0.9*i/13;const [B,Ys]=sh.dims(u);for(const sd of [1,-1])posts.push([sd*B*0.95,Ys,-sh.len/2+u*sh.len]);}
   CBG={geo,deck,railG,posts};return CBG;}
-function committeeBoat(kind){const P=cbParts(),sh=CBSHAPE;const g=new THREE.Group();
+/* ================= Start-/Zielboot „Achim“ (Motordingi Typ 401, Bau-Nr. 48) – Maße aus der Werftkoje ================= */
+// Messstationen vom Bug: [Position mm, Deck, Kiel, halbe Breite, Spant (Höhe, halbe Breite, …)] – Höhen ab Basis, Wasserlinie bei 480 mm
+const ACHIM_ST=[[0,1180,1130,0,[]],[70,1171,1124,104,[1126,23,1133,54,1141,73,1150,89,1155,95,1160,99,1168,103]],[139,1163,1100,198,[1103,43,1108,82,1113,104,1118,124,1123,141,1128,156,1135,171,1141,182,1147,190,1154,195,1159,198]],[220,1153,956,288,[964,63,972,92,982,120,995,151,1011,180,1027,204,1045,227,1065,248,1084,264,1104,276,1124,284,1140,287]],[300,1144,764,362,[779,79,794,116,813,151,840,190,870,226,901,257,935,286,973,311,1011,332,1049,347,1087,356,1117,361]],[400,1131,578,440,[600,96,622,140,650,183,689,231,733,275,777,312,827,347,882,379,938,403,993,422,1048,434,1093,439]],[500,1120,426,503,[454,110,480,158,516,209,565,264,620,315,676,357,738,397,808,433,877,461,946,482,1016,496,1071,502]],[650,1110,292,574,[324,125,357,185,398,243,455,306,480,329,521,363,586,411,660,455,742,495,823,527,905,550,987,565,1053,572]],[800,1102,210,631,[246,134,281,199,326,271,388,345,460,410,480,425,531,461,611,509,701,550,790,583,879,607,968,622,1040,629]],[1000,1090,137,703,[175,141,213,208,260,299,327,397,403,475,480,532,565,584,661,625,756,656,851,679,947,695,1023,701]],[1200,1078,96,769,[135,143,175,211,224,318,292,448,371,542,450,606,480,626,538,658,636,701,734,728,832,748,931,762,1009,767]],[1400,1068,74,831,[114,141,154,208,203,332,273,499,352,612,432,683,480,715,521,735,621,778,720,800,819,815,919,826,998,830]],[1600,1062,70,881,[110,136,149,201,199,344,268,548,348,681,427,757,480,793,516,807,616,846,715,860,814,871,913,877,993,880]],[2000,1070,70,921,[110,124,150,184,200,361,270,615,350,770,430,851,480,884,520,893,620,916,720,918,820,920,920,920,1000,921]],[2500,1081,70,957,[110,127,151,190,201,384,272,656,353,818,434,902,480,933,525,941,626,957,727,957,828,957,929,957,1010,957]],[3200,1095,70,966,[111,129,152,194,203,396,275,670,357,831,439,915,480,942,531,951,634,966,736,966,839,966,941,966,1023,966]],[3800,1093,60,962,[101,127,143,191,194,384,267,657,349,821,432,906,480,938,525,946,628,962,731,962,835,962,938,962,1021,962]],[4400,1092,50,944,[92,124,133,185,185,367,258,637,342,800,425,884,480,920,519,926,623,944,727,944,832,944,936,944,1019,944]],[5000,1090,40,908,[82,117,124,174,176,340,250,596,334,754,418,835,480,873,512,880,618,908,722,908,828,908,932,908,1016,908]],[5600,1088,22,858,[65,107,107,158,161,301,235,537,320,688,406,765,480,807,502,811,608,858,715,858,822,858,928,858,1013,858]],[6000,1086,10,821,[53,101,96,147,150,276,225,500,311,644,397,719,480,763,494,765,602,821,709,821,817,821,925,821,1011,821]],[6250,1086,4,793,[47,97,91,141,145,262,220,477,307,617,394,690,480,733,491,735,599,793,707,793,816,793,924,793,1010,793]],[6400,1085,0,767,[43,93,87,136,141,251,217,458,304,595,391,666,480,709,488,709,597,767,705,767,814,767,922,767,1009,767]]];
+const ACH={L:6400,WL:480,sta:null,glow:[],lamps:[],reg:false};
+function achInit(){if(ACH.sta)return;const WL=ACH.WL;
+  ACH.sta=ACHIM_ST.map(s=>{const pts=[[0,(s[2]-WL)/1000]];for(let j=0;j<s[4].length;j+=2)pts.push([s[4][j+1]/1000,(s[4][j]-WL)/1000]);pts.push([s[3]/1000,(s[1]-WL)/1000]);return {x:s[0],pts,B:s[3]/1000,Ys:(s[1]-WL)/1000,Yk:(s[2]-WL)/1000};});}
+const achI=(x,f)=>{const S=ACH.sta;if(x<=S[0].x)return f(S[0]);const n=S.length;if(x>=S[n-1].x)return f(S[n-1]);let i=0;while(S[i+1].x<x)i++;const t=(x-S[i].x)/(S[i+1].x-S[i].x);return f(S[i])*(1-t)+f(S[i+1])*t;};
+const achB=x=>achI(x,s=>s.B),achY=x=>achI(x,s=>s.Ys),achK=x=>achI(x,s=>s.Yk);
+const achZ=x=>(x-ACH.L/2)/1000;
+function achHW(st,y){if(y<=st.Yk)return 0;const p=st.pts;for(let i=0;i<p.length-1;i++){const a=p[i],b=p[i+1];if(y>=a[1]&&y<=b[1]){const t=b[1]>a[1]?(y-a[1])/(b[1]-a[1]):0;return a[0]+(b[0]-a[0])*t;}}return st.B;}
+const achHWx=(x,y)=>achI(x,s=>achHW(s,y));
+function achimGeo(){if(ACH.geo)return ACH.geo;achInit();const S=ACH.sta,M=16,K=2*M-1,pos=[],col=[],idx=[];
+  const cb=new THREE.Color('#1f3fb0'),cr=new THREE.Color('#b5402c');
+  const res=pts=>{const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));const tot=cum[cum.length-1]||1e-6,out=[];let j=0;for(let k=0;k<M;k++){const d=tot*k/(M-1);while(j<pts.length-2&&cum[j+1]<d)j++;const seg=cum[j+1]-cum[j]||1e-6,t=Math.min(1,Math.max(0,(d-cum[j])/seg));out.push([pts[j][0]+(pts[j+1][0]-pts[j][0])*t,pts[j][1]+(pts[j+1][1]-pts[j][1])*t]);}return out;};
+  const rings=[];
+  for(const st of S){const R=res(st.pts),z=achZ(st.x),ring=[];for(let k=M-1;k>=1;k--)ring.push([-R[k][0],R[k][1],z]);for(let k=0;k<M;k++)ring.push([R[k][0],R[k][1],z]);rings.push(ring);
+    for(const v of ring){pos.push(v[0],v[1],v[2]);const c=v[1]<-0.02?cr:cb;col.push(c.r,c.g,c.b);}}
+  for(let i=0;i<S.length-1;i++)for(let j=0;j<K-1;j++){const a=i*K+j,b=a+1,c=a+K,d=b+K;idx.push(a,c,b,b,c,d);}
+  // Spiegel (Heck) schließen
+  const last=rings[rings.length-1],base=pos.length/3;let cy=0;for(const v of last)cy+=v[1];cy/=last.length;pos.push(0,cy,last[0][2]);col.push(cb.r,cb.g,cb.b);
+  for(let j=0;j<K-1;j++)idx.push(base,(S.length-1)*K+j,(S.length-1)*K+j+1);
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();
+  // Deckstreifen: Vordeck, schmale Seitendecks, Heckdeck
+  const strip=(x0,x1,inset)=>{const N=Math.max(2,Math.round((x1-x0)/80)),p=[],ix=[];for(let k=0;k<=N;k++){const x=x0+(x1-x0)*k/N,B=achB(x),Y=achY(x)+0.004,z=achZ(x),inn=Math.max(0,B-inset);p.push(-B,Y,z,-inn,Y,z,inn,Y,z,B,Y,z);}
+    for(let k=0;k<N;k++){const a=k*4,b=a+4;ix.push(a,b,a+1,a+1,b,b+1,a+2,b+2,a+3,a+3,b+2,b+3);}
+    const q=new THREE.BufferGeometry();q.setAttribute('position',new THREE.Float32BufferAttribute(p,3));q.setIndex(ix);q.computeVertexNormals();return q;};
+  const decks=[strip(0,2250,9),strip(2250,6150,0.14),strip(6150,6400,9)];
+  // Plicht-Boden (Höhe 0,09 m über Wasserlinie)
+  const fy=0.09,fp=[],fi=[];{const x0=2250,x1=6150,N=40;for(let k=0;k<=N;k++){const x=x0+(x1-x0)*k/N,w=Math.max(0.05,achHWx(x,fy)-0.01);fp.push(-w,fy,achZ(x),w,fy,achZ(x));}for(let k=0;k<N;k++){const a=k*2,b=a+2;fi.push(a,b,a+1,a+1,b,b+1);}}
+  const fl=new THREE.BufferGeometry();fl.setAttribute('position',new THREE.Float32BufferAttribute(fp,3));fl.setIndex(fi);fl.computeVertexNormals();
+  ACH.geo={hull:g,decks,floor:fl};return ACH.geo;}
+function tagSprite(text,col){const c=document.createElement('canvas'),x=c.getContext('2d');x.font='bold 30px "Arial Narrow",Arial,sans-serif';const tw=Math.ceil(x.measureText(text).width),W=Math.max(150,tw+62);c.width=W;c.height=64;
+  x.fillStyle='rgba(8,26,36,.7)';x.beginPath();x.moveTo(14,10);x.lineTo(W-14,10);x.quadraticCurveTo(W-6,10,W-6,18);x.lineTo(W-6,46);x.quadraticCurveTo(W-6,54,W-14,54);x.lineTo(14,54);x.quadraticCurveTo(6,54,6,46);x.lineTo(6,18);x.quadraticCurveTo(6,10,14,10);x.fill();
+  x.fillStyle=col||'#fdd835';x.fillRect(16,20,8,24);x.fillStyle='#eaf2f4';x.font='bold 30px "Arial Narrow",Arial,sans-serif';x.textBaseline='middle';x.fillText(text,32,33);
+  const t=new THREE.CanvasTexture(c);const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false,fog:false}));return {sp,w:0.9*W/64};}
+function achText(){const c=document.createElement('canvas');c.width=1024;c.height=256;const x=c.getContext('2d');x.clearRect(0,0,1024,256);x.font='italic bold 230px Arial,"Arial Narrow",sans-serif';x.textAlign='center';x.textBaseline='middle';x.lineJoin='round';x.lineWidth=14;x.strokeStyle='rgba(10,22,70,.85)';x.strokeText('Achim',512,138,960);x.fillStyle='#ffffff';x.fillText('Achim',512,138,960);const t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;}
+function achimBoat(kind){const G=achimGeo(),g0=new THREE.Group(),g=new THREE.Group(),L=ACH.L,SC=1.5;g.scale.setScalar(SC);g0.add(g);
+  const hm=new THREE.MeshPhongMaterial({vertexColors:true,shininess:70,side:THREE.DoubleSide});hm.envMap=envRT.texture;hm.combine=THREE.MixOperation;hm.reflectivity=0.12;
+  g.add(new THREE.Mesh(G.hull,hm));
+  const dm=new THREE.MeshPhongMaterial({color:'#c4c9cc',shininess:30,side:THREE.DoubleSide});for(const d of G.decks)g.add(new THREE.Mesh(d,dm));
+  g.add(new THREE.Mesh(G.floor,new THREE.MeshLambertMaterial({color:'#9aa3a8',side:THREE.DoubleSide})));
+  const mat=c=>new THREE.MeshPhongMaterial({color:c,shininess:60}),white=mat('#f2f4f5'),steel=new THREE.MeshPhongMaterial({color:'#c9cdd0',shininess:90}),dark=mat('#1e2326'),grey=mat('#6c7780'),wood=mat('#c9a77c');
+  const V=(x,y,s)=>new THREE.Vector3(s/1000,y/1000,achZ(x));
+  const box=(w,h,d,x,y,s,m)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(w/1000,h/1000,d/1000),m);b.position.copy(V(x,y,s));g.add(b);return b;};   // w quer, h hoch, d längs (mm); y = Mitte
+  const cyl=(r,h,x,y,s,m,seg)=>{const c=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,seg||12),m);c.position.copy(V(x,y,s));g.add(c);return c;};
+  // Einrichtung
+  box(280,40,900,2350,320,650,wood);box(280,40,900,2350,320,-650,wood);box(280,40,1500,4600,320,650,wood);box(280,40,1500,4600,320,-650,wood);
+  box(500,680,970,3300,110,0,mat('#4a5560'));                                   // Motorkasten
+  box(300,330,450,4350,165,380,mat('#8a6a48'));box(300,330,450,4350,165,-380,mat('#8a6a48'));   // Tanks unter den Bänken
+  box(300,180,300,1900,670,0,mat('#6b7a83'));                                   // Steuerstand
+  {const w=new THREE.Mesh(new THREE.TorusGeometry(0.13,0.012,6,20),dark);w.position.copy(V(1900,820,0));w.rotation.x=-1.0;g.add(w);}
+  box(120,70,80,330,710,0,grey);box(120,70,80,6050,610,0,grey);                  // Poller
+  box(300,60,450,600,690,0,grey);                                                 // Anker
+  {const r=new THREE.Mesh(new THREE.TorusGeometry(0.19,0.05,8,24),mat('#e8553f'));r.position.copy(V(6050,665,0));r.rotation.x=Math.PI/2;g.add(r);}   // Rettungsring
+  for(const sd of [1,-1])cyl(0.125,0.3,6200,570,sd*560,mat('#2b3135'),14);       // Heckfender
+  {const pts=[];for(let x=700;x>=130;x-=60)pts.push(new THREE.Vector3(-achB(x)+0.02,achY(x)+0.035,achZ(x)));for(let x=130;x<=700;x+=60)pts.push(new THREE.Vector3(achB(x)-0.02,achY(x)+0.035,achZ(x)));
+   g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),40,0.032,6,false),dark));}   // Bugfender
+  // Ruder
+  cyl(0.016,0.6,6490,350,0,steel,8);box(12,630,230,6595,150,0,mat('#c2272d'));
+  // Mast mit Scheinwerfer und Topplaterne
+  cyl(0.0275,2.12,1380,1631,0,white,10);
+  {const sp=new THREE.Mesh(new THREE.CylinderGeometry(0.065,0.065,0.18,12),white);sp.rotation.x=Math.PI/2;sp.position.copy(V(1290,1334,0));g.add(sp);
+   const lens=new THREE.MeshBasicMaterial({color:'#e9ecee'});const ln=new THREE.Mesh(new THREE.CircleGeometry(0.058,12),lens);ln.position.copy(V(1200,1334,0));ln.rotation.y=Math.PI;g.add(ln);ACH.lamps.push([lens,'#e9ecee',1]);
+   const top=new THREE.MeshBasicMaterial({color:'#f5f5f5'});const tp=new THREE.Mesh(new THREE.SphereGeometry(0.055,10,8),top);tp.position.copy(V(1380,2705,0));g.add(tp);ACH.lamps.push([top,'#f5f5f5',1]);}
+  // Seitenlaternen
+  for(const [sd,c] of [[1,'#2fa84f'],[-1,'#d23a2e']]){const m=new THREE.MeshLambertMaterial({color:c,emissive:c,emissiveIntensity:0});box(90,90,90,1700,644,sd*640,m);ACH.lamps.push([m,c,2]);}
+  // Schriftzug „Achim“ auf beiden Seiten (Hüllfläche folgt dem Rumpf)
+  {const tx=achText(),tm=new THREE.MeshLambertMaterial({map:tx,transparent:true,alphaTest:0.4,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
+   for(const sd of [1,-1]){const NX=20,NY=3,p=[],uv=[],ix=[];for(let j=0;j<=NY;j++)for(let i=0;i<=NX;i++){const x=850+1450*i/NX,y=0.30-0.17+0.34*j/NY,w=achHWx(x,y)+0.004;p.push(sd*w,y,achZ(x));uv.push(sd>0?1-i/NX:i/NX,j/NY);}
+    for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){const a=j*(NX+1)+i,b=a+1,c=a+NX+1,d=c+1;ix.push(a,c,b,b,c,d);}
+    const q=new THREE.BufferGeometry();q.setAttribute('position',new THREE.Float32BufferAttribute(p,3));q.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));q.setIndex(ix);g.add(new THREE.Mesh(q,tm));}}
+  // Verdeck (blaue Plane) mit Windschutz und Fenstern
+  {const SW=813,xs=2150,xe=2610,xu=2360,xf=3200,xh=6400,xw=3200,xsu=1500,eV=560,hF=860,kr=190,hH=820,krH=220,eF=hF-kr,eH=hH-krH;
+   const ed=x=>x<=xf?eV+(eF-eV)*(x-xe)/Math.max(1,xf-xe):eF+(eH-eF)*(x-xf)/Math.max(1,xh-xf);
+   const tarp=new THREE.MeshLambertMaterial({color:'#1b3fa8',side:THREE.DoubleSide}),glass=new THREE.MeshPhongMaterial({color:'#8fc3dd',shininess:100,transparent:true,opacity:0.42,side:THREE.DoubleSide,depthWrite:false});
+   const Q=(x,s,h)=>new THREE.Vector3(s/1000,achY(x)+h/1000,achZ(x));
+   const fan=(a,m)=>{const n=a.length,c=a.reduce((s,v)=>s.add(v),new THREE.Vector3()).multiplyScalar(1/n),p=[c.x,c.y,c.z],ix=[];for(const v of a)p.push(v.x,v.y,v.z);for(let j=0;j<n;j++)ix.push(0,1+j,1+(j+1)%n);const q=new THREE.BufferGeometry();q.setAttribute('position',new THREE.Float32BufferAttribute(p,3));q.setIndex(ix);q.computeVertexNormals();g.add(new THREE.Mesh(q,m));};
+   for(const sg of [1,-1])fan([Q(xsu,0,0),Q(xu,sg*SW,0),Q(xe,sg*SW,eV),Q(xs,0,eV)],glass);
+   for(const sg of [1,-1]){
+     fan([Q(xs,0,eV),Q(xe,sg*SW,eV),Q(xf,sg*SW,eF),Q(xf,0,hF)],tarp);
+     fan([Q(xf,0,hF),Q(xf,sg*SW,eF),Q(xh,sg*SW,eH),Q(xh,0,hH)],tarp);
+     fan([Q(xu,sg*SW,-20),Q(xw,sg*SW,-20),Q(xw,sg*SW,ed(xw)),Q(xe,sg*SW,eV)],tarp);
+     fan([Q(xw,sg*SW,90),Q(xh-20,sg*SW,90),Q(xh-20,sg*SW,ed(xh-20)-30),Q(xf,sg*SW,ed(xf)-30),Q(xw,sg*SW,ed(xw)-30)],glass);}
+   fan([Q(xh,-SW,90),Q(xh,SW,90),Q(xh,SW,eH-30),Q(xh,0,hH-30),Q(xh,-SW,eH-30)],glass);
+   for(const sg of [1,-1])for(const x of [xe,xf,xh-30]){const h=ed(x)/1000,p=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,h,6),steel);p.position.set(sg*SW/1000,achY(x)+h/2,achZ(x));g.add(p);}}   // Stützen
+  // Anker-Leine
+  {const anc=new THREE.Mesh(GEO.unitCyl,MAT.dark);anc.scale.set(0.02,5,0.02);anc.position.set(0,-0.7,-L/2000-1.2);anc.rotation.x=0.75;g.add(anc);}
+  // Signalrah und Flaggen am Mast
+  const mz=achZ(1380),yardY=2.28;
+  const yard=new THREE.Mesh(GEO.unitCyl,steel);yard.scale.set(0.03,2.5,0.03);yard.rotation.z=Math.PI/2;yard.position.set(0,yardY,mz);g.add(yard);
+  const fg=new THREE.PlaneGeometry(0.62,0.41);fg.rotateY(Math.PI/2);fg.translate(0,-0.2,0.32);
+  const mk=(k,x,y)=>{const m=new THREE.Mesh(fg,new THREE.MeshLambertMaterial({map:flagTex(k),side:THREE.DoubleSide,transparent:true,alphaTest:0.5}));m.position.set(x,y,mz);g.add(m);return m;};
+  mk(kind==='finish'?'blue':'wl',0,2.80);
+  const flags={};if(kind!=='finish'){const xs2={k:-1.0,p:-0.67,ap:-0.34,x:0,fs:0.34,s:0.67,c:1.0};for(const k in xs2){flags[k]=mk(k,xs2[k],yardY-0.02);flags[k].visible=false;}}
+  // Besatzung: Wettfahrtleitung sitzt auf den Bänken
+  for(const [z,sd] of [[1.4,1],[1.4,-1],[-0.85,1]]){const seat={role:'crew',z:z*SC,gx:0.65*SC,sitY:0.41*SC,footX:0.42*SC,footY:0.1*SC};const p=makeSailor(g0,randomLook(1,'#ff6a1a'));poseSailor(p,seat,'crew',sd,0,false,null,null);}
+  // Lichtschein bei Nacht
+  const gl=navGlowTex();for(const [x,y,s,c,sz] of [[1380,2705,0,0xffffff,1.1],[1700,644,640,0x35ff6a,0.5],[1700,644,-640,0xff4a38,0.5],[1200,1334,0,0xfff2d0,0.8]]){const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:gl,color:c,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0,fog:false}));sp.scale.set(sz,sz,1);sp.position.copy(V(x,y,s));g.add(sp);ACH.glow.push(sp);}
+  if(!ACH.reg){ACH.reg=true;const anim=SHORE.anim||(SHORE.anim=[]);anim.push(now=>{const n=typeof NIGHT==='number'?NIGHT:0;for(const sp of ACH.glow)sp.material.opacity=n*0.9;for(const [m,c,t] of ACH.lamps){if(t===2)m.emissiveIntensity=n;else m.color.set(n>0.3?'#ffffff':c);}});}
+  g0.traverse(n=>{if(n.isMesh)n.castShadow=true;});g0.userData.tilt=0.3;g0.userData.flags=flags;return g0;}
+
+function committeeBoat(kind){try{return achimBoat(kind);}catch(e){console.error('Achim',e);return committeeBoatOld(kind);}}
+function committeeBoatOld(kind){const P=cbParts(),sh=CBSHAPE;const g=new THREE.Group();
   const hm=new THREE.MeshPhongMaterial({vertexColors:true,shininess:70,side:THREE.DoubleSide});hm.envMap=envRT.texture;hm.combine=THREE.MixOperation;hm.reflectivity=0.12;
   g.add(new THREE.Mesh(P.geo,hm));g.add(new THREE.Mesh(P.deck,MAT.deck));
   const white=new THREE.MeshPhongMaterial({color:'#f4f4f0',shininess:60});const steel=new THREE.MeshPhongMaterial({color:'#c9cdd0',shininess:90});
@@ -2460,18 +2572,19 @@ function committeeBoat(kind){const P=cbParts(),sh=CBSHAPE;const g=new THREE.Grou
 
 function buildCourse3D(){
   {const fb0=$('flagBar');if(fb0)fb0.dataset.k='~';}
-  const C=G.course;const at=(o,x,y)=>{o.position.set(x,0,-y);raceRoot.add(o);return o;};C3={zones:[],floats:[]};
+  const C=G.course;const at=(o,x,y)=>{o.position.set(x,0,-y);raceRoot.add(o);return o;};C3={zones:[],floats:[],labels:[]};
+  const tag=(o,txt,h,col)=>{const t=tagSprite(txt,col);raceRoot.add(t.sp);if(G.noRefl)G.noRefl.push(t.sp);C3.labels.push({sp:t.sp,o,h,w:t.w});};
   const marks=C.buoys;
-  for(const m of marks){const o=at(buoy(),m.x,m.y);C3.floats.push({o,x:m.x,y:m.y,bu:m});}
+  for(const m of marks){const o=at(buoy(),m.x,m.y);C3.floats.push({o,x:m.x,y:m.y,bu:m});tag(o,(m.m&&m.m.name)||'Tonne',3.4,'#fdd835');}
   if(!C.lesson){
-    const pin=buoy(0.72);const pole=new THREE.Mesh(GEO.unitCyl,MAT.dark);pole.scale.set(0.035,2.6,0.035);pole.position.y=2.9;const fl=new THREE.Mesh(new THREE.PlaneGeometry(0.85,0.57).rotateY(Math.PI/2).translate(0,-0.29,0.44),new THREE.MeshLambertMaterial({map:flagTex('wl'),side:THREE.DoubleSide}));fl.position.y=4.15;pin.add(pole,fl);at(pin,C.pin.x,C.pin.y);C3.floats.push({o:pin,x:C.pin.x,y:C.pin.y});
-    const cb=committeeBoat('start');C3.cbFlags=cb.userData.flags;cb.rotation.y=-C.W0*DEG;at(cb,C.cb.x,C.cb.y);C3.floats.push({o:cb,x:C.cb.x,y:C.cb.y,k:0.4});
+    const pin=buoy(0.72);const pole=new THREE.Mesh(GEO.unitCyl,MAT.dark);pole.scale.set(0.035,2.6,0.035);pole.position.y=2.9;const fl=new THREE.Mesh(new THREE.PlaneGeometry(0.85,0.57).rotateY(Math.PI/2).translate(0,-0.29,0.44),new THREE.MeshLambertMaterial({map:flagTex('wl'),side:THREE.DoubleSide}));fl.position.y=4.15;pin.add(pole,fl);at(pin,C.pin.x,C.pin.y);C3.floats.push({o:pin,x:C.pin.x,y:C.pin.y});tag(pin,'Pin-Tonne',5.1,'#ff6a1a');
+    const cb=committeeBoat('start');C3.cbFlags=cb.userData.flags;cb.rotation.y=-C.W0*DEG;at(cb,C.cb.x,C.cb.y);C3.floats.push({o:cb,x:C.cb.x,y:C.cb.y,k:0.4});tag(cb,'Startschiff „Achim“',5.0,'#ff6a1a');
     {const dx=C.cb.x-C.pin.x,dy=C.cb.y-C.pin.y,len=Math.hypot(dx,dy);const lm=new THREE.MeshBasicMaterial({color:0xff3b30,transparent:true,opacity:0.85,depthWrite:false,side:THREE.DoubleSide});
       const tube=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,len,8,1,true),lm);tube.rotation.z=Math.PI/2;tube.position.y=0.38;
       const rib=new THREE.Mesh(new THREE.PlaneGeometry(len,0.9),lm);rib.rotation.x=-Math.PI/2;rib.position.y=0.14;
       const line=new THREE.Group();line.add(tube,rib);line.position.set((C.pin.x+C.cb.x)/2,0,-(C.pin.y+C.cb.y)/2);line.rotation.y=Math.atan2(dy,dx);raceRoot.add(line);G.noRefl.push(line);C3.line=line;C3.lineMat=lm;}
-    if(C.finishUp){const F=C.fin;const fb=at(buoy(),F.a.x,F.a.y);fb.scale.setScalar(0.8);C3.floats.push({o:fb,x:F.a.x,y:F.a.y});
-      const zs=committeeBoat('finish');zs.rotation.y=-C.W0*DEG;at(zs,F.b.x,F.b.y);C3.floats.push({o:zs,x:F.b.x,y:F.b.y,k:0.4});
+    if(C.finishUp){const F=C.fin;const fb=at(buoy(),F.a.x,F.a.y);fb.scale.setScalar(0.8);C3.floats.push({o:fb,x:F.a.x,y:F.a.y});tag(fb,'Zieltonne',3.0,'#2d6cdf');
+      const zs=committeeBoat('finish');zs.rotation.y=-C.W0*DEG;at(zs,F.b.x,F.b.y);C3.floats.push({o:zs,x:F.b.x,y:F.b.y,k:0.4});tag(zs,'Zielschiff „Achim“',5.0,'#2d6cdf');
       const fl2=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(F.a.x,0.35,-F.a.y),new THREE.Vector3(F.b.x,0.35,-F.b.y)]),new THREE.LineDashedMaterial({color:0x5fb4ff,dashSize:2,gapSize:1.5,transparent:true,opacity:0.6}));fl2.computeLineDistances();raceRoot.add(fl2);G.noRefl.push(fl2);}
   }
   for(const m of marks){const z=new THREE.Mesh(new THREE.RingGeometry(S.zone*L-0.15,S.zone*L+0.15,72).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.28,depthWrite:false}));z.position.set(m.x,0.3,-m.y);raceRoot.add(z);C3.zones.push(z);G.noRefl.push(z);}
@@ -3453,6 +3566,7 @@ function render(dt,now){
   const pl=P();
   for(const z of C3.zones)z.visible=S.showZone;
   for(const fo of C3.floats){const gf=gustAt(fo.x,-fo.y);const h=waveSurf(fo.x,-fo.y,now,gf);fo.o.position.y=h*(fo.k||1);const tl=fo.o.userData.tilt;if(tl){const hx=waveSurf(fo.x+1.5,-fo.y,now,gf),hz=waveSurf(fo.x,-fo.y+1.5,now,gf);fo.o.rotation.z=-(hx-h)/1.5*tl*1.4+Math.sin(now*1.3+fo.x)*0.02*tl;fo.o.rotation.x=(hz-h)/1.5*tl*1.4;}}
+  if(C3.labels)for(const lb of C3.labels){const o=lb.o,d=camera.position.distanceTo(o.position),ls=clamp(d*0.022,0.45,7);lb.sp.visible=d>12;lb.sp.position.set(o.position.x,o.position.y+lb.h+ls*0.4,o.position.z);lb.sp.scale.set(lb.w*ls,0.9*ls,1);}
   const ll=S.laylines&&G.running&&cam.mode!=='board'&&!G.row&&!pl.rib?laylines(pl):null;
   C3.lay.forEach((l,i)=>{l.visible=!!ll;if(ll){const d=dirv(i?ll.b2:ll.b1);const a=l.geometry.attributes.position;a.setXYZ(0,ll.m.x,0.3+WAMP,-ll.m.y);a.setXYZ(1,ll.m.x+d[0]*350,0.3+WAMP,-(ll.m.y+d[1]*350));a.needsUpdate=true;}});
   if(C3.line){C3.line.position.y=WAMP*0.8;if(C3.lineMat){const pre=G.t<0&&!(G.flags&&G.flags.ap&&false);C3.lineMat.color.setHex(pre?0xff3b30:0x31d07a);C3.lineMat.opacity=pre&&G.t>-10&&G.running?0.6+0.35*Math.abs(Math.sin(now*Math.PI)):0.85;}}
