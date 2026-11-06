@@ -3921,10 +3921,15 @@ function avoid(b,hd){
     if(hit){const cr=fo[0]*(cy-b.y)-fo[1]*(cx-b.x);let pk=wrap360(out+(cr<0?-35:35));const ap=wrap180(b.W-pk);if(Math.abs(ap)<32)pk=wrap360(out+(cr<0?35:-35));out=pk;break;}}
   return out;
 }
+function lineAim(b,lp){const C=G.course,al=bowAlong(b)[0],lat=bowAlong(b)[1],lpl=lp.x*C.R[0]+lp.y*C.R[1];
+  if(al<0&&-al<40){const lc=lat+(lpl-lat)*(-al)/(20-al);if(Math.abs(lc)>C.lineLen/2-4)return [lp.x-C.U[0]*8,lp.y-C.U[1]*8];}
+  return [lp.x+C.U[0]*20,lp.y+C.U[1]*20];}
 function aiDecide(b){
   const C=G.course,ai=b.ai,W=b.W;
   if(b.finished){b.spiWant=false;const px=-C.U[0]*75+C.R[0]*(b.i*12-40),py=-C.U[1]*75+C.R[1]*(b.i*12-40);if(Math.hypot(px-b.x,py-b.y)<15)return wrap360(W-b.side*22);return courseTo(b,px,py);}
   if(!b.started){b.spiWant=false;
+    if(!ai.lineSet){ai.lineSet=true;if(!G._lo){const a=G.boats.filter(o=>o.ai).map(o=>o.i);for(let q=a.length-1;q>0;q--){const r=Math.floor(Math.random()*(q+1));[a[q],a[r]]=[a[r],a[q]];}G._lo=a;}
+      const n=G._lo.length,k=Math.max(0,G._lo.indexOf(b.i));ai.lineT=clamp(-0.7+1.3*(n>1?k/(n-1):0.5)+rnd(-0.05,0.05),-0.8,0.7);}
     const lp={x:C.R[0]*ai.lineT*C.lineLen/2,y:C.R[1]*ai.lineT*C.lineLen/2};
     if(G.t<0){const dist=Math.hypot(lp.x-b.x,lp.y-b.y);const o=opt(b.twsL,false,b.headsail);const vEst=Math.max(0.6,polarSpeed(b.twsL,o.up+5,0,b.headsail)*KN*0.92);
       const tNeed=dist/vEst+3,tLeft=-G.t;
@@ -3932,9 +3937,9 @@ function aiDecide(b){
       if(!ai.go){const qx=lp.x-C.U[0]*38,qy=lp.y-C.U[1]*38;if(Math.hypot(qx-b.x,qy-b.y)>24)return avoid(b,courseTo(b,qx,qy));
         ai.holdT-=ai.react;if(ai.holdT<=0){ai.holdT=rnd(10,16);ai.holdDir*=-1;}return avoid(b,wrap360(C.W0+ai.holdDir*95));}
       if(tNeed<tLeft+ai.buf-1.5)return avoid(b,wrap360(W-b.side*26));
-      return avoid(b,courseTo(b,lp.x+C.U[0]*20,lp.y+C.U[1]*20));}
-    if(b.ocs)return avoid(b,courseTo(b,lp.x-C.U[0]*12,lp.y-C.U[1]*12));
-    return avoid(b,courseTo(b,lp.x+C.U[0]*20,lp.y+C.U[1]*20));}
+      return avoid(b,courseTo(b,...lineAim(b,lp)));}
+    if(b.ocs||bowAlong(b)[0]>0)return avoid(b,courseTo(b,lp.x-C.U[0]*12,lp.y-C.U[1]*12));
+    return avoid(b,courseTo(b,...lineAim(b,lp)));}
   const tgt=C.seq[b.leg];let tx,ty,down=false,far=true;
   if(tgt==='free'){b.spiWant=false;return avoid(b,wrap360(W-b.side*45));}
   if(tgt==='finish'){if(C.finishUp){const fc=C.fin.c;const lat=clamp((b.x-fc.x)*C.R[0]+(b.y-fc.y)*C.R[1],-C.fin.len/2+5,C.fin.len/2-5);tx=fc.x+C.R[0]*lat+C.U[0]*8;ty=fc.y+C.R[1]*lat+C.U[1]*8;down=false;}
@@ -3951,8 +3956,8 @@ function aiDecide(b){
 }
 function aiControl(b,dt){
   const ai=b.ai;
-  if(b.penalty>0){if(!ai.penStart)ai.penStart=G.t;const crowd=G.boats.some(o=>o!==b&&!o.finished&&Math.hypot(o.x-b.x,o.y-b.y)<13);
-    if(G.t-ai.penStart>1&&(!crowd||G.t-ai.penStart>9||b.doing)){b.spiWant=false;b.rudder+=clamp(ai.penDir-b.rudder,-4*dt,4*dt);return;}}else ai.penStart=0;
+  if(b.penalty>0){if(!ai.penStart)ai.penStart=G.t;const crowd=G.boats.some(o=>o!==b&&!o.finished&&!o.rib&&!o.gone&&Math.hypot(o.x-b.x,o.y-b.y)<Math.max(13,3*L))||G.course.obst.some(ob=>!ob.pier&&ptSeg(b.x,b.y,ob.ax,ob.ay,ob.bx,ob.by)<ob.r+4*L);
+    if(G.t-ai.penStart>1&&(!crowd||G.t-ai.penStart>25)){b.spiWant=false;b.rudder+=clamp(ai.penDir-b.rudder,-4*dt,4*dt);return;}}else ai.penStart=0;
   ai.tick-=dt;if(ai.tick<=0){ai.tick=ai.script?0.15:ai.react*rnd(0.7,1.3);ai.hd=ai.script?ai.script(b):aiDecide(b);}
   const tr=clamp(wrap180(ai.hd-b.h)/14,-1,1);b.rudder+=clamp(tr-b.rudder,-5*dt,5*dt);
 }
@@ -4008,7 +4013,7 @@ function rowFault(A,B){const k=keepClear(A,B);if(!['10','11','12'].includes(k.ru
   const f=ruleFault(R,K,k.rule);return f?{who:R,rule:f.rule,txt:f.txt}:k;}
 function givePenalty(b,rule,txt,part2,other){if(G.boats)(G.incidents=G.incidents||[]).push({t:G.t,rule,txt,a:G.boats.indexOf(b),b:other?G.boats.indexOf(other):null,x:b.x,y:b.y});
   if(b.isPlayer&&G.events)ev('pen','Strafe: Regel '+rule+' ('+txt+')'+(other?' ggü. '+other.name:''),false);
-  const deg=part2&&S.penaltyMode==='rrs'?720:360;b.penalty+=deg;b.penCount++;
+  const deg=part2&&S.penaltyMode==='rrs'?720:360;if(!b.isPlayer&&b.ai&&b.penalty>0)return;b.penalty+=deg;b.penCount++;
   if(G.lesson){if(b.isPlayer)G.lesson.playerPen={rule,txt};else G.lesson.cpuPen={rule,txt};}
   if(b.isPlayer){msg('Strafe '+deg+'°: Regel '+rule+' ('+txt+')'+(other?' ggü. '+other.name:''),'bad');beep(196,0.5,'square',0.06);}
   else if(other&&other.isPlayer)msg(b.name+' muss kringeln · Regel '+rule+' ('+txt+')','good');
