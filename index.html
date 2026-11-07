@@ -103,6 +103,7 @@ body.touch .sails{display:none}
 .anacv{display:block;width:100%;height:min(56vh,520px);background:#0e3447;border-radius:10px;border:1px solid var(--rule);touch-action:none}
 .anabar{display:flex;gap:10px;align-items:center;margin-top:10px}
 .anabar input[type=range]{flex:1;accent-color:var(--mark)}
+.anatips{margin-top:10px;font-size:14px;line-height:1.5}.anatips h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.1em;color:var(--mark);font-size:15px;margin:10px 0 2px}.anatips ul{margin:0;padding-left:18px}.anatips li{margin:3px 0}
 .evlist{display:flex;flex-direction:column;gap:4px;margin-top:10px;max-height:28vh;overflow:auto}
 .ev{display:grid;grid-template-columns:auto 1fr;gap:10px;text-align:left;background:#0b2531;border:1px solid var(--rule);border-left:3px solid var(--port);border-radius:6px;padding:6px 10px;color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
 .ev.good{border-left-color:var(--stb)}.ev b{font-family:var(--f-display);font-variant-numeric:tabular-nums}
@@ -626,6 +627,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
     <canvas class="anacv" id="anaCv"></canvas>
     <div class="anabar"><button class="btn ghost" id="anaPlay" type="button" style="padding:6px 14px;font-size:16px">Abspielen</button><input type="range" id="anaT" min="0" max="1000" value="1000"><span id="anaTime" style="font-family:var(--f-display);font-size:18px;font-variant-numeric:tabular-nums;min-width:56px">0:00</span></div>
     <div id="anaRule" class="anarule" hidden></div>
+    <div id="anaTips" class="anatips"></div>
     <div class="evlist" id="anaList"></div>
     <div class="actions"><button class="btn ghost" id="anaBack" type="button">Zurück</button></div>
   </div>
@@ -830,7 +832,7 @@ const RIG=()=>RIGS[CL.key];
 /* ================= Einstellungen ================= */
 const DEFAULTS={tws:10,shiftAmp:8,shiftPeriod:70,puffs:2,puffStrength:25,dirtyAir:true,waveH:0,legLength:450,laps:2,startTime:60,zone:3,
   boatClass:'jolle',sailNo:'GER 1',headsail:'fock',autoTrim:true,gameSpeed:1.5,laylines:true,showZone:true,roundArrow:true,vectors:true,cpuCount:6,cpuSkill:1,
-  rules:true,markRules:true,markTouch:true,ocs:true,penaltyMode:'rrs',allMsgs:false,gfx:isTouch?'mittel':'hoch',courseType:'wl',finishUp:false,series:1,revier:'open',mapTrack:false,ladder:true,count10:true,startSound:'horn',rowBoat:'zk10',courseFan:true,windFrom:225,rowDist:500,current:0,currentDir:'lee',coach:true,ghost:true,touchMode:'slider',wxCloud:25,wxPrecip:'none',wxUseWind:true,wxUseWx:true,wxUseTime:true,season:'auto'};
+  rules:true,cpuCalm:true,markRules:true,markTouch:true,ocs:true,penaltyMode:'one',allMsgs:false,gfx:isTouch?'mittel':'hoch',courseType:'wl',finishUp:false,series:1,revier:'open',mapTrack:false,ladder:true,count10:true,startSound:'horn',rowBoat:'zk10',courseFan:true,windFrom:225,rowDist:500,current:0,currentDir:'lee',coach:true,ghost:true,touchMode:'slider',wxCloud:25,wxPrecip:'none',wxUseWind:true,wxUseWx:true,wxUseTime:true,season:'auto'};
 let S=Object.assign({},DEFAULTS),S_main=null;
 try{const raw=localStorage.getItem('regattakoje.v1');if(raw)Object.assign(S,JSON.parse(raw));}catch(e){}
 if(!CLASSES[S.boatClass])S.boatClass='jolle';
@@ -896,7 +898,8 @@ const SCHEMA=[
   {k:'markRules',label:'Bahnmarkenraum (Regel 18)',type:'check'},
   {k:'markTouch',label:'Tonnenberührung (Regel 31)',type:'check'},
   {k:'ocs',label:'Frühstart zurück (Regel 29.1)',type:'check'},
-  {k:'penaltyMode',label:'Strafe',type:'select',options:[['one','360° für alles'],['rrs','720° Teil 2, 360° Tonne']]},
+  {k:'penaltyMode',label:'Strafe',type:'select',options:[['one','360° für alles']]},
+  {k:'cpuCalm',label:'CPU-Kontakte untereinander am Start & an der Tonne ohne Strafe',type:'check',hint:'Die Boote berühren sich dort trotzdem, kringeln aber nicht – weniger Chaos im Feld'},
   {k:'allMsgs',label:'Auch Vorfälle zwischen CPU-Booten melden',type:'check'}]},
  {group:'Grafik',items:[
   {k:'gfx',label:'Qualität',type:'select',options:[['ultra','Ultra: Leuchten, Farbstimmung, feine Schatten (starke Geräte)'],['hoch','Hoch: Spiegelungen + Schatten'],['mittel','Mittel: Schatten'],['niedrig','Niedrig: schnell']],hint:'Ruckelt es auf dem Handy, eine Stufe runter'},
@@ -3902,7 +3905,8 @@ function courseTo(b,tx,ty){
     else if(ai.thr<50&&b.started&&G.t-ai.lastTack>18&&dist>70){const sh=wrap180(W-G.wind.W0);if(side*sh<-ai.thr){side=-side;ai.lastTack=G.t;ai.commitSide=side;ai.commitUntil=G.t+(CL.key==='topcat'?9:6);}}
     return wrap360(W-side*th);}
   if(abs>be)return wrap360(W-b.side*be);
-  if(s!==b.side){if(abs<90?abs<th+ai.margin:abs>be-ai.margin)return wrap360(W-b.side*(abs<90?th:be));}
+  const lx=ai.margin+(((b.i*7+b.leg*3)%5)*0.9);
+  if(s!==b.side){if(abs<90?abs<th+lx:abs>be-lx)return wrap360(W-b.side*(abs<90?th:be));}
   return B;
 }
 function avoid(b,hd){
@@ -3910,10 +3914,10 @@ function avoid(b,hd){
   for(const o of G.boats){if(o===b||o.finished)continue;const dx=o.x-b.x,dy=o.y-b.y,d=Math.hypot(dx,dy);if(d>35)continue;
     const fb=dirv(hd),fo=dirv(o.h),vb=Math.max(b.v,1);const rvx=fo[0]*o.v-fb[0]*vb,rvy=fo[1]*o.v-fb[1]*vb;const rv2=rvx*rvx+rvy*rvy;
     const tc=rv2>1e-4?clamp(-(dx*rvx+dy*rvy)/rv2,0,7):0;const dmin=Math.hypot(dx+rvx*tc,dy+rvy*tc);if(dmin>ai.avoid*(L/4.7*0.5+0.5))continue;
-    const kc=keepClear(b,o);if(kc.who!==b)continue;const pri=1/(tc+0.5);if(pri<best)continue;best=pri;
+    const kc=keepClear(b,o);const gw=kc.who===b;if(!gw&&!(o.ai&&!o.isPlayer&&tc<2.6&&dmin<L*0.85))continue;const pri=1/(tc+0.5);if(pri<best)continue;best=pri;
     const sx=o.x-fo[0]*L*2.3,sy=o.y-fo[1]*L*2.3;const hDuck=brg(b.x,b.y,sx,sy);const aD=Math.abs(wrap180(b.W-hDuck));
     const cr=fb[0]*dy-fb[1]*dx;const away=wrap360(hd+(cr<0?-30:30));
-    let pk=(kc.rule==='10'||kc.rule==='12'||kc.rule.indexOf('22')===0)&&aD>34?hDuck:away;
+    let pk=gw&&(kc.rule==='10'||kc.rule==='12'||kc.rule.indexOf('22')===0)&&aD>34?hDuck:away;
     const ap=wrap180(b.W-pk);if(Math.abs(ap)<32)pk=wrap360(b.W-sgn(ap)*32);out=pk;}
   const fo=dirv(out),vv=Math.max(b.v,1.2);
   for(const ob of G.course.obst){const cx=(ob.ax+ob.bx)/2,cy=(ob.ay+ob.by)/2;if(Math.hypot(cx-b.x,cy-b.y)>30)continue;
@@ -3932,6 +3936,25 @@ function finishAim(b){const C=G.course;const fc=C.finishUp?C.fin.c:{x:0,y:0},hal
   if(al*dirS>L*1.5){ /* schon hinter der Linie, aber nicht durchgefahren -> zurück auf die Kursseite, dann neu durch die Linie */
     const back=Math.max(14,L*3);return {x:fc.x+C.R[0]*lt-C.U[0]*dirS*back,y:fc.y+C.R[1]*lt-C.U[1]*dirS*back};}
   return {x:fc.x+C.R[0]*lt+C.U[0]*dirS*ahead,y:fc.y+C.R[1]*lt+C.U[1]*dirS*ahead};}
+function finishFix(b,hd){
+  const C=G.course,ai=b.ai;if(C.lesson)return hd;
+  const fc=C.finishUp?C.fin.c:{x:0,y:0},half=(C.finishUp?C.fin.len:C.lineLen)/2,dirS=C.finishUp?1:-1;
+  const f=dirv(b.h),bx=b.x+f[0]*L/2-fc.x,by=b.y+f[1]*L/2-fc.y;
+  const al=(bx*C.U[0]+by*C.U[1])*dirS,lat=bx*C.R[0]+by*C.R[1];
+  if(al>=0||al<-260)return hd;
+  const pred=h=>{const d=dirv(h),ds=(d[0]*C.U[0]+d[1]*C.U[1])*dirS,dl=d[0]*C.R[0]+d[1]*C.R[1];if(ds<0.12)return 1e9;return lat+(-al/ds)*dl;};
+  const lim=half*(C.finishUp?0.7:0.75),p0=Math.abs(pred(hd));
+  if(p0<=lim)return hd;
+  if(G.t-(ai.finFlip||-99)<5)return hd;
+  const o=opt(b.twsL,true,b.headsail),W=b.W;const aN=Math.abs(wrap180(W-hd));
+  let alt=null;
+  if(C.finishUp){if(aN<=o.up+8)alt=wrap360(W+sgn(wrap180(W-hd))*o.up);}
+  else{if(aN>=o.down-8)alt=wrap360(W+sgn(wrap180(W-hd))*o.down);}
+  if(alt==null)return hd;
+  const p1=Math.abs(pred(alt));
+  if(p1<p0-1.5){ai.finFlip=G.t;return alt;}
+  return hd;
+}
 function aiDecide(b){
   const C=G.course,ai=b.ai,W=b.W;
   if(b.finished){b.spiWant=false;const px=-C.U[0]*75+C.R[0]*(b.i*12-40),py=-C.U[1]*75+C.R[1]*(b.i*12-40);if(Math.hypot(px-b.x,py-b.y)<15)return wrap360(W-b.side*22);return courseTo(b,px,py);}
@@ -3966,7 +3989,7 @@ function aiDecide(b){
       else{tx=m.x-m.n[0]*K-m.d[0]*Bk;ty=m.y-m.n[1]*K-m.d[1]*Bk;}}
     else if(dm<Math.max(28,L*3)&&al>-14){far=false;if(al<2.5){tx=m.x-m.n[0]*off+m.d[0]*3.5;ty=m.y-m.n[1]*off+m.d[1]*3.5;}else{tx=m.x+m.d[0]*8+m.n[0]*off;ty=m.y+m.d[1]*8+m.n[1]*off;}}
     else{tx=m.x-m.n[0]*off-m.d[0]*2;ty=m.y-m.n[1]*off-m.d[1]*2;}}
-  const hd=courseTo(b,tx,ty);
+  let hd=courseTo(b,tx,ty);if(tgt==='finish')hd=finishFix(b,hd);
   const distT=Math.hypot(tx-b.x,ty-b.y);
   b.spiWant=!!CL.spi&&!C.lesson&&down&&Math.abs(b.a)>100&&(G.t-b.legT)>ai.spiDelay&&(tgt==='finish'||(far&&distT>40));
   return avoid(b,hd);
@@ -4030,12 +4053,22 @@ function rowFault(A,B){const k=keepClear(A,B);if(!['10','11','12'].includes(k.ru
   const f=ruleFault(R,K,k.rule);return f?{who:R,rule:f.rule,txt:f.txt}:k;}
 function givePenalty(b,rule,txt,part2,other){if(G.boats)(G.incidents=G.incidents||[]).push({t:G.t,rule,txt,a:G.boats.indexOf(b),b:other?G.boats.indexOf(other):null,x:b.x,y:b.y});
   if(b.isPlayer&&G.events)ev('pen','Strafe: Regel '+rule+' ('+txt+')'+(other?' ggü. '+other.name:''),false);
-  const deg=part2&&S.penaltyMode==='rrs'?720:360;if(!b.isPlayer&&b.ai&&b.penalty>0)return;b.penalty+=deg;b.penCount++;
+  const deg=360;if(!b.isPlayer&&b.ai&&b.penalty>0)return;
+  if(b.isPlayer&&b.penalty>0&&G.t-(b.lastPenT??-99)<12){if(G.incidents&&G.incidents.length)G.incidents[G.incidents.length-1].merged=true;return;}
+  b.lastPenT=G.t;b.penalty=Math.min(b.penalty+deg,360);b.penCount++;
   if(G.lesson){if(b.isPlayer)G.lesson.playerPen={rule,txt};else G.lesson.cpuPen={rule,txt};}
   if(b.isPlayer){msg('Strafe '+deg+'°: Regel '+rule+' ('+txt+')'+(other?' ggü. '+other.name:''),'bad');beep(196,0.5,'square',0.06);}
   else if(other&&other.isPlayer)msg(b.name+' muss kringeln · Regel '+rule+' ('+txt+')','good');
   else if(S.allMsgs)msg(b.name+' kringelt · Regel '+rule,'info');
 }
+function cpuCalm(A,B){
+  if(S.cpuCalm===false||!A.ai||!B.ai||A.isPlayer||B.isPlayer)return false;
+  const C=G.course;if(G.t<40)return true;
+  if(markZone(A,B))return true;
+  const R=(S.zone+2)*L;
+  for(const m of C.seq){if(!m||m==='finish'||m==='free'||m.x==null)continue;
+    if(Math.hypot(A.x-m.x,A.y-m.y)<R&&Math.hypot(B.x-m.x,B.y-m.y)<R)return true;}
+  return false;}
 function collisions(dt){
   const bs=G.boats;const hl=L*0.47,lim=(L+BEAM)*(L+BEAM);
   for(let i=0;i<bs.length;i++){const A=bs[i];if(A.finished||A.rib||A.gone)continue;const fA=dirv(A.h);
@@ -4044,7 +4077,7 @@ function collisions(dt){
       if(sd<BEAM){const d=Math.hypot(dx,dy)||1;const push=(BEAM-sd)*0.5+0.02;const pa=B.remote?2*push:push,pb=A.remote?2*push:push;if(!A.remote){A.x+=dx/d*pa;A.y+=dy/d*pa;A.v*=1-2*dt;}if(!B.remote){B.x-=dx/d*pb;B.y-=dy/d*pb;B.v*=1-2*dt;}
         if(G.lesson)G.lesson.contact=true;
         const key=A.i+'-'+B.i;if(G.t-(G.hits[key]??-99)>6){G.hits[key]=G.t;
-          if(S.rules){const k=rowFault(A,B);const other=k.who===A?B:A;if(!k.who.remote)givePenalty(k.who,k.rule,k.txt,true,other);else if(bs[0].rib)(G.incidents=G.incidents||[]).push({t:G.t,rule:k.rule,txt:k.txt,a:bs.indexOf(k.who),b:bs.indexOf(other),x:k.who.x,y:k.who.y});}
+          if(S.rules&&!cpuCalm(A,B)){const k=rowFault(A,B);const other=k.who===A?B:A;if(!k.who.remote)givePenalty(k.who,k.rule,k.txt,true,other);else if(bs[0].rib)(G.incidents=G.incidents||[]).push({t:G.t,rule:k.rule,txt:k.txt,a:bs.indexOf(k.who),b:bs.indexOf(other),x:k.who.x,y:k.who.y});}
           else if(A.isPlayer||B.isPlayer)msg('Berührung','warn');}}}
     if(A.remote)continue;
     for(let k=0;k<G.course.obst.length;k++){const ob=G.course.obst[k];if(ob.pier){hbPierHit(A,ob,k,dt,fA,hl);continue;}
@@ -4427,7 +4460,67 @@ function openAnalysis(from){anaFrom=from;$(from).hidden=true;$('anaOv').hidden=f
   if(incs.length){const hd=document.createElement('div');hd.className='evhd';hd.textContent='Regel-Clips ('+incs.length+') – antippen zum Abspielen';li.prepend(hd);let at=hd;
     for(const c of incs){const bt=document.createElement('button');bt.type='button';bt.className='ev';bt.innerHTML='<b>'+fmtT(c.t)+'</b><span></span>';bt.lastChild.textContent='▶ Regel '+c.rule+': '+(G.boats[c.a]?G.boats[c.a].name:'?')+' – '+c.txt+(c.b!=null&&G.boats[c.b]?' ggü. '+G.boats[c.b].name:'');bt.onclick=()=>playClip(c);at.after(bt);at=bt;}}
   for(const m of (G.tmarks||[])){const bt=document.createElement('button');bt.type='button';bt.className='ev good';bt.innerHTML='<b>'+fmtT(m.t)+'</b><span></span>';bt.lastChild.textContent='★ Markiert: '+m.name;bt.onclick=()=>{anaPlaying=false;anaZoom={x:m.x,y:m.y,r:80};anaHi=null;anaT=m.t;$('anaT').value=Math.round((anaT-anaRange[0])/(anaRange[1]-anaRange[0]||1)*1000);drawAna();};li.appendChild(bt);}
+  try{renderTips();}catch(e){console.error('Tipps',e);}
   requestAnimationFrame(drawAna);}
+/* Tipps & schnellster Weg (Analyse) */
+function renderTips(){
+  const box=$('anaTips');if(!box)return;box.innerHTML='';
+  const pl=P(),C=G.course,A=G.ana;
+  if(!pl||pl.rib||G.lesson||G.drill||!G.rec[0]||G.rec[0].length<10||!pl.started)return;
+  const rec=G.rec[0],wr=G.windRec,hs=pl.headsail,tws=S.tws,hasSpi=!!CL.spi;
+  const f1=x=>x.toFixed(1).replace('.',','),r0=Math.round;
+  const oU=opt(tws,false,hs),oD=opt(tws,hasSpi,hs),oD0=opt(tws,false,hs);
+  const vU=a=>polarSpeed(tws,a,0,hs)*Math.cos(a*DEG);
+  const vD=(a,sp)=>-polarSpeed(tws,a,sp?1:0,hs)*Math.cos(a*DEG);
+  const t0=pl.startT!=null?pl.startT:0,t1=pl.finished?pl.finishT:rec[rec.length-1][0];
+  const wmA=C.wm?C.wm.x*C.U[0]+C.wm.y*C.U[1]:S.legLength;
+  let nu=0,sU=0,offU=0,hdr=0,nd=0,sD=0,offD=0,spiD=0,tBeat=null,shS=0,shN=0;
+  for(let j=0;j<rec.length;j++){const q=rec[j],w=wr[j];if(!w||q[0]<t0||q[0]>t1)continue;
+    const twa=Math.abs(wrap180(w[1]-q[3])),al=q[1]*C.U[0]+q[2]*C.U[1];
+    if(tBeat==null&&al>=wmA*0.9)tBeat=q[0];
+    if(tBeat==null){shS+=wrap180(w[1]-C.W0);shN++;}
+    if(twa<80){nu++;sU+=twa;if(Math.abs(twa-oU.up)>5)offU++;const sh=wrap180(w[1]-C.W0),sd=wrap180(w[1]-q[3])>=0?1:-1;if(sd*sh<-4)hdr++;}
+    else if(twa>115){nd++;sD+=twa;const sp=(q[4]&2)?1:0;spiD+=sp;if(Math.abs(twa-(sp?oD.down:oD0.down))>8)offD++;}}
+  const fast=[],key=[];
+  /* ---- Schnellster Weg ---- */
+  const vu=vU(oU.up),hi=vU(oU.up-8),lo=vU(oU.up+8);
+  fast.push('<b>Am Wind:</b> Bei '+tws+' kn ist dein bester Winkel etwa <b>'+oU.up+'°</b> zum wahren Wind (Höhe '+f1(vu)+' kn). Acht Grad zu hoch kosten '+r0((1-hi/vu)*100)+' % Höhe, acht Grad zu tief '+r0((1-lo/vu)*100)+' %.');
+  if(nu>20){const av=sU/nu;fast.push('Du bist im Schnitt <b>'+r0(av)+'°</b> gesegelt'+(Math.abs(av-oU.up)>3?' – '+(av<oU.up?'zu hoch (Fahrt fehlt, Boot stallt)':'zu tief (verschenkte Höhe)'):' – sehr gut')+', in '+r0(offU/nu*100)+' % der Zeit mehr als 5° daneben.');}
+  const dv=vD(oD.down,hasSpi),d180=vD(180,hasSpi);
+  fast.push('<b>Raumschots:</b> Der beste Winkel ist etwa <b>'+oD.down+'°</b>'+(hasSpi?' mit Spi':'')+' (VMG '+f1(dv)+' kn). Direkt vor dem Wind (180°) bleiben nur '+r0(d180/dv*100)+' % davon – lieber im Zickzack halsen.');
+  if(nd>20){const av=sD/nd;fast.push('Du bist im Schnitt <b>'+r0(av)+'°</b> gesegelt'+(Math.abs(av-oD.down)>6?' ('+(av>oD.down?'zu tief, bring den Winkel höher':'zu hoch, fall mehr ab')+')':' – gut')+(hasSpi?' · Spi in '+r0(spiD/nd*100)+' % der Raumschotszeit':'')+'.');}
+  /* Seite der Kreuz */
+  const n=G.boats.length;let sideTxt='';
+  if(n>=3&&C.wm){const rows=[];
+    G.boats.forEach((b,i)=>{if(b.rib||b.ghost||!G.rec[i])return;let s=0,c=0;for(const q of G.rec[i]){if(q[0]<0)continue;const al=q[1]*C.U[0]+q[2]*C.U[1];if(al>=wmA*0.9)break;if(al<20)continue;s+=q[1]*C.R[0]+q[2]*C.R[1];c++;}
+      if(c>8)rows.push({i,lat:s/c,pr:progress(b)});});
+    if(rows.length>=3){rows.sort((a,b)=>b.pr-a.pr);const k=Math.max(1,Math.floor(rows.length/2));let top=0;for(let z=0;z<k;z++)top+=rows[z].lat;top/=k;
+      const me=rows.find(r=>r.i===0);if(me){const side=x=>x>0?'rechts':'links';
+        sideTxt='<b>Kurs der Kreuz:</b> Die vorderen Boote lagen im Schnitt '+r0(Math.abs(top))+' m '+side(top)+' der Mittellinie, du '+r0(Math.abs(me.lat))+' m '+side(me.lat)+'.'+(Math.abs(top-me.lat)>=12?' Probier beim nächsten Mal die '+side(top)+'e Seite.':' Ihr wart auf derselben Seite.');}}}
+  if(shN>10){const m=shS/shN;sideTxt+=(sideTxt?' ':'<b>Wind:</b> ')+'Der Wind drehte auf der Kreuz im Mittel '+(Math.abs(m)<2?'kaum (unter 2°)':f1(Math.abs(m))+'° nach '+(m>0?'rechts – der Steuerbordbug lag im Lift':'links – der Backbordbug lag im Lift'))+'.';}
+  if(sideTxt)fast.push(sideTxt);
+  if(nu>20)fast.push('<b>Wenden:</b> '+A.tacks+' Wenden, '+r0(hdr/nu*100)+' % der Kreuzzeit im Header'+(hdr/nu>0.35?' – wende früher, sobald du im Header segelst, und bleib im Lift.':' – gut gelöst.')+' Jede Wende kostet Fahrt; wende nur für Dreher oder an der Layline.');
+  /* ---- Worauf es ankommt (nach Gewicht sortiert) ---- */
+  const gs=G.gunStat,items=[];
+  if(pl.penCount>0)items.push([pl.penCount*10,'<b>Strafen:</b> '+pl.penCount+' Kringel. Jeder kostet Fahrt und Plätze. Früh ausweichen, Wegerecht und Bahnmarkenraum kennen, Kontakt vermeiden.']);
+  if(gs){const late=pl.startT!=null?pl.startT:null,vt=polarSpeed(tws,oU.up,0,hs)*KN,vp=clamp(gs.v/vt,0,1.3);
+    if(gs.ocs)items.push([9,'<b>Start:</b> Frühstart. Nimm in den letzten 10 s Fahrt raus (anluven, fieren) und beschleunige erst ~5 s vor dem Schuss.']);
+    else if(late!=null&&late>4)items.push([6,'<b>Start:</b> '+r0(late)+' s nach dem Schuss gestartet. Pass auf Abstand ÷ Fahrt auf, der Wert steht oben links.']);
+    else if(vp<0.7)items.push([5,'<b>Start:</b> Beim Schuss nur '+r0(vp*100)+' % der Sollfahrt. Etwa 5 s vorher abfallen und Fahrt aufnehmen.']);
+    else items.push([1,'<b>Start:</b> Sauber, pünktlich und mit Fahrt.']);
+    if(gs.bl>=0.8)items.push([2,'<b>Linie:</b> Das '+gs.fav+'-Ende war '+f1(gs.bl)+' Bootslängen bevorteilt.']);}
+  const cnt=t=>G.events.filter(e=>e.type===t).length;
+  if(cnt('over')>0)items.push([cnt('over')*3,'<b>Layline:</b> '+cnt('over')+'× überstanden. Wende erst, wenn die Tonne gerade noch anliegt, und halte dich lieber in der Mitte der Bahn.']);
+  if(cnt('lift')>0)items.push([cnt('lift')*2,'<b>Wenden:</b> '+cnt('lift')+'× aus dem Lift gewendet. Im Lift bleiben, im Header wenden.']);
+  if(A.dirtyTot>20)items.push([A.dirtyTot/4,'<b>Abdeckung:</b> '+r0(A.dirtyTot)+' s im Windschatten. Früh wenden oder abfallen, statt hinter einem Boot zu hängen.']);
+  if(nd>20&&hasSpi&&spiD/nd<0.6)items.push([4,'<b>Spi/Gennaker:</b> Nur in '+r0(spiD/nd*100)+' % der Raumschotszeit gesetzt. Setz ihn ab ca. 110° zum Wind, wenn die Tonne weit weg ist.']);
+  if(nu>20&&Math.abs(sU/nu-oU.up)>4)items.push([4,'<b>Winkel am Wind:</b> '+r0(sU/nu)+'° statt '+oU.up+'°. Schot und Kurs auf die grüne Zone im Kursfächer abstimmen.']);
+  if(nd>20&&Math.abs(sD/nd-oD.down)>8)items.push([3,'<b>Raumschots-Winkel:</b> '+r0(sD/nd)+'° statt '+oD.down+'°.']);
+  items.sort((a,b)=>b[0]-a[0]);
+  const gen='Start (Fahrt und richtiges Ende) → Wind lesen (im Header wenden) → Winkel und Trimm (Höhe, Spi) → Laylines nicht überstehen → Regeln und sauber an der Tonne.';
+  const li=a=>'<ul>'+a.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+  box.innerHTML='<h3>Schnellster Weg</h3>'+li(fast)+'<h3>Worauf es ankommt</h3>'+li(items.slice(0,5).map(x=>x[1]).concat(['<b>Reihenfolge:</b> '+gen]));
+}
 $('anaT').addEventListener('input',e=>{anaPlaying=false;$('anaPlay').textContent='Abspielen';anaT=anaRange[0]+(anaRange[1]-anaRange[0])*e.target.value/1000;drawAna();});
 $('anaPlay').addEventListener('click',()=>{anaPlaying=!anaPlaying;$('anaPlay').textContent=anaPlaying?'Pause':'Abspielen';if(anaPlaying){if(anaT>=anaRange[1]-0.5)anaT=anaRange[0];let lt=performance.now();const tick=n=>{if(!anaPlaying||$('anaOv').hidden)return;const d=(n-lt)/1000;lt=n;anaT=Math.min(anaRange[1],anaT+d*12);$('anaT').value=Math.round((anaT-anaRange[0])/(anaRange[1]-anaRange[0]||1)*1000);drawAna();if(anaT<anaRange[1])requestAnimationFrame(tick);else{anaPlaying=false;$('anaPlay').textContent='Abspielen';}};requestAnimationFrame(tick);}});
 function drawAna(){const cv=$('anaCv');const dpr=Math.min(2,window.devicePixelRatio||1);const W=cv.clientWidth,H=cv.clientHeight;if(!W)return;if(cv.width!==Math.round(W*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);}
