@@ -243,6 +243,30 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
 .lessons{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:14px}
 .lesson{display:grid;grid-template-columns:auto 1fr auto;gap:2px 12px;align-items:center;text-align:left;background:#0b2531;border:1px solid var(--rule);border-radius:10px;padding:12px 14px;color:var(--ink);font:inherit;cursor:pointer}
 .lesson:hover{border-color:var(--sky)}
+.schgrid .no{font-size:28px}.schgrid .tt small{display:block;font-weight:400;font-size:13px;color:var(--ink-dim);margin-top:2px}
+.ftabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}.ftabs button{font:600 14px var(--f-body);color:var(--ink);background:#0b2531;border:1px solid var(--rule);border-radius:999px;padding:7px 14px;cursor:pointer}.ftabs button.on{background:var(--sky);color:#04192a;border-color:var(--sky)}
+.fchips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.fchip{font:500 13px var(--f-body);color:var(--ink-dim);background:transparent;border:1px solid var(--rule);border-radius:999px;padding:4px 11px;cursor:pointer}.fchip.on{color:var(--ink);border-color:var(--mark)}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.fcard{display:flex;flex-direction:column;align-items:center;gap:8px;background:#0b2531;border:1px solid var(--rule);border-radius:10px;padding:12px 8px;color:var(--ink);font:inherit;cursor:pointer;text-align:center}.fcard:hover{border-color:var(--sky)}
+.fart,.fqart,.fdetArt{display:flex;justify-content:center;align-items:center;min-height:44px}.fstack{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px}.fstack svg{display:block}
+.fnm{font-weight:600;font-size:14px}.fdots{display:flex;gap:3px}.fdots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.15)}.fdots i.on{background:var(--stb)}
+.fprog{height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:12px}.fprog div{height:100%;background:var(--stb)}.fprogT{font-size:12.5px;color:var(--ink-dim);margin-top:4px}
+.fdet{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:20px;align-items:start;margin-top:14px}.fdetNm{margin:2px 0 10px;font-family:var(--f-display);font-size:28px}.fgrp{font-family:var(--f-display);letter-spacing:.1em;text-transform:uppercase;font-size:13px;color:var(--mark)}
+.frows{width:100%;border-collapse:collapse}.frows td{border-top:1px solid var(--rule);padding:8px 6px;vertical-align:top;font-size:14.5px;line-height:1.4}.fact{font-size:18px;width:22px}.fact.up{color:var(--stb)}.fact.dn{color:var(--port)}
+.fsig{white-space:nowrap;text-align:right}.fsig small{display:block;color:var(--ink-dim);font-size:11.5px}.fplay{font:600 14px var(--f-body);background:#0b2531;color:var(--ink);border:1px solid var(--rule);border-radius:6px;padding:3px 8px;cursor:pointer}
+.ftip{color:var(--ink-dim);font-size:14px;line-height:1.5;margin:10px 0 0}
+.fqhead{font-size:13px;color:var(--ink-dim);margin-top:12px}.fq{font-size:18px;font-weight:600;margin:10px 0 12px;line-height:1.35}.fqart{margin-top:10px}
+.fopts{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px}.flagopts{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.fopt{background:#0b2531;border:1px solid var(--rule);border-radius:10px;padding:11px 12px;color:var(--ink);font:500 15px var(--f-body);text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:52px}.fopts:not(.flagopts) .fopt{justify-content:flex-start}
+.fopt:hover:not(:disabled){border-color:var(--sky)}.fopt.right{border-color:var(--stb);background:rgba(63,208,138,.16)}.fopt.wrong{border-color:var(--port);background:rgba(255,79,95,.16)}.fopt:disabled{cursor:default}
+.ffb{margin-top:12px}.fok{color:var(--stb);font-weight:600}.fno{color:var(--port);font-weight:600}.fok b,.fno b{color:var(--ink)}
+.fsigrow{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px 0 2px}.fsr{display:inline-flex;align-items:center;gap:5px}.fsr b{font-size:15px}.fsr b.up{color:var(--stb)}.fsr b.dn{color:var(--port)}
+.fplay{display:inline-block;font:600 14px var(--f-body);background:#0b2531;color:var(--ink);border:1px solid var(--rule);border-radius:6px;padding:4px 9px;cursor:pointer;white-space:nowrap}.fplay:hover{border-color:var(--sky)}
+.fsnd{display:flex;justify-content:center;margin:0 0 12px}.fsnd .fplay{font-size:17px;padding:10px 18px}.fsgl{font-size:16px;letter-spacing:2px;min-width:70px;color:var(--flag)}
+.fopt .fplay{margin-left:auto}.fflag{flex-direction:column;gap:6px}.foptNm{font-size:13px;color:var(--ink-dim);min-height:16px}.ffbrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:8px}.ffbrow .fsigrow{justify-content:flex-start;margin:0}
+.fres{text-align:center;margin-top:14px}.fresN{font-family:var(--f-display);font-size:54px;font-weight:800;color:var(--mark)}
+@media (max-width:620px){.fdet{grid-template-columns:1fr}.fdetArt{justify-content:flex-start}.fgrid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}}
+
 .lesson .no{grid-row:span 2;font-family:var(--f-display);font-weight:800;font-size:30px;color:var(--sky);line-height:1;font-variant-numeric:tabular-nums}
 .lesson .rl{font-family:var(--f-display);font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:13px;color:var(--mark)}
 .lesson .tt{font-weight:600;font-size:15px}
@@ -403,10 +427,11 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
       <button class="btn blue" id="drillBtn" type="button">Startübung</button>
       <button class="btn blue" id="freeBtn" type="button">Freies Training</button>
       <button class="btn blue" id="mpBtn" type="button">Mehrspieler</button>
-      <button class="btn blue" id="hbBtn" type="button">Hafen &amp; MOB</button>
+      <button class="btn blue" id="schoolBtn" type="button">Seesportschule</button>
+      <button class="btn blue" id="hbBtn" type="button" hidden>Hafen &amp; MOB</button>
       <button class="btn blue" id="rowBtn" type="button">Rudern</button>
       <button class="btn blue" id="dsBtn" type="button">Bootsdesigner</button>
-      <button class="btn blue" id="tutBtn" type="button">Regel-Tutorial</button>
+      <button class="btn blue" id="tutBtn" type="button" hidden>Regel-Tutorial</button>
       <button class="btn ghost" id="ghostLoadBtn" type="button">Fahrt laden</button>
       <button class="btn ghost" id="gpxBtn" type="button">Ufer laden (GPX)</button>
       <button class="btn blue" id="edBtn" type="button">Gelände- &amp; Seeeditor (2D)</button>
@@ -446,7 +471,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
           <li><b>10</b> Backbord hält frei von Steuerbord</li>
           <li><b>11</b> Luv hält frei von Lee · <b>12</b> klar achteraus hält frei</li>
           <li><b>13</b> wendendes Boot hält frei</li>
-          <li><b>18</b> Bahnmarkenraum in der Zone (nicht bei Gegenbug an der Luvtonne)</li>
+          <li><b>18</b> Bahnmarkenraum in der Zone (nicht bei entgegengesetztem Schlag an der Luvtonne)</li>
           <li><b>22</b> kringelnde Boote und zurückkehrende Frühstarter halten frei</li>
           <li><b>29.1</b> Frühstart: zurück hinter die Linie · <b>31</b> Tonne berührt</li>
           <li><b>44.2</b> Strafe: 360° (wahlweise 720° für Teil 2)</li>
@@ -482,6 +507,30 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
     <p class="rules" style="padding:0">Stand: November 2026</p>
     </section>
     <div class="actions"><button class="btn" id="legalClose" type="button">Schließen</button></div>
+  </div>
+</div>
+
+<div id="schoolOv" class="overlay" hidden>
+  <div class="card" style="max-width:820px">
+    <div class="sub" style="font-family:var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:var(--mark);font-size:14px">Leipziger Seesportclub</div>
+    <h2>Seesportschule</h2>
+    <p class="lede" style="margin:4px 0 0">Alles zum Lernen an einem Ort: Wettfahrtregeln auf dem Wasser, Hafenmanöver und Mann über Bord, und die Signalflaggen der Wettfahrtleitung.</p>
+    <div class="lessons schgrid">
+      <button type="button" class="lesson" data-sch="tut"><span class="no">§</span><span class="rl">Regeln</span><span class="ck"></span><span class="tt">Regel-Tutorial</span></button>
+      <button type="button" class="lesson" data-sch="hb"><span class="no">⚓</span><span class="rl">Manöver</span><span class="ck"></span><span class="tt">Hafen &amp; Mann über Bord</span></button>
+      <button type="button" class="lesson" data-sch="flags"><span class="no">⚑</span><span class="rl">Signale</span><span class="ck"></span><span class="tt">Flaggen lernen<small id="schFlagSub"></small></span></button>
+    </div>
+    <div class="actions"><button class="btn ghost" id="schBack" type="button">Hauptmenü</button></div>
+  </div>
+</div>
+
+<div id="flagOv" class="overlay" hidden>
+  <div class="card" style="max-width:880px">
+    <div class="sub" style="font-family:var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:var(--mark);font-size:14px">Seesportschule</div>
+    <h2>Flaggen der Wettfahrtleitung</h2>
+    <div class="ftabs" id="flagTabs"><button type="button" data-m="cards">Lernkarten</button><button type="button" data-m="f2m">Flagge → Bedeutung</button><button type="button" data-m="m2f">Bedeutung → Flagge</button><button type="button" data-m="mix">Gemischt</button><button type="button" data-m="snd">Schallsignale</button><button type="button" data-m="seq">Startablauf</button></div>
+    <div id="flagBody"></div>
+    <div class="actions"><button class="btn ghost" id="flagBack" type="button">Seesportschule</button></div>
   </div>
 </div>
 
@@ -4021,7 +4070,7 @@ function keepClear(A,B){
     if(dOut>mz.R)return {who:out,rule:'18.2(a)',txt:'noch nicht in der Zone – Bahnmarkenraum geben'};
     if(clearAstern(ins,out))return {who:ins,rule:'18.2(a)',txt:'nicht überlappt, achteraus – Bahnmarkenraum geben'};return {who:out,rule:'18.2(a)',txt:'Außenboot – Bahnmarkenraum geben'};}
   const tA=tackOf(A),tB=tackOf(B);
-  if(tA!==tB)return tA<0?{who:A,rule:'10',txt:'Backbordbug'}:{who:B,rule:'10',txt:'Backbordbug'};
+  if(tA!==tB)return tA<0?{who:A,rule:'10',txt:'Backbordschlag'}:{who:B,rule:'10',txt:'Backbordschlag'};
   if(clearAstern(A,B))return {who:A,rule:'12',txt:'klar achteraus'};
   if(clearAstern(B,A))return {who:B,rule:'12',txt:'klar achteraus'};
   const u=dirv((A.W+B.W)/2);return (A.x*u[0]+A.y*u[1])>(B.x*u[0]+B.y*u[1])?{who:A,rule:'11',txt:'Luvboot'}:{who:B,rule:'11',txt:'Luvboot'};
@@ -4178,41 +4227,41 @@ function diagram(d){let s='<svg viewBox="0 0 260 190" role="img" aria-label="Ski
   return s+'</svg>';}
 const LESSONS=[
  {id:'r10a',rule:'Regel 10',title:'Backbord hält frei',
-  text:'Sind zwei Boote auf verschiedenen Bugs, muss das Boot auf Backbordbug freihalten. Backbordbug heißt: Der Wind kommt von Backbord (links), dein Großbaum steht an Steuerbord. Freihalten bedeutet, dass das Wegerechtsboot seinen Kurs ohne Ausweichen weitersegeln kann. Merksatz: Der Baum steht immer auf der anderen Seite als der Wind. Wer den Baum an Backbord hat, segelt Steuerbordbug und hat Wegerecht; wer den Baum an Steuerbord hat, segelt Backbordbug und muss freihalten.',
-  task:'Du bist auf Backbordbug, NED 7 kommt auf Steuerbordbug. Halte frei: früh abfallen und hinter seinem Heck durch (ducken) oder vorher wenden.',
+  text:'Sind zwei Boote auf entgegengesetztem Schlag, muss das Boot auf Backbordschlag freihalten. Backbordschlag heißt: Der Wind kommt von Backbord (links), dein Großbaum steht an Steuerbord. Freihalten bedeutet, dass das Wegerechtsboot seinen Kurs ohne Ausweichen weitersegeln kann. Merksatz: Der Baum steht immer auf der anderen Seite als der Wind. Maßgeblich ist die Luvseite – deshalb sprechen die Wettfahrtregeln heute von Backbord- und Steuerbordschlag; „Bug“ wird umgangssprachlich manchmal nach der Segelseite benannt und ist daher missverständlich. Quellen: Wettfahrtregeln 2025–2028, Definition „Schlag“: „Ein Boot ist auf dem Schlag, Steuerbord oder Backbord, der seiner Luvseite entspricht.“ – KVR Regel 12: Ausweichen muss das Fahrzeug, das „den Wind von Backbord hat“; Luvseite ist „die Seite, die dem gesetzten Großsegel gegenüberliegt“. – BinSchStrO § 6.02a Nr. 5 (Binnengewässer, also auch Cospudener See). Wer den Baum an Backbord hat, segelt Steuerbordschlag und hat Wegerecht; wer den Baum an Steuerbord hat, segelt Backbordschlag und muss freihalten.',
+  task:'Du bist auf Backbordschlag, NED 7 kommt auf Steuerbordschlag. Halte frei: früh abfallen und hinter seinem Heck durch (ducken) oder vorher wenden.',
   dia:{boats:[[85,135,45,'#ffd23f','Du'],[175,135,315,'#e5484d','NED 7']],tracks:[[85,135,45,62],[175,135,315,62]],hit:[130,92]},
   setup(G){const v=V45(),T=14;const p=G.boats[0],c=G.boats[1];let d=dirv(45);placeB(p,-d[0]*v*T,40-d[1]*v*T,45,v);d=dirv(315);placeB(c,-d[0]*v*(T-0.7),40-d[1]*v*(T-0.7),315,v);c.ai.script=hold(1,45);G.lesson.T=T;},
   check(G,Ls){if(Ls.t>Ls.T+8)return {ok:true,why:'Sauber freigehalten. Als Backbordboot lohnt es sich, früh zu entscheiden: Je früher du abfällst, desto weniger Höhe verlierst du. Wenden ist die Alternative, wenn du auf die rechte Seite willst.'};}},
  {id:'r10b',rule:'Regel 10 + 16',title:'Du hast Wegerecht',
-  text:'Jetzt bist du auf Steuerbordbug und hast Wegerecht. Regel 16: Ändert ein Wegerechtsboot seinen Kurs, muss es dem anderen Boot Raum zum Freihalten geben. Regel 14: Auch mit Wegerecht musst du eine Berührung vermeiden, wenn das vernünftig möglich ist.',
-  task:'Halte einfach deinen Kurs. NED 7 auf Backbordbug muss ausweichen. Nicht steuern!',
+  text:'Jetzt bist du auf Steuerbordschlag und hast Wegerecht. Regel 16: Ändert ein Wegerechtsboot seinen Kurs, muss es dem anderen Boot Raum zum Freihalten geben. Regel 14: Auch mit Wegerecht musst du eine Berührung vermeiden, wenn das vernünftig möglich ist.',
+  task:'Halte einfach deinen Kurs. NED 7 auf Backbordschlag muss ausweichen. Nicht steuern!',
   dia:{boats:[[175,135,315,'#ffd23f','Du'],[85,135,45,'#e5484d','NED 7']],tracks:[[85,135,45,62],[175,135,315,62]],hit:[130,92]},
   setup(G){const v=V45(),T=14;const p=G.boats[0],c=G.boats[1];let d=dirv(315);placeB(p,-d[0]*v*T,40-d[1]*v*T,315,v);d=dirv(45);placeB(c,-d[0]*v*(T-0.7),40-d[1]*v*(T-0.7),45,v);c.ai.script=b=>avoid(b,hold(-1,45)(b));G.lesson.T=T;},
   check(G,Ls){const p=P();if(Ls.t<Ls.T+2&&Math.abs(Math.abs(p.a)-45)>14)return {ok:false,why:'Du hast deinen Kurs deutlich geändert. Regel 16: Das Wegerechtsboot darf den Kurs nur so ändern, dass das andere Boot noch freihalten kann. Wer auf das ausweichende Boot zusteuert („jagt“), verstößt dagegen.'};
     if(Ls.t>Ls.T+8)return {ok:true,why:Ls.cpuPen?'NED 7 hat nicht freigehalten und muss kringeln. Du hast alles richtig gemacht: Kurs gehalten.':'Richtig: Kurs halten und das Backbordboot ausweichen lassen. Es ist hinter deinem Heck durchgegangen.'};}},
  {id:'r11',rule:'Regel 11',title:'Luv hält frei von Lee',
-  text:'Sind zwei Boote auf dem gleichen Bug und überlappen sich, hält das Luvboot frei vom Leeboot. Überlappen heißt: Keiner ist klar voraus. Das Leeboot darf anluven, muss dir nach Regel 16 aber Raum lassen, dass du ausweichen kannst.',
+  text:'Sind zwei Boote auf dem gleichen Schlag und überlappen sich, hält das Luvboot frei vom Leeboot. Überlappen heißt: Keiner ist klar voraus. Das Leeboot darf anluven, muss dir nach Regel 16 aber Raum lassen, dass du ausweichen kannst.',
   task:'Du bist das Luvboot. NED 7 in Lee luvt langsam an. Halte frei: mit anluven, Fahrt rausnehmen oder einer Wende.',
   dia:{boats:[[160,95,315,'#ffd23f','Du'],[125,125,315,'#e5484d','NED 7']],tracks:[[125,125,330,55],[160,95,315,50]],arc:'M118,112 Q120,80 145,62'},
   setup(G){const v=V45();const p=G.boats[0],c=G.boats[1];placeB(p,0,0,315,v);const l=dirv(225),f=dirv(315);placeB(c,l[0]*6+f[0]*3,l[1]*6+f[1]*3,315,v);c.ai.perf=1.2;
     c.ai.script=b=>{const t=G.lesson.t;const twa=t<3?45:t<16?Math.max(30,45-(t-3)*3.5):45;return wrap360(b.W-twa);};},
   check(G,Ls){if(Ls.t>24)return {ok:true,why:'Gut freigehalten. Als Luvboot musst du immer damit rechnen, dass das Leeboot anluvt. Hat das Leeboot die Überlappung allerdings von achtern hergestellt, darf es nach Regel 17 nicht über seinen richtigen Kurs anluven.'};}},
  {id:'r12',rule:'Regel 12',title:'Klar achteraus hält frei',
-  text:'Auf gleichem Bug ohne Überlappung hält das Boot klar achteraus frei. Sobald du überlappst, gilt Regel 11: Gehst du in Luv vorbei, hältst du als Luvboot weiter frei. Gehst du in Lee vorbei, darfst du nach Regel 17 nicht über deinen richtigen Kurs anluven.',
+  text:'Auf gleichem Schlag ohne Überlappung hält das Boot klar achteraus frei. Sobald du überlappst, gilt Regel 11: Gehst du in Luv vorbei, hältst du als Luvboot weiter frei. Gehst du in Lee vorbei, darfst du nach Regel 17 nicht über deinen richtigen Kurs anluven.',
   task:'Du bist schneller als NED 7. Überhole ohne Berührung, in Luv oder in Lee.',
   dia:{boats:[[180,95,270,'#ffd23f','Du'],[95,95,270,'#e5484d','NED 7']],tracks:[[180,95,270,60]]},
   setup(G){const v=polarSpeed(10,100,0,'fock')*KN;const p=G.boats[0],c=G.boats[1];placeB(p,0,0,260,v);const f=dirv(260);placeB(c,f[0]*14,f[1]*14,260,v*0.55);c.ai.perf=0.5;c.ai.script=hold(1,100);},
   check(G,Ls){const p=P(),c=G.boats[1];const f=dirv(c.h);const ahead=(p.x-c.x)*f[0]+(p.y-c.y)*f[1];if(ahead>L+1)return {ok:true,why:'Überholt. Merke: Von hinten bist du nach Regel 12 in der Pflicht. Überholen in Lee bringt dich aus dem Windschatten, aber Regel 17 bremst dein Anluven.'};
     if(Ls.t>75)return {ok:false,why:'Zu lange gebraucht. Steuere am Boot vorbei, entweder etwas höher (Luv) oder tiefer (Lee).'};}},
  {id:'r13',rule:'Regel 13',title:'Während der Wende',
-  text:'Ab dem Moment, in dem ein Boot durch den Wind geht, bis es auf Am-Wind-Kurs ist, muss es von anderen Booten freihalten, egal auf welchem Bug. Danach gelten wieder die normalen Regeln. Regel 15: Wer durch eigene Aktion Wegerecht bekommt, muss dem anderen zunächst Raum zum Freihalten geben.',
+  text:'Ab dem Moment, in dem ein Boot durch den Wind geht, bis es auf Am-Wind-Kurs ist, muss es von anderen Booten freihalten, egal auf welchem Schlag. Danach gelten wieder die normalen Regeln. Regel 15: Wer durch eigene Aktion Wegerecht bekommt, muss dem anderen zunächst Raum zum Freihalten geben.',
   task:'NED 7 wendet vor dir. Halte Kurs, solange er wendet. Danach ist er klar voraus und du musst freihalten.',
   dia:{boats:[[170,140,315,'#ffd23f','Du'],[110,85,10,'#e5484d','NED 7 wendet']],tracks:[[170,140,315,70]],arc:'M95,100 Q100,70 125,72'},
   setup(G){const v=V45();const p=G.boats[0],c=G.boats[1];placeB(p,0,0,315,v);const f=dirv(315),l=dirv(225);placeB(c,f[0]*24+l[0]*9,f[1]*24+l[1]*9,45,v);
     c.ai.script=b=>G.lesson.t<1.5?hold(-1,45)(b):hold(1,45)(b);},
   check(G,Ls){if(Ls.t>24)return {ok:true,why:Ls.cpuPen?'NED 7 hat beim Wenden nicht freigehalten und muss kringeln. Du warst im Recht.':'Richtig. Während der Wende musste NED 7 freihalten, danach warst du klar achteraus und hast selbst freigehalten. Achte auch auf seine Abdeckung.'};}},
  {id:'r18',rule:'Regel 18',title:'Bahnmarkenraum',mark:true,
-  text:'Erreicht das erste von zwei überlappenden Booten die Zone (hier 3 Bootslängen um die Tonne), muss das Außenboot dem Innenboot Bahnmarkenraum geben: Raum, um zur Tonne zu segeln und sie zu runden. Ausnahme: an der Luvtonne, wenn die Boote auf verschiedenen Bugs sind.',
+  text:'Erreicht das erste von zwei überlappenden Booten die Zone (hier 3 Bootslängen um die Tonne), muss das Außenboot dem Innenboot Bahnmarkenraum geben: Raum, um zur Tonne zu segeln und sie zu runden. Ausnahme: an der Luvtonne, wenn die Boote auf entgegengesetztem Schlag sind.',
   task:'Du bist innen. Runde die Leetonne an Backbord (Tonne links lassen), eng und ohne sie zu berühren. Der gelbe Pfeil zeigt die Richtung.',
   dia:{boats:[[140,45,170,'#ffd23f','Du'],[110,45,170,'#e5484d','NED 7']],mark:[152,128],zone:[152,128,40],tracks:[[140,45,170,70]]},
   setup(G){const v=polarSpeed(10,170,0,'fock')*KN;const p=G.boats[0],c=G.boats[1];placeB(p,-6,52,172,v);placeB(c,-11.5,52,172,v);},
@@ -4227,8 +4276,8 @@ const LESSONS=[
     if(Ls.given&&p.penalty===0)return {ok:true,why:'Kringel erledigt. Im Rennen gilt: Wer mit offener Strafe durchs Ziel geht, wird disqualifiziert.'};
     if(Ls.t>70)return {ok:false,why:'Die Drehung war nicht vollständig. Dreh einmal komplett in eine Richtung, ohne zurückzulenken.'};}},
  {id:'r15',rule:'Regel 15',title:'Wegerecht neu erhalten',
-  text:'Wer durch eigene Aktion Wegerecht bekommt, zum Beispiel durch eine Wende auf Steuerbordbug, muss dem anderen Boot zunächst Raum zum Freihalten geben. Während der Wende selbst gilt Regel 13: Du hältst frei, bis du auf Am-Wind-Kurs bist.',
-  task:'Du bist auf Backbordbug, NED 7 kommt auf Steuerbord. Wende vor ihm auf Steuerbord, aber früh genug, dass er noch ausweichen kann.',
+  text:'Wer durch eigene Aktion Wegerecht bekommt, zum Beispiel durch eine Wende auf Steuerbordschlag, muss dem anderen Boot zunächst Raum zum Freihalten geben. Während der Wende selbst gilt Regel 13: Du hältst frei, bis du auf Am-Wind-Kurs bist.',
+  task:'Du bist auf Backbordschlag, NED 7 kommt auf Steuerbord. Wende vor ihm auf Steuerbord, aber früh genug, dass er noch ausweichen kann.',
   dia:{boats:[[95,140,45,'#ffd23f','Du'],[180,120,315,'#e5484d','NED 7']],tracks:[[95,140,45,50],[180,120,315,60]],arc:'M125,112 Q120,92 100,90'},
   setup(G){const v=V45();const p=G.boats[0],c=G.boats[1];placeB(p,0,0,45,v);placeB(c,30,-2,315,v);c.ai.script=b=>avoid(b,hold(1,45)(b));},
   check(G,Ls){const p=P();if(Ls.t>24)return p.side===1?{ok:true,why:'Gut gemacht. Du hast früh genug gewendet. Danach musste NED 7 freihalten, durfte aber erst Raum dafür bekommen (Regel 15). Wer zu knapp vor einem Boot wendet, verstößt gegen Regel 13 oder 15.'}:{ok:false,why:'Du hast nicht gewendet. Ziel der Lektion ist die Wende auf Steuerbord vor NED 7.'};}},
@@ -4241,12 +4290,12 @@ const LESSONS=[
     if(Math.abs(rel)<L&&lat<2*L&&Math.abs(p.a)<86)return {ok:false,why:'Du hast angeluvt, während du von achtern in Lee überlappt hast. Regel 17 erlaubt dir dann nur deinen richtigen Kurs.'};
     if(rel>L+1)return {ok:true,why:'Sauber vorbei. Dein Wegerecht als Leeboot war durch Regel 17 begrenzt, das Luvboot musste trotzdem freihalten.'};
     if(Ls.t>75)return {ok:false,why:'Zu lange gebraucht. Bleib auf Halbwind und überhole in Lee.'};}},
- {id:'r18w',rule:'Regel 18 / 10',title:'Gegenbug an der Luvtonne',mark:'wind',
-  text:'Regel 18 (Bahnmarkenraum) gilt nicht zwischen Booten auf entgegengesetzten Bugs, die sich auf der Kreuz der Luvtonne nähern. Dann gilt Regel 10: Backbord hält frei, auch direkt an der Tonne.',
+ {id:'r18w',rule:'Regel 18 / 10',title:'entgegengesetztem Schlag an der Luvtonne',mark:'wind',
+  text:'Regel 18 (Bahnmarkenraum) gilt nicht zwischen Booten auf entgegengesetztem Schlag, die sich auf der Kreuz der Luvtonne nähern. Dann gilt Regel 10: Backbord hält frei, auch direkt an der Tonne.',
   task:'Du kommst auf Backbord an die Luvtonne, NED 7 auf Steuerbord. Halte frei und runde dann die Tonne an Backbord.',
   dia:{boats:[[90,150,45,'#ffd23f','Du'],[180,150,315,'#e5484d','NED 7']],mark:[135,60],zone:[135,60,38],tracks:[[90,150,45,90],[180,150,315,90]]},
   setup(G){const v=V45();const p=G.boats[0],c=G.boats[1];placeB(p,-25,-30,45,v);placeB(c,27,-29,315,v);},
-  check(G,Ls){const p=P();if(p.leg>=1)return {ok:true,why:'Richtig. Auf Gegenbug an der Luvtonne gibt es keinen Bahnmarkenraum, Backbord muss freihalten.'};if(Ls.t>70)return {ok:false,why:'Tonne nicht gerundet. Halte frei und runde dann an Backbord.'};}}
+  check(G,Ls){const p=P();if(p.leg>=1)return {ok:true,why:'Richtig. Auf entgegengesetztem Schlag an der Luvtonne gibt es keinen Bahnmarkenraum, Backbord muss freihalten.'};if(Ls.t>70)return {ok:false,why:'Tonne nicht gerundet. Halte frei und runde dann an Backbord.'};}}
 ];
 function lessonStep(dt){const Ls=G.lesson;if(Ls.done)return;Ls.t+=dt;
   let r=null;if(Ls.playerPen&&!Ls.def.allowPen)r={ok:false,why:'Strafe für dich nach Regel '+Ls.playerPen.rule+' ('+Ls.playerPen.txt+'). '+({r15:'Wende früher und mit mehr Abstand. Während der Wende hältst du frei (Regel 13).',r18w:'Auf Backbord hast du an der Luvtonne keinen Anspruch auf Raum. Ducke hinter NED 7 oder wende früher.',r17:'',r10a:'Als Backbordboot musst du früher reagieren, ducken oder wenden.',r11:'Als Luvboot musst du mitluven oder wegwenden, bevor es eng wird.',r12:'Von hinten musst du einen Bogen um das Boot machen.',r13:'Nach der Wende war NED 7 vorn. Dann musst du als Boot klar achteraus freihalten.',r18:'Bleib innen, aber berühr die Tonne nicht.'}[Ls.def.id]||'')};
@@ -4260,7 +4309,7 @@ function renderLessonList(){const el=document.getElementById('lessonList');el.in
   LESSONS.forEach((l,i)=>{const b=document.createElement('button');b.type='button';b.className='lesson';
     b.innerHTML='<span class="no">'+(i+1)+'</span><span class="rl">'+l.rule+'</span><span class="ck">'+(lessonDone[l.id]?'✓ geschafft':'')+'</span><span class="tt">'+l.title+'</span>';
     b.onclick=()=>openLesson(i);el.appendChild(b);});el.appendChild(qb);}
-function hideAllOv(){for(const id of ['freeOv','menu','tutOv','lesOv','lesResOv','pauseOv','resOv','drillOv','anaOv','quizOv','mpOv','dsOv','hbOv','hbResOv','edOv','bmOv'])document.getElementById(id).hidden=true;}
+function hideAllOv(){for(const id of ['schoolOv','flagOv','freeOv','menu','tutOv','lesOv','lesResOv','pauseOv','resOv','drillOv','anaOv','quizOv','mpOv','dsOv','hbOv','hbResOv','edOv','bmOv'])document.getElementById(id).hidden=true;}
 function openTutorial(){restoreS();if(G){G.running=false;G.paused=false;}hideAllOv();hudEl.hidden=true;renderLessonList();tutOv.hidden=false;}
 function openLesson(i){curLesson=i;const l=LESSONS[i];hideAllOv();hudEl.hidden=true;
   document.getElementById('lesNo').textContent='Lektion '+(i+1)+' von '+LESSONS.length+' · '+l.rule;
@@ -4497,7 +4546,7 @@ function renderTips(){
     if(rows.length>=3){rows.sort((a,b)=>b.pr-a.pr);const k=Math.max(1,Math.floor(rows.length/2));let top=0;for(let z=0;z<k;z++)top+=rows[z].lat;top/=k;
       const me=rows.find(r=>r.i===0);if(me){const side=x=>x>0?'rechts':'links';
         sideTxt='<b>Kurs der Kreuz:</b> Die vorderen Boote lagen im Schnitt '+r0(Math.abs(top))+' m '+side(top)+' der Mittellinie, du '+r0(Math.abs(me.lat))+' m '+side(me.lat)+'.'+(Math.abs(top-me.lat)>=12?' Probier beim nächsten Mal die '+side(top)+'e Seite.':' Ihr wart auf derselben Seite.');}}}
-  if(shN>10){const m=shS/shN;sideTxt+=(sideTxt?' ':'<b>Wind:</b> ')+'Der Wind drehte auf der Kreuz im Mittel '+(Math.abs(m)<2?'kaum (unter 2°)':f1(Math.abs(m))+'° nach '+(m>0?'rechts – der Steuerbordbug lag im Lift':'links – der Backbordbug lag im Lift'))+'.';}
+  if(shN>10){const m=shS/shN;sideTxt+=(sideTxt?' ':'<b>Wind:</b> ')+'Der Wind drehte auf der Kreuz im Mittel '+(Math.abs(m)<2?'kaum (unter 2°)':f1(Math.abs(m))+'° nach '+(m>0?'rechts – der Steuerbordschlag lag im Lift':'links – der Backbordschlag lag im Lift'))+'.';}
   if(sideTxt)fast.push(sideTxt);
   if(nu>20)fast.push('<b>Wenden:</b> '+A.tacks+' Wenden, '+r0(hdr/nu*100)+' % der Kreuzzeit im Header'+(hdr/nu>0.35?' – wende früher, sobald du im Header segelst, und bleib im Lift.':' – gut gelöst.')+' Jede Wende kostet Fahrt; wende nur für Dreher oder an der Layline.');
   /* ---- Worauf es ankommt (nach Gewicht sortiert) ---- */
@@ -4578,12 +4627,12 @@ function importRun(e){const f=e.target.files&&e.target.files[0];if(!f)return;con
     catch(err){$('ghostInfo').textContent='Die Datei ist keine gültige Regattakoje-Fahrt.';}e.target.value='';};rd.readAsText(f);}
 /* Quiz */
 const QUIZ=[
- {q:'Zwei Boote kreuzen auf der Kreuz. Gelb ist auf Backbordbug, Rot auf Steuerbordbug. Wer muss freihalten?',dia:{boats:[[85,135,45,'#ffd23f','Gelb'],[175,135,315,'#e5484d','Rot']],tracks:[[85,135,45,62],[175,135,315,62]],hit:[130,92]},o:['Gelb (Backbordbug)','Rot (Steuerbordbug)','Das Boot, das weiter in Luv ist'],a:0,why:'Regel 10: Auf verschiedenen Bugs hält das Backbordboot frei.'},
- {q:'Beide auf Steuerbordbug, überlappend. Gelb ist in Luv, Rot in Lee. Wer hält frei?',dia:{boats:[[160,95,315,'#ffd23f','Gelb'],[125,125,315,'#e5484d','Rot']]},o:['Rot (Lee)','Gelb (Luv)','Keiner, wer zuerst da war'],a:1,why:'Regel 11: Gleicher Bug und überlappend, das Luvboot hält frei.'},
- {q:'Gleicher Bug, keine Überlappung: Gelb ist klar achteraus von Rot. Wer hält frei?',dia:{boats:[[180,95,270,'#ffd23f','Gelb'],[95,95,270,'#e5484d','Rot']]},o:['Rot, weil es langsamer ist','Gelb (klar achteraus)','Beide müssen ausweichen'],a:1,why:'Regel 12: Das Boot klar achteraus hält frei.'},
- {q:'Rot geht gerade durch den Wind und ist noch nicht auf Am-Wind-Kurs. Gelb segelt auf Backbordbug. Wer hält frei?',dia:{boats:[[170,140,45,'#ffd23f','Gelb'],[110,85,0,'#e5484d','Rot wendet']]},o:['Gelb, weil es auf Backbord ist','Rot, weil es wendet','Niemand'],a:1,why:'Regel 13: Ein Boot, das wendet, hält frei, bis es auf Am-Wind-Kurs ist, auch gegenüber einem Backbordboot.'},
+ {q:'Zwei Boote kreuzen auf der Kreuz. Gelb ist auf Backbordschlag, Rot auf Steuerbordschlag. Wer muss freihalten?',dia:{boats:[[85,135,45,'#ffd23f','Gelb'],[175,135,315,'#e5484d','Rot']],tracks:[[85,135,45,62],[175,135,315,62]],hit:[130,92]},o:['Gelb (Backbordschlag)','Rot (Steuerbordschlag)','Das Boot, das weiter in Luv ist'],a:0,why:'Regel 10: Auf entgegengesetztem Schlag hält das Backbordboot frei.'},
+ {q:'Beide auf Steuerbordschlag, überlappend. Gelb ist in Luv, Rot in Lee. Wer hält frei?',dia:{boats:[[160,95,315,'#ffd23f','Gelb'],[125,125,315,'#e5484d','Rot']]},o:['Rot (Lee)','Gelb (Luv)','Keiner, wer zuerst da war'],a:1,why:'Regel 11: Gleicher Schlag und überlappend, das Luvboot hält frei.'},
+ {q:'Gleicher Schlag, keine Überlappung: Gelb ist klar achteraus von Rot. Wer hält frei?',dia:{boats:[[180,95,270,'#ffd23f','Gelb'],[95,95,270,'#e5484d','Rot']]},o:['Rot, weil es langsamer ist','Gelb (klar achteraus)','Beide müssen ausweichen'],a:1,why:'Regel 12: Das Boot klar achteraus hält frei.'},
+ {q:'Rot geht gerade durch den Wind und ist noch nicht auf Am-Wind-Kurs. Gelb segelt auf Backbordschlag. Wer hält frei?',dia:{boats:[[170,140,45,'#ffd23f','Gelb'],[110,85,0,'#e5484d','Rot wendet']]},o:['Gelb, weil es auf Backbord ist','Rot, weil es wendet','Niemand'],a:1,why:'Regel 13: Ein Boot, das wendet, hält frei, bis es auf Am-Wind-Kurs ist, auch gegenüber einem Backbordboot.'},
  {q:'Leetonne: Gelb und Rot sind überlappt, als Rot die Zone erreicht. Gelb ist innen. Wer bekommt Bahnmarkenraum?',dia:{boats:[[140,45,170,'#ffd23f','Gelb'],[110,45,170,'#e5484d','Rot']],mark:[152,128],zone:[152,128,40]},o:['Rot, weil es zuerst in der Zone war','Gelb (Innenboot)','Keiner, Regel 18 gilt hier nicht'],a:1,why:'Regel 18.2(a): Sind die Boote überlappt, wenn das erste die Zone erreicht, gibt das Außenboot dem Innenboot Bahnmarkenraum.'},
- {q:'Luvtonne: Gelb auf Backbord ist innen, Rot kommt auf Steuerbord. Muss Rot Gelb Bahnmarkenraum geben?',dia:{boats:[[90,150,45,'#ffd23f','Gelb'],[180,150,315,'#e5484d','Rot']],mark:[135,60],zone:[135,60,38]},o:['Ja, Gelb ist innen','Nein, Regel 18 gilt nicht. Gelb muss nach Regel 10 freihalten','Nur, wenn Gelb zuerst in der Zone war'],a:1,why:'Regel 18.1(a): Zwischen Booten auf entgegengesetzten Bugs auf der Kreuz an der Luvtonne gilt Regel 18 nicht.'},
+ {q:'Luvtonne: Gelb auf Backbord ist innen, Rot kommt auf Steuerbord. Muss Rot Gelb Bahnmarkenraum geben?',dia:{boats:[[90,150,45,'#ffd23f','Gelb'],[180,150,315,'#e5484d','Rot']],mark:[135,60],zone:[135,60,38]},o:['Ja, Gelb ist innen','Nein, Regel 18 gilt nicht. Gelb muss nach Regel 10 freihalten','Nur, wenn Gelb zuerst in der Zone war'],a:1,why:'Regel 18.1(a): Zwischen Booten auf entgegengesetztem Schlag auf der Kreuz an der Luvtonne gilt Regel 18 nicht.'},
  {q:'Dein Boot hat die Leetonne berührt, sonst nichts. Wie entlastest du dich?',o:['Zwei Drehungen (720°)','Eine Drehung (360°)','Gar nicht, das ist erlaubt'],a:1,why:'Für eine Berührung der Bahnmarke (Regel 31) reicht eine Drehung, die Ein-Drehungs-Strafe.'},
  {q:'Beim Startsignal ist dein Bug über der Linie. Was musst du tun?',o:['Weitersegeln und am Ende eine Drehung machen','Komplett auf die Vorstartseite zurück und neu starten','Nichts, wenn es nur der Bug war'],a:1,why:'Regel 29.1 und 28: Du musst zur Vorstartseite zurück und korrekt starten. Solange hältst du frei (Regel 22.1).'},
  {q:'Gelb kommt von klar achteraus innerhalb von zwei Bootslängen in eine Lee-Überlappung mit Rot. Darf Gelb anluven, um Rot abzudrängen?',dia:{boats:[[170,110,270,'#ffd23f','Gelb'],[110,90,270,'#e5484d','Rot']]},o:['Ja, Lee hat Wegerecht','Nur bis zum Wind','Nein, nicht über seinen richtigen Kurs'],a:2,why:'Regel 17: Wer so überlappt, darf nicht höher als seinen richtigen Kurs segeln, solange die Überlappung besteht.'},
@@ -5196,14 +5245,14 @@ function trainerWatch(dt){const fb=G.fb,p=P();if(!p||p.rib||p.gone)return;const 
   else if(p.side!==fb.side){fb.side=p.side;const isUp=Math.abs(p.a)<90;if(isUp)st.tacks++;else st.gybes++;fb.tk={t:G.t,v0:fb.vAvg,up:isUp};}
   if(fb.tk&&G.t-fb.tk.t>=6){const r=fb.tk.v0>0.5?p.v/fb.tk.v0:1,w=fb.tk.up?'Wende':'Halse';fb.tk=null;
     fb.lastTk=r>=0.9?'Die letzte '+w+' war sauber – kaum Fahrt verloren.':r>=0.7?'Die letzte '+w+' war okay, du bist aber etwas eingebrochen.':'Die letzte '+w+' hat viel Fahrt gekostet ('+Math.round((1-r)*100)+' %).';
-    fbTip('tk',r>=0.9?w+' sauber – du hast fast die ganze Fahrt mitgenommen.':r>=0.7?w+' okay, aber du bist etwas eingebrochen. Ruder weicher legen und erst dichtholen, wenn das Boot Fahrt hat.':w+' mit viel Fahrtverlust ('+Math.round((1-r)*100)+' %). Gleichmäßig durch den Wind drehen und erst auf neuem Bug abfallen und beschleunigen.',10,true);}
+    fbTip('tk',r>=0.9?w+' sauber – du hast fast die ganze Fahrt mitgenommen.':r>=0.7?w+' okay, aber du bist etwas eingebrochen. Ruder weicher legen und erst dichtholen, wenn das Boot Fahrt hat.':w+' mit viel Fahrtverlust ('+Math.round((1-r)*100)+' %). Gleichmäßig durch den Wind drehen und erst auf neuem Schlag abfallen und beschleunigen.',10,true);}
   const tg=C.seq[p.leg],tp=targetPoint(p),dist=Math.hypot(tp.x-p.x,tp.y-p.y);
   if(fb.luffT>2.5)fbTip('luff',S.autoTrim?'Dein Segel killt. Fall ein Stück ab, dann steht es wieder.':'Dein Segel killt – Schot dichter (Q) oder etwas abfallen.',14);
   else if(fb.stallT>3)fbTip('stall',S.autoTrim?'Das Segel ist überzogen – prüf deinen Kurs zum Wind.':'Das Segel ist überzogen – Schot ein Stück fieren (E).',16);
   else if(fb.pinchT>5)fbTip('pinch','Du fährst zu hoch am Wind. Fall ein paar Grad ab – mit mehr Fahrt kommst du am Ende höher und schneller voran.',18);
   else if(fb.trimT>5)fbTip('trim',p.trim>p.trimOpt?'Schot dichter holen (Q) – das Segel steht zu weit auf.':'Schot fieren (E) – du hast zu dicht getrimmt.',16);
   const sh=wrap180(G.wind.cur-C.W0);
-  if(Math.abs(sh-fb.lastSh)>=7){const hdr=up&&p.side*sh<-5;const txt='Der Wind ist nach '+(sh>fb.lastSh?'rechts':'links')+' gedreht ('+Math.round(Math.abs(sh))+'° gegenüber dem Kursmittel).'+(up?(hdr?' Du bist gerade im Header – eine Wende bringt dich in den Lift.':' Du liegst im Lift – bleib auf diesem Bug, solange es trägt.'):'');if(fbTip('shift',txt,25))fb.lastSh=sh;}
+  if(Math.abs(sh-fb.lastSh)>=7){const hdr=up&&p.side*sh<-5;const txt='Der Wind ist nach '+(sh>fb.lastSh?'rechts':'links')+' gedreht ('+Math.round(Math.abs(sh))+'° gegenüber dem Kursmittel).'+(up?(hdr?' Du bist gerade im Header – eine Wende bringt dich in den Lift.':' Du liegst im Lift – bleib auf diesem Schlag, solange es trägt.'):'');if(fbTip('shift',txt,25))fb.lastSh=sh;}
   if(CL.spi&&!p.spiWant&&Math.abs(p.a)>115&&dist>60)fbTip('spi','Raumschots-Kurs – setz '+(CL.spi==='genn'?'den Gennaker':'den Spi')+' (X).',30);
   if(p.spiWant&&isMark(tg)&&tg.kind!=='wind'&&tg.kind!=='wing'&&dist<45)fbTip('drop','Tonne kommt – '+(CL.spi==='genn'?'Gennaker':'Spi')+' jetzt bergen (X).',20);
   for(const o of G.boats){if(o===p||o.rib||o.gone)continue;if(Math.hypot(o.x-p.x,o.y-p.y)<L*2.2){fbTip('near',(o.name||'Ein Boot')+' ist dicht bei dir – Abstand halten und Wasser lesen.',25);break;}}
@@ -5646,9 +5695,9 @@ function hudSpec(b){const t=camBoat();el.clock.textContent=fmtT(G.t);el.clock.cl
   el.wind.textContent=String(Math.round(wrap360(G.wind.cur+HOFF()))).padStart(3,'0')+'° · '+S.tws+' kn';renderLog();drawRose(t);}
 
 /* ================= Regel-Clips in der Analyse ================= */
-const RULETXT={'10':['Backbord hält frei von Steuerbord','Auf entgegengesetzten Bugen muss das Boot mit Wind von Backbord ausweichen (Baum an Steuerbord). Wer den Baum an Backbord hat, hat Wegerecht.'],
- '11':['Luv hält frei von Lee','Auf gleichem Bug und überlappt muss das Luvboot dem Leeboot ausweichen.'],
- '12':['Klar achteraus hält frei','Auf gleichem Bug ohne Überlappung muss das Boot klar achteraus ausweichen.'],
+const RULETXT={'10':['Backbord hält frei von Steuerbord','Auf entgegengesetztem Schlag muss das Boot mit Wind von Backbord ausweichen (Baum an Steuerbord). Wer den Baum an Backbord hat, hat Wegerecht.'],
+ '11':['Luv hält frei von Lee','Auf gleichem Schlag und überlappt muss das Luvboot dem Leeboot ausweichen.'],
+ '12':['Klar achteraus hält frei','Auf gleichem Schlag ohne Überlappung muss das Boot klar achteraus ausweichen.'],
  '13':['Beim Wenden freihalten','Wer nach dem Durchgang durch den Wind noch nicht auf Am-Wind-Kurs ist, hält frei von allen.'],
  '18.2':['Bahnmarkenraum','In der Zone muss das äußere Boot dem inneren, überlappten Boot Raum zum Runden geben.'],
  '18.2(b)':['Klar voraus an der Zone','Wer beim Erreichen der Zone klar voraus ist, bekommt Raum – das Boot klar achteraus nicht.'],
@@ -6505,4 +6554,183 @@ setTimeout(modelPrefetch,1200);
    const t=document.getElementById(a.dataset.legal==='ds'?'legDs':'legImp');ov.scrollTop=0;setTimeout(()=>{try{t.scrollIntoView({block:'start'});}catch(_){}} ,0);});
  document.getElementById('legalClose').onclick=()=>{ov.hidden=true;};
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!ov.hidden){ov.hidden=true;e.stopPropagation();}},true);})();
+</script>
+<script>
+/* ================= Seesportschule: Regel-Tutorial, Hafen & MOB, Flaggen lernen ================= */
+(function(){
+const $$=id=>document.getElementById(id);
+const FLG_KEY='regattakoje.flags';
+/* --- Flaggenbilder (SVG, 60x40) --- */
+function fRect(x,y,w,h,c){return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+c+'"/>';}
+const BL='#1f4fb3',RD='#d42a2a',YE='#f6c919',WH='#f7f7f2',BK='#111',GR='#1fae3a';
+function flagBody(k){const r=fRect;switch(k){
+  case 'K':return r(0,0,60,40,WH)+'<rect x="2" y="2" width="56" height="36" fill="none" stroke="#222" stroke-width="2"/><text x="30" y="26" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="14" fill="#222">Klasse</text>';
+  case 'P':return r(0,0,60,40,BL)+r(18,11,24,18,WH);
+  case 'I':return r(0,0,60,40,YE)+'<ellipse cx="30" cy="20" rx="11" ry="9" fill="'+BK+'"/>';
+  case 'BLK':return r(0,0,60,40,BK);
+  case 'U':return r(0,0,30,20,RD)+r(30,0,30,20,WH)+r(0,20,30,20,WH)+r(30,20,30,20,RD);
+  case 'Z':return '<path d="M0 0 L30 20 L0 40Z" fill="'+BK+'"/><path d="M0 0 L60 0 L30 20Z" fill="'+YE+'"/><path d="M60 0 L60 40 L30 20Z" fill="'+BL+'"/><path d="M0 40 L60 40 L30 20Z" fill="'+RD+'"/>';
+  case 'X':return r(0,0,60,40,WH)+r(24,0,12,40,BL)+r(0,14,60,12,BL);
+  case 'H':return r(0,0,30,40,WH)+r(30,0,30,40,RD);
+  case 'A':return r(0,0,30,40,WH)+'<path d="M30 0 L60 0 L46 20 L60 40 L30 40Z" fill="'+BL+'"/>';
+  case 'N':{let s='';for(let i=0;i<4;i++)for(let j=0;j<4;j++)s+=r(i*15,j*10,15,10,(i+j)%2?WH:BL);return s;}
+  case 'M':return r(0,0,60,40,BL)+'<path d="M0 0 L60 40 M60 0 L0 40" stroke="'+WH+'" stroke-width="8"/>';
+  case 'S':return r(0,0,60,40,WH)+r(18,11,24,18,BL);
+  case 'Y':{let s=r(0,0,60,40,YE);for(let i=-40;i<60;i+=14)s+='<path d="M'+i+' 40 L'+(i+40)+' 0" stroke="'+RD+'" stroke-width="6"/>';return '<g clip-path="url(#fc)">'+s+'</g>';}
+  case 'L':return r(0,0,30,20,YE)+r(30,0,30,20,BK)+r(0,20,30,20,BK)+r(30,20,30,20,YE);
+  case 'O':return '<path d="M0 0 L60 0 L0 40Z" fill="'+RD+'"/><path d="M60 0 L60 40 L0 40Z" fill="'+YE+'"/>';
+  case 'ROT':return r(0,0,60,40,'#ff5a1f');
+  case 'BLAU':return r(0,0,60,40,BL);
+  case 'F':return r(0,0,60,40,WH)+'<path d="M30 3 L52 20 L30 37 L8 20Z" fill="'+RD+'"/>';
+  case 'C':return r(0,0,60,8,BL)+r(0,8,60,8,WH)+r(0,16,60,8,RD)+r(0,24,60,8,WH)+r(0,32,60,8,BL);
+  case 'TRI':return r(0,0,60,40,WH)+'<path d="M30 4 L52 36 L8 36Z" fill="'+GR+'"/>';
+  case 'RECT':return r(0,0,60,40,WH)+r(16,6,28,28,RD);
+  case 'PLUS':return r(0,0,60,40,WH)+r(25,6,10,28,BK)+r(16,15,28,10,BK);
+  case 'MIN':return r(0,0,60,40,WH)+r(16,15,28,10,BK);
+  case 'TGR':return r(0,0,60,40,GR);
+  case 'TRD':return r(0,0,60,40,RD);
+}return r(0,0,60,40,'#888');}
+function pennant(k){if(k==='AP'){let s='<path d="M0 0 L90 13 L90 27 L0 40Z" fill="'+WH+'"/>';const xs=[[0,12],[24,36],[48,60],[72,84]];for(const [a,b] of xs){const ya=13*a/90,yb=13*b/90;s+='<path d="M'+a+' '+ya+' L'+b+' '+yb+' L'+b+' '+(40-yb)+' L'+a+' '+(40-ya)+'Z" fill="'+RD+'"/>';}return {w:90,s:s+'<path d="M0 0 L90 13 L90 27 L0 40Z" fill="none" stroke="rgba(0,0,0,.35)"/>'};}
+  if(k==='HS1')return {w:66,s:'<path d="M0 0 L66 20 L0 40Z" fill="'+BL+'"/><path d="M5 9 L44 20 L5 31Z" fill="'+YE+'"/>'};return null;}
+function oneFlag(k,sc){const p=pennant(k);if(p)return '<svg viewBox="0 0 '+(p.w+4)+' 40" width="'+Math.round((p.w+4)*sc)+'" height="'+Math.round(40*sc)+'" aria-hidden="true"><rect x="0" y="-2" width="3" height="44" fill="#ddd"/><g transform="translate(4 0)">'+p.s+'</g></svg>';
+  return '<svg viewBox="0 0 64 40" width="'+Math.round(64*sc)+'" height="'+Math.round(40*sc)+'" aria-hidden="true"><defs><clipPath id="fc"><rect width="60" height="40"/></clipPath></defs><rect x="0" y="-2" width="3" height="44" fill="#ddd"/><g transform="translate(4 0)">'+flagBody(k)+'<rect x="0" y="0" width="60" height="40" fill="none" stroke="rgba(0,0,0,.35)"/></g></svg>';}
+function flagArt(F,sc){sc=sc||1;if(F.pair)return '<span class="fstack">'+F.art.map(k=>oneFlag(k,sc*(F.art.length>1?0.78:1))).join('')+'</span>';
+  if(F.art.length>1)return '<span class="fstack">'+F.art.map(k=>oneFlag(k,sc*0.78)).join('')+'</span>';return oneFlag(F.art[0],sc);}
+window.schoolFlagArt=flagArt;
+/* --- Inhalte: Wettfahrtregeln 2025–2028, Wettfahrtsignale --- */
+const S1='●',S2='●●',S3='●●●',LG='▬',REP='wiederholt';
+const FL=[
+ {id:'K',name:'Klassenflagge',art:['K'],grp:'start',rule:'26',rows:[['▲','Ankündigungssignal – noch 5 Minuten bis zum Start',S1],['▼','Startsignal',S1]],tip:'Statt der Klassenflagge kann auch ein Klassenzeichen gezeigt werden. Die Zeit zählt immer ab dem optischen Signal, nicht ab dem Schall.'},
+ {id:'P',q:'Normale Vorbereitungsflagge – keine besondere Frühstartregel',name:'Papa',art:['P'],grp:'start',rule:'26',rows:[['▲','Vorbereitungssignal – noch 4 Minuten',S1],['▼','Noch 1 Minute bis zum Start',LG]],tip:'Die normale Vorbereitungsflagge ohne besondere Frühstartregel.'},
+ {id:'I',q:'Vorbereitung: Frühstarter in der letzten Minute müssen „rund um ein Ende“ zurück',name:'India',art:['I'],grp:'start',rule:'26 · 30.1',rows:[['▲','Vorbereitungssignal – noch 4 Minuten',S1],['▼','Noch 1 Minute bis zum Start',LG]],tip:'Regel 30.1: Wer in der letzten Minute auf der Bahnseite der Linie oder ihrer Verlängerungen ist, muss über eine Verlängerung auf die Vorstartseite zurück („Rund-um-ein-Ende“).'},
+ {id:'BLK',q:'Vorbereitung: wer in der letzten Minute im Dreieck ist, wird disqualifiziert (BFD) – auch bei Neustart',name:'Schwarze Flagge',art:['BLK'],grp:'start',rule:'26 · 30.4',rows:[['▲','Vorbereitungssignal – noch 4 Minuten',S1],['▼','Noch 1 Minute bis zum Start',LG]],tip:'Regel 30.4: Wer in der letzten Minute im Dreieck aus Startlinie und erster Bahnmarke ist, wird ohne Anhörung disqualifiziert (BFD) – auch wenn neu gestartet wird. Die Segelnummer wird angezeigt.'},
+ {id:'U',q:'Vorbereitung: wer in der letzten Minute im Dreieck ist, wird disqualifiziert (UFD) – bei Neustart wieder dabei',name:'Uniform',art:['U'],grp:'start',rule:'26 · 30.3',rows:[['▲','Vorbereitungssignal – noch 4 Minuten',S1],['▼','Noch 1 Minute bis zum Start',LG]],tip:'Regel 30.3: Wer in der letzten Minute im Dreieck aus Startlinie und erster Bahnmarke ist, wird disqualifiziert (UFD). Zurückfahren hilft nicht – bei Neustart oder Wiederholung darf das Boot aber wieder mitsegeln.'},
+ {id:'Z',q:'Vorbereitung: wer in der letzten Minute im Dreieck ist, bekommt 20 % Punktstrafe',name:'Zulu',art:['Z'],grp:'start',rule:'26 · 30.2',rows:[['▲','Vorbereitungssignal – noch 4 Minuten',S1],['▼','Noch 1 Minute bis zum Start',LG]],tip:'Regel 30.2: Wer in der letzten Minute im Dreieck aus Startlinie und erster Bahnmarke ist, bekommt 20 % Punktstrafe – auch bei Neustart.'},
+ {id:'X',name:'X-Ray',art:['X'],grp:'start',rule:'29.1',rows:[['▲','Einzelrückruf: ein oder mehrere Boote sind zu früh gestartet',S1],['▼','Alle Frühstarter sind zurück – spätestens 4 Minuten nach dem Start','—']],tip:'Gleich beim Startsignal gesetzt. Frühstarter müssen ganz auf die Vorstartseite zurück und neu starten.'},
+ {id:'HS1',name:'1. Hilfsstander',art:['HS1'],grp:'start',rule:'29.2',rows:[['▲','Allgemeiner Rückruf – der Start wird wiederholt',S2],['▼','Ankündigungssignal folgt in 1 Minute',S1]],tip:'Nach dem Bergen kommt eine Minute später das neue Ankündigungssignal – also noch 6 Minuten bis zum Start.'},
+ {id:'AP',name:'Antwortwimpel (AP)',art:['AP'],grp:'versch',rule:'27.3 · Wettfahrtsignale',rows:[['▲','Startverschiebung: nicht gestartete Wettfahrten werden verschoben',S2],['▼','Ankündigungssignal folgt in 1 Minute',S1]],tip:'Über einem Klassenzeichen gilt die Verschiebung nur für diese Klasse. Nach dem Bergen: noch 6 Minuten bis zum Start.'},
+ {id:'APH',name:'AP über Hotel',art:['AP','H'],pair:true,grp:'versch',rule:'Wettfahrtsignale',rows:[['▲','Nicht gestartete Wettfahrten sind verschoben – weitere Signale an Land',S2]],tip:'Zurück in Hafennähe und auf Signale an Land achten.'},
+ {id:'APA',name:'AP über Alfa',art:['AP','A'],pair:true,grp:'versch',rule:'Wettfahrtsignale',rows:[['▲','Nicht gestartete Wettfahrten sind verschoben – heute keine Wettfahrt mehr',S2]],tip:'Der Wettfahrttag ist beendet.'},
+ {id:'N',name:'November',art:['N'],grp:'abbruch',rule:'32 · Wettfahrtsignale',rows:[['▲','Alle gestarteten Wettfahrten sind abgebrochen – zurück ins Startgebiet',S3],['▼','Ankündigungssignal folgt in 1 Minute',S1]],tip:'Abbruch betrifft schon gestartete Wettfahrten. Nach dem Bergen: noch 6 Minuten bis zum neuen Start.'},
+ {id:'NH',name:'N über Hotel',art:['N','H'],pair:true,grp:'abbruch',rule:'32 · Wettfahrtsignale',rows:[['▲','Alle Wettfahrten sind abgebrochen – weitere Signale an Land',S3]],tip:''},
+ {id:'NA',name:'N über Alfa',art:['N','A'],pair:true,grp:'abbruch',rule:'32 · Wettfahrtsignale',rows:[['▲','Alle Wettfahrten sind abgebrochen – heute keine Wettfahrt mehr',S3]],tip:''},
+ {id:'S',name:'Sierra',art:['S'],grp:'bahn',rule:'32.2',rows:[['▲','Bahnabkürzung: Ziellinie zwischen der Bahnmarke und der Stange mit dieser Flagge',S2]],tip:'An einem Tor oder einer Bahnmarke gezeigt: dort durchs Ziel.'},
+ {id:'M',name:'Mike',art:['M'],grp:'bahn',rule:'34 (b)',rows:[['▲','Dieses Objekt ersetzt eine fehlende Bahnmarke',REP]],tip:'Das Boot oder Objekt mit der Flagge wird wie die fehlende Bahnmarke gerundet.'},
+ {id:'C',name:'Charlie',art:['C'],grp:'bahn',rule:'33',rows:[['▲','Die Position der nächsten Bahnmarke ist geändert',REP]],tip:'Wird an der Bahnmarke vor dem geänderten Schenkel gezeigt, möglichst bevor das erste Boot den Schenkel beginnt.'},
+ {id:'CGR',name:'Charlie über Grün / Rot',art:['C','TRI'],pair:true,grp:'bahn',rule:'33 (a)(2)',rows:[['▲','Nächste Bahnmarke nach Steuerbord (grünes Dreieck) bzw. nach Backbord (rotes Rechteck) verlegt',REP]],tip:'Grünes Dreieck = Steuerbord, rotes Rechteck = Backbord. Auch die neue Kompassrichtung kann angezeigt werden.'},
+ {id:'CPM',name:'Charlie über Plus / Minus',art:['C','PLUS'],pair:true,grp:'bahn',rule:'33 (b)',rows:[['▲','Der nächste Schenkel ist verlängert (+) bzw. verkürzt (−)',REP]],tip:''},
+ {id:'TAF',name:'Tafel Grün / Rot',art:['TGR','TRD'],grp:'bahn',rule:'27.1 · Segelanweisung',rows:[['▲','Die Bahnmarke ist an Steuerbord (grün) bzw. an Backbord (rot) zu runden','—']],tip:'Wird meist vor dem Ankündigungssignal am Startschiff gezeigt.'},
+ {id:'ROT',name:'Orange Flagge',art:['ROT'],grp:'bahn',rule:'Segelanweisung',rows:[['▲','Startlinie zwischen diesem Boot und der Startboje','—']],tip:'Oft auch eine orange Flagge am Startschiff. Häufig schon vor dem Ankündigungssignal mit einem Schallsignal gesetzt.'},
+ {id:'BLAU',name:'Blaue Flagge',art:['BLAU'],grp:'bahn',rule:'Segelanweisung',rows:[['▲','Das Zielschiff ist auf Position – Ziellinie zwischen diesem Boot und der Zielboje','—']],tip:''},
+ {id:'F',name:'Foxtrot',art:['F'],grp:'bahn',rule:'Segelanweisung',rows:[['▲','Bahnabkürzung laut Segelanweisung, z. B. nach Runden der Bahnmarke direkt ins Ziel','—']],tip:'Keine Wettfahrtregel – gilt nur, wenn die Segelanweisung es so festlegt.'},
+ {id:'Y',name:'Yankee',art:['Y'],grp:'allg',rule:'40',rows:[['▲','Schwimmwestenpflicht für alle an Bord',S1]],tip:'An Land gezeigt gilt die Pflicht die ganze Zeit auf dem Wasser.'},
+ {id:'L',name:'Lima',art:['L'],grp:'allg',rule:'Wettfahrtsignale',rows:[['▲','Auf dem Wasser: in Rufweite kommen oder diesem Boot folgen · an Land: eine Bekanntmachung ist ausgehängt',S1]],tip:''},
+ {id:'O',name:'Oscar',art:['O'],grp:'allg',rule:'42 · Anhang P',rows:[['▲','Pumpen, Schaukeln und Wriggen sind erlaubt (ab einer festgelegten Windstärke)','—']],tip:'Gilt nur, wenn die Klassenregeln oder die Segelanweisung das vorsehen.'}
+];
+const GRP={start:'Start',versch:'Verschiebung',abbruch:'Abbruch',bahn:'Bahn & Ziel',allg:'Allgemein'};
+/* Startablauf-Fragen */
+const SEQ=[
+ {q:'Wie viele Minuten vor dem Start kommt das Ankündigungssignal?',a:'5 Minuten',o:['4 Minuten','6 Minuten','10 Minuten'],art:'K'},
+ {q:'Welche Flagge wird als Ankündigungssignal gesetzt?',a:'K',o:['P','HS1','AP'],flags:true},
+ {q:'Welche Flagge wird 4 Minuten vor dem Start als normale Vorbereitungsflagge gesetzt?',a:'P',o:['K','S','X'],flags:true},
+ {q:'Was geschieht 1 Minute vor dem Start?',a:'Vorbereitungsflagge wird geborgen, ein langes Schallsignal',o:['Klassenflagge wird geborgen, ein Schallsignal','Vorbereitungsflagge wird gesetzt, ein Schallsignal','Antwortwimpel wird gesetzt, zwei Schallsignale'],art:'P'},
+ {q:'Welche Flagge wird zum Start geborgen?',a:'K',o:['P','X','AP'],flags:true},
+ {q:'Der Antwortwimpel wird geborgen. Wie lange noch bis zum Start?',a:'6 Minuten',o:['5 Minuten','1 Minute','4 Minuten'],art:'AP'},
+ {q:'Der 1. Hilfsstander wird geborgen. Wann kommt das neue Ankündigungssignal?',a:'1 Minute später',o:['Sofort','5 Minuten später','Nach einem neuen Vorbereitungssignal'],art:'HS1'},
+ {q:'Welche Flagge zeigt einen Einzelrückruf an?',a:'X',o:['HS1','S','C'],flags:true},
+ {q:'Welche Flagge zeigt einen Allgemeinen Rückruf an?',a:'HS1',o:['X','AP','N'],flags:true},
+ {q:'Welche Flagge bedeutet Startverschiebung?',a:'AP',o:['N','HS1','L'],flags:true},
+ {q:'Wann zählt die Zeit – beim Schallsignal oder beim Flaggensignal?',a:'Beim Flaggensignal',o:['Beim Schallsignal','Beim lauteren von beiden','Immer beim ersten Ton'],art:null},
+ {q:'Welche Vorbereitungsflagge disqualifiziert Frühstarter im Dreieck so, dass auch ein Neustart die Strafe nicht aufhebt?',a:'BLK',o:['I','Z','U'],flags:true},
+ {q:'Bei welcher Vorbereitungsflagge müssen Frühstarter „rund um ein Ende“ zurück?',a:'I',o:['P','U','BLK'],flags:true},
+ {q:'Welche Vorbereitungsflagge bedeutet 20 % Punktstrafe für Frühstarter im Dreieck?',a:'Z',o:['U','I','BLK'],flags:true},
+ {q:'Bei welcher Vorbereitungsflagge wird ein Frühstarter im Dreieck disqualifiziert, darf aber bei einem Neustart wieder mitsegeln?',a:'U',o:['BLK','Z','P'],flags:true}
+];
+const SIGS=[S1,S2,S3,LG,REP];
+/* --- Fortschritt (Leitner-Fächer 0–4) --- */
+function loadP(){try{return JSON.parse(localStorage.getItem(FLG_KEY)||'{}')||{};}catch(e){return {};}}
+function saveP(p){try{localStorage.setItem(FLG_KEY,JSON.stringify(p));}catch(e){}}
+function known(){const p=loadP();return FL.filter(f=>(p[f.id]||0)>=3).length;}
+function pickWeighted(list,p){const w=list.map(f=>Math.pow(2,4-Math.min(4,p[f.id]||0)));let s=w.reduce((a,b)=>a+b,0)*Math.random();for(let i=0;i<list.length;i++){s-=w[i];if(s<=0)return list[i];}return list[list.length-1];}
+const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+const mean=f=>f.q||f.rows[0][1];
+function sigTxt(s){return s===S1?'1 kurzes':s===S2?'2 kurze':s===S3?'3 kurze':s===LG?'1 langes':s===REP?'wiederholte':'kein';}
+function sym(s){return s===REP?'●●●●…':s;}
+function sigName(s){return s===S1?'Ein Schallsignal':s===S2?'Zwei Schallsignale':s===S3?'Drei Schallsignale':s===LG?'Ein langes Schallsignal':'Wiederholte Schallsignale';}
+let AC2=null,playTimer=[];
+function tone(t0,d){const a=AC2;const o1=a.createOscillator(),o2=a.createOscillator(),g=a.createGain();o1.type='sawtooth';o2.type='square';o1.frequency.value=220;o2.frequency.value=330;
+  const g2=a.createGain();g2.gain.value=0.3;o1.connect(g);o2.connect(g2);g2.connect(g);g.connect(a.destination);
+  g.gain.setValueAtTime(0.0001,t0);g.gain.exponentialRampToValueAtTime(0.09,t0+0.04);g.gain.setValueAtTime(0.09,t0+d-0.06);g.gain.exponentialRampToValueAtTime(0.0001,t0+d);
+  o1.start(t0);o2.start(t0);o1.stop(t0+d+0.02);o2.stop(t0+d+0.02);}
+function playSig(s){try{if(!AC2)AC2=new (window.AudioContext||window.webkitAudioContext)();if(AC2.state==='suspended')AC2.resume();}catch(e){return;}
+  const t=AC2.currentTime+0.05;const seq=s===LG?[2.4]:s===S1?[0.7]:s===S2?[0.6,0.6]:s===S3?[0.55,0.55,0.55]:s===REP?[0.4,0.4,0.4,0.4,0.4,0.4]:[];
+  let x=t;for(const d of seq){tone(x,d);x+=d+0.45;}}
+function sfx(ok){try{if(!AC2)AC2=new (window.AudioContext||window.webkitAudioContext)();const o=AC2.createOscillator(),g=AC2.createGain(),t=AC2.currentTime;o.type=ok?'sine':'square';o.frequency.value=ok?880:180;g.gain.setValueAtTime(ok?0.08:0.04,t);g.gain.exponentialRampToValueAtTime(0.0001,t+(ok?0.18:0.3));o.connect(g);g.connect(AC2.destination);o.start(t);o.stop(t+0.35);}catch(e){}}
+function playBtn(s,label){return s&&s!=='—'?'<span role="button" tabindex="0" class="fplay" data-s="'+s+'" title="Signal anhören">♪ '+(label||s)+'</span>':'';}
+function sigRow(f){return '<div class="fsigrow">'+f.rows.filter(r=>r[2]!=='—').map(r=>'<span class="fsr"><b class="'+(r[0]==='▲'?'up':'dn')+'">'+r[0]+'</b>'+playBtn(r[2],sym(r[2])+' '+sigTxt(r[2]))+'</span>').join('')+'</div>';}
+/* --- Seesportschule-Übersicht --- */
+function openSchool(){try{if(typeof restoreS==='function')restoreS();if(window.G){G.running=false;G.paused=false;}}catch(e){}
+  for(const o of document.querySelectorAll('.overlay'))o.hidden=true;const hud=$$('hud');if(hud)hud.hidden=true;
+  $$('schFlagSub').textContent=known()+' von '+FL.length+' Flaggen sicher';$$('schoolOv').hidden=false;}
+window.openSchool=openSchool;
+/* --- Flaggen-Trainer --- */
+let mode='cards',filt='all',quiz=null;
+function openFlags(m){for(const o of document.querySelectorAll('.overlay'))o.hidden=true;$$('flagOv').hidden=false;setMode(m||'cards');}
+function setMode(m){mode=m;for(const b of document.querySelectorAll('#flagTabs [data-m]'))b.classList.toggle('on',b.dataset.m===m);
+  if(m==='cards')renderCards();else startQuiz(m);}
+function progBar(){const p=loadP();return '<div class="fprog"><div style="width:'+Math.round(100*known()/FL.length)+'%"></div></div><div class="fprogT">'+known()+' von '+FL.length+' sicher · '+FL.filter(f=>(p[f.id]||0)>0).length+' schon geübt</div>';}
+function renderCards(){const p=loadP();const chips=['all'].concat(Object.keys(GRP)).map(g=>'<button type="button" class="fchip'+(filt===g?' on':'')+'" data-g="'+g+'">'+(g==='all'?'Alle':GRP[g])+'</button>').join('');
+  const list=FL.filter(f=>filt==='all'||f.grp===filt);
+  $$('flagBody').innerHTML=progBar()+'<div class="fchips">'+chips+'</div><div class="fgrid">'+list.map(f=>'<button type="button" class="fcard" data-id="'+f.id+'"><span class="fart">'+flagArt(f,1)+'</span><span class="fnm">'+f.name+'</span><span class="fdots">'+[1,2,3,4].map(i=>'<i class="'+((p[f.id]||0)>=i?'on':'')+'"></i>').join('')+'</span></button>').join('')+'</div>';}
+function detail(id){const f=FL.find(x=>x.id===id);if(!f)return;
+  $$('flagBody').innerHTML='<div class="fdet"><div class="fdetArt">'+flagArt(f,2.2)+'</div><div><div class="fgrp">'+GRP[f.grp]+' · '+(/^\d/.test(f.rule)?'Regel ':'')+f.rule+'</div><h3 class="fdetNm">'+f.name+'</h3>'+
+   '<table class="frows">'+f.rows.map(r=>'<tr><td class="fact '+(r[0]==='▲'?'up':'dn')+'">'+r[0]+'</td><td>'+r[1]+'</td><td class="fsig">'+(r[2]==='—'?'':playBtn(r[2],sym(r[2])+' ♪'))+'<small>'+sigTxt(r[2])+'</small></td></tr>').join('')+'</table>'+
+   (f.tip?'<p class="ftip">'+f.tip+'</p>':'')+'</div></div><div class="actions"><button type="button" class="btn ghost" data-back="1">Zur Übersicht</button></div>';}
+const byId=id=>FL.find(f=>f.id===id);
+function newQ(kind){const p=loadP();
+  if(kind==='mix'){const r=Math.random();kind=r<0.38?'f2m':r<0.76?'m2f':r<0.88?'snd':'seq';}
+  if(kind==='seq'){if(Math.random()<0.3)return newQ('snd');const s=SEQ[Math.floor(Math.random()*SEQ.length)];
+    if(s.flags)return {t:'flag',q:s.q,raw:true,opts:shuf([s.a].concat(s.o)),ans:s.a,id:s.a};
+    return {t:'txt',q:s.q,art:s.art?byId(s.art):null,opts:shuf([s.a].concat(s.o)),ans:s.a,id:null};}
+  if(kind==='snd'){if(Math.random()<0.5){const s=SIGS[Math.floor(Math.random()*SIGS.length)];return {t:'snd',q:'Hör hin: Welches Schallsignal ist das?',play:s,opts:shuf(SIGS.slice()),ans:s,id:null,auto:true};}
+    const cand=FL.filter(f=>f.rows[0][2]!=='—');const f=pickWeighted(cand,p);return {t:'snd',q:'Welches Schallsignal gehört zum Setzen dieser Flagge?',art:f,opts:shuf(SIGS.slice()),ans:f.rows[0][2],id:f.id,noSig:true};}
+  const f=pickWeighted(FL,p);const others=shuf(FL.filter(x=>x.id!==f.id&&mean(x)!==mean(f)));
+  if(kind==='f2m'){const opts=shuf([mean(f)].concat(others.slice(0,3).map(mean)));return {t:'txt',q:'Was bedeutet diese Flagge'+(f.rows.length>1?' beim Setzen':'')+'?',art:f,opts,ans:mean(f),id:f.id};}
+  const opts=shuf([f].concat(others.slice(0,3)));return {t:'flag',q:mean(f),opts:opts.map(o=>o.id),ans:f.id,id:f.id};}
+function startQuiz(kind){quiz={kind,n:0,ok:0,max:10,cur:null,done:false};nextQ();}
+function nextQ(){if(quiz.n>=quiz.max){showRes();return;}quiz.cur=newQ(quiz.kind);quiz.n++;quiz.answered=false;renderQ();if(quiz.cur.auto)setTimeout(()=>playSig(quiz.cur.play),250);}
+function renderQ(){const c=quiz.cur;let h='<div class="fqhead">Frage '+quiz.n+' von '+quiz.max+' · '+quiz.ok+' richtig</div>';
+  if(c.art)h+='<div class="fqart">'+flagArt(c.art,2)+'</div>'+(c.noSig?'':sigRow(c.art));
+  if(c.t==='flag')h+='<div class="fq">'+(c.raw?c.q:'Welche Flagge bedeutet: <b>'+c.q+'</b>?')+'</div><div class="fopts flagopts">'+c.opts.map((id,i)=>'<button type="button" class="fopt fflag" data-i="'+i+'">'+flagArt(byId(id),1.3)+'<span class="foptNm">'+(quiz.answered?byId(id).name:'')+'</span></button>').join('')+'</div>';
+  else if(c.t==='snd')h+='<div class="fq">'+c.q+'</div>'+(c.play?'<div class="fsnd">'+playBtn(c.play,'Nochmal anhören')+'</div>':'')+'<div class="fopts">'+c.opts.map((s,i)=>'<button type="button" class="fopt" data-i="'+i+'"><span class="fsgl">'+sym(s)+'</span>'+sigName(s)+(c.play?'':' '+playBtn(s,'♪').replace('♪ ♪','♪'))+'</button>').join('')+'</div>';
+  else h+='<div class="fq">'+c.q+'</div><div class="fopts">'+c.opts.map((o,i)=>'<button type="button" class="fopt" data-i="'+i+'">'+o+'</button>').join('')+'</div>';
+  h+='<div class="ffb" id="flagFb"></div>';$$('flagBody').innerHTML=h;}
+function answer(i){if(quiz.answered)return;quiz.answered=true;const c=quiz.cur;const pick=c.opts[i];const ok=pick===c.ans;if(ok)quiz.ok++;
+  if(c.id){const p=loadP();p[c.id]=ok?Math.min(4,(p[c.id]||0)+1):Math.max(0,(p[c.id]||0)-2);saveP(p);}
+  const btns=document.querySelectorAll('#flagBody .fopt');btns.forEach((b,j)=>{if(c.opts[j]===c.ans)b.classList.add('right');else if(j===i)b.classList.add('wrong');b.disabled=true;
+    if(c.t==='flag'){const nm=b.querySelector('.foptNm');if(nm)nm.textContent=byId(c.opts[j]).name;}});
+  sfx(ok);
+  const f=c.id&&byId(c.id);const ansTxt=c.t==='snd'?sigName(c.ans):c.t==='flag'?byId(c.ans).name:c.ans;
+  $$('flagFb').innerHTML='<div class="'+(ok?'fok':'fno')+'">'+(ok?'Richtig!':'Nicht ganz.')+(f?' <b>'+f.name+'</b> – '+(/^\d/.test(f.rule)?'Regel ':'')+f.rule+': '+f.rows[0][1]+(f.rows.length>1?'. Beim Bergen: '+f.rows[1][1].replace(/^./,m=>m.toLowerCase()):'')+'.':(ok?' ':' Richtig ist: ')+'<b>'+ansTxt+'</b>.')+'</div>'+
+   (f?'<div class="ffbrow">'+flagArt(f,1)+sigRow(f)+'</div>':'')+(f&&f.tip?'<p class="ftip">'+f.tip+'</p>':'')+'<div class="actions"><button type="button" class="btn blue" data-next="1">'+(quiz.n>=quiz.max?'Auswertung':'Weiter')+'</button></div>';}
+function showRes(){const pct=Math.round(100*quiz.ok/quiz.max);$$('flagBody').innerHTML='<div class="fres"><div class="fresN">'+quiz.ok+' / '+quiz.max+'</div><p>'+(pct>=90?'Stark – du kennst deine Flaggen!':pct>=60?'Gut dabei. Die schwierigen Flaggen kommen öfter dran.':'Weiter üben – schau dir die Lernkarten an.')+'</p>'+progBar()+'<div class="actions"><button type="button" class="btn" data-again="1">Nochmal</button><button type="button" class="btn ghost" data-m2="cards">Lernkarten</button></div></div>';}
+/* --- Ereignisse --- */
+document.addEventListener('click',e=>{const t=e.target.closest?e.target:null;if(!t)return;const inFlag=t.closest('#flagOv');const inSch=t.closest('#schoolOv');
+  if(t.closest('#schoolBtn')){openSchool();return;}
+  if(inSch){const it=t.closest('[data-sch]');if(it){const k=it.dataset.sch;if(k==='tut')$$('tutBtn').click();else if(k==='hb')$$('hbBtn').click();else if(k==='flags')openFlags('cards');}
+    if(t.closest('#schBack')){$$('schoolOv').hidden=true;$$('menu').hidden=false;}return;}
+  if(!inFlag)return;
+  const tab=t.closest('#flagTabs [data-m]');if(tab){setMode(tab.dataset.m);return;}
+  const ch=t.closest('.fchip');if(ch){filt=ch.dataset.g;renderCards();return;}
+  const cd=t.closest('.fcard');if(cd){detail(cd.dataset.id);return;}
+  const pl=t.closest('.fplay');if(pl){e.stopPropagation();e.preventDefault();playSig(pl.dataset.s);return;}
+  if(t.closest('[data-back]')){renderCards();return;}
+  const op=t.closest('.fopt');if(op&&quiz){answer(+op.dataset.i);return;}
+  if(t.closest('[data-next]')){nextQ();return;}
+  if(t.closest('[data-again]')){startQuiz(quiz?quiz.kind:'mix');return;}
+  const m2=t.closest('[data-m2]');if(m2){setMode(m2.dataset.m2);return;}
+  if(t.closest('#flagBack')){openSchool();return;}});
+/* Zurück aus Tutorial bzw. Hafen führt in die Seesportschule */
+for(const id of ['tutBack','hbBack']){const b=$$(id);if(b){b.textContent='Seesportschule';b.addEventListener('click',()=>setTimeout(openSchool,0));}}
+})();
 </script>
