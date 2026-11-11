@@ -1090,7 +1090,7 @@ const SCHEMA=[
   {k:'season',label:'Jahreszeit',type:'select',options:[['auto','automatisch (nach Datum)'],['fruehling','Frühling'],['sommer','Sommer'],['herbst','Herbst'],['winter','Winter']],hint:'Frühling: frisches Grün und Blüten · Herbst: buntes Laub · Winter: kahle Laubbäume, Schnee auf Wiesen und im Wald, Eisrand am Ufer. Schneefall stellst du beim Niederschlag ein'}]}
 ];
 const form=document.getElementById('setForm');
-function onSetting(k){if(k==='revier'&&(S.revier==='cospu'||S.revier==='rangs')&&(S.sunLive||/^(Cospudener|Rangsdorfer) See · Stand|^Stand /.test(S.wxInfo||''))&&!(G&&G.running&&!G.over))setTimeout(()=>loadLiveWx(),0);if(k==='season'){applyLight();buildShore();if(G&&!G.running)newRace(null);return;}if(k==='licht')S.sunLive=null;if(k==='licht'||k==='wxCloud'||k==='wxPrecip'||k==='windFrom'||k==='revier'||k==='gfx')applyLight();if(k==='gfx'&&(S.revier==='cospu'||isGL())&&G&&!G.running){buildShore();}if(!G)return;
+function onSetting(k){if(k==='revier'&&S.wxSite&&(S.revier==='cospu'||S.revier==='rangs')&&wxSite().name!==S.wxSite&&!(G&&G.running&&!G.over))setTimeout(()=>loadLiveWx(),0);if(k==='season'){applyLight();buildShore();if(G&&!G.running)newRace(null);return;}if(k==='licht')S.sunLive=null;if(k==='licht'||k==='wxCloud'||k==='wxPrecip'||k==='windFrom'||k==='revier'||k==='gfx')applyLight();if(k==='gfx'&&(S.revier==='cospu'||isGL())&&G&&!G.running){buildShore();}if(!G)return;
   if((k==='tws'||k==='waveH')&&!G.running)setupWaves();
   if((k==='boatClass'||k==='courseType'||k==='finishUp'||k==='legLength'||k==='laps')&&!G.running){newRace(null);}
   if(k==='revier'||k==='windFrom'){buildShore();if(!G.running)newRace(null);}
@@ -1147,7 +1147,7 @@ async function loadLiveWx(){if(wxBusy)return;wxBusy=true;const say=t=>{S.wxInfo=
     if(S.wxUseWx){S.wxCloud=clamp(Math.round((Number(c.cloud_cover)||0)/5)*5,0,100);S.wxPrecip=wxPrecipOf(c);parts.push('Wolken '+Math.round(c.cloud_cover)+' %');parts.push(WX_TXT[S.wxPrecip]);}
     if(S.wxUseTime){const sp=sunPos(t,site.lat,site.lon);S.sunLive={az:Math.round(sp.az*10)/10,el:Math.round(sp.el*10)/10};S.licht=lightForElev(sp.el);parts.push('Licht: '+LIGHT_TXT[S.licht]+' (Sonne '+Math.round(sp.el)+'° hoch)');}
     if(!parts.length)parts.push('nichts zum Übernehmen ausgewählt');
-    say(site.name+' · Stand '+hhmm+' Uhr · '+parts.join(' · ')+(running?' · Während einer Fahrt wird nur Wetter und Licht übernommen.':''));
+    S.wxSite=site.name;say(site.name+' · Stand '+hhmm+' Uhr · '+parts.join(' · ')+(running?' · Während einer Fahrt wird nur Wetter und Licht übernommen.':''));
     buildForm();applyLight();
     if(S.wxUseWind&&!running){if(G&&!G.running)setupWaves();onSetting('revier');}
   }catch(e){say('Live-Daten nicht erreichbar ('+(e&&e.name==='AbortError'?'Zeitüberschreitung':'keine Verbindung')+'). Deine Einstellungen bleiben unverändert.');}
