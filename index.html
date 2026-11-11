@@ -1085,6 +1085,7 @@ const SCHEMA=[
   {k:'allMsgs',label:'Auch Vorfälle zwischen CPU-Booten melden',type:'check'}]},
  {group:'Grafik',items:[
   {k:'gfx',label:'Qualität',type:'select',options:[['ultra','Ultra: Leuchten, Farbstimmung, feine Schatten (starke Geräte)'],['hoch','Hoch: Spiegelungen + Schatten'],['mittel','Mittel: Schatten'],['niedrig','Niedrig: schnell']],hint:'Ruckelt es auf dem Handy, eine Stufe runter'},
+  {k:'starLines',label:'Sternbilder nachts einzeichnen',type:'check',hint:'Mond und Sterne stehen wie am echten Himmel über dem gewählten See (aktuelles Datum; nachts die aktuelle Uhrzeit, tagsüber der Himmel von heute 23 Uhr).'},
   {k:'licht',label:'Licht',type:'select',options:[['mittag','Mittag'],['nachmittag','Nachmittag'],['gold','Goldene Stunde'],['daemmerung','Dämmerung'],['nacht','Nacht']],hint:'Von Hand gewählt, gilt eine feste Sonnenrichtung. Über „Live-Daten laden“ steht die Sonne wie in Wirklichkeit'},
   {k:'season',label:'Jahreszeit',type:'select',options:[['auto','automatisch (nach Datum)'],['fruehling','Frühling'],['sommer','Sommer'],['herbst','Herbst'],['winter','Winter']],hint:'Frühling: frisches Grün und Blüten · Herbst: buntes Laub · Winter: kahle Laubbäume, Schnee auf Wiesen und im Wald, Eisrand am Ufer. Schneefall stellst du beim Niederschlag ein'}]}
 ];
@@ -1236,13 +1237,93 @@ float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(ha
 float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*noise(p);p*=2.03;a*=.5;}return v;}
 void main(){vec3 d=normalize(vP);float h=max(d.y,0.);
  vec3 col=mix(hor,top,pow(h,.45));
- float sd=max(dot(d,sunDir),0.);col+=(1.-.9*uCl)*vec3(1.,.88,.7)*pow(sd,10.)*.28*(1.-.85*uN)+(1.-.97*uCl)*mix(vec3(1.,.98,.9),vec3(.82,.88,1.),uN)*smoothstep(mix(.9993,.9988,uN),mix(.9997,.9992,uN),sd);
- if(uN>0.&&d.y>0.){vec3 f=floor(d*230.);float hs=fract(sin(dot(f,vec3(12.9898,78.233,45.164)))*43758.5453);col+=vec3(.9,.95,1.)*step(.9962,hs)*smoothstep(0.,.15,d.y)*uN*(.4+.6*fract(hs*7.));}
+ float sd=max(dot(d,sunDir),0.);col+=(1.-.9*uCl)*vec3(1.,.88,.7)*pow(sd,10.)*.28*(1.-.85*uN)+(1.-.97*uCl)*mix(vec3(1.,.98,.9),vec3(.82,.88,1.),uN)*smoothstep(mix(.9993,.9988,uN),mix(.9997,.9992,uN),sd)*(1.-uN);
  if(d.y>0.){vec2 uv=d.xz/(d.y+.12)*1.3+vec2(uT*.006,uT*.003);float c=fbm(uv);float lo=mix(.8,-.25,pow(uCl,.8));c=smoothstep(lo,lo+.28,c)*smoothstep(0.,.22,d.y);
   float sh=fbm(uv*1.8+vec2(3.1,1.7));vec3 cc=mix(vec3(.72,.76,.82),vec3(1.,.99,.97),sh*(1.-.55*uCl))*(1.-.45*uDk)*(1.-.9*uN);col=mix(col,cc,c*mix(.88,1.,uCl));}
  else col=mix(hor,vec3(.35,.45,.5)*(1.-.92*uN),clamp(-d.y*4.,0.,1.));
  gl_FragColor=vec4(col,1.);}`}));
-sky.frustumCulled=false;sky.renderOrder=-1000;scene.add(sky);scene.background=new THREE.Color('#9ec6e0');
+sky.frustumCulled=false;sky.renderOrder=-1000;scene.add(sky);
+/* ================= Sternenhimmel und Mond nach aktueller Uhrzeit und Ort ================= */
+// Helle Sterne (J2000): Name, Rektaszension in Stunden, Deklination in Grad, Helligkeit
+const STARS=[['Sirius',6.752,-16.716,-1.46],['Canopus',6.399,-52.696,-0.74],['Arktur',14.261,19.182,-0.05],['Wega',18.616,38.784,0.03],['Kapella',5.278,45.998,0.08],['Rigel',5.242,-8.202,0.13],['Prokyon',7.655,5.225,0.34],['Beteigeuze',5.919,7.407,0.45],['Atair',19.846,8.868,0.76],['Aldebaran',4.599,16.509,0.86],['Antares',16.490,-26.432,0.96],['Spica',13.420,-11.161,0.97],['Pollux',7.755,28.026,1.14],['Fomalhaut',22.961,-29.622,1.16],['Deneb',20.690,45.280,1.25],['Regulus',10.140,11.967,1.40],['Adhara',6.977,-28.972,1.50],['Kastor',7.577,31.888,1.58],['Shaula',17.560,-37.104,1.62],['Bellatrix',5.419,6.350,1.64],['Elnath',5.438,28.608,1.65],['Alnilam',5.604,-1.202,1.69],['Alnitak',5.679,-1.943,1.74],['Mintaka',5.533,-0.299,2.23],['Saiph',5.796,-9.670,2.07],['Alioth',12.900,55.960,1.76],['Dubhe',11.062,61.751,1.79],['Mirfak',3.405,49.861,1.79],['Wezen',7.140,-26.393,1.83],['Alkaid',13.792,49.313,1.85],['Menkalinan',5.992,44.948,1.90],['Alhena',6.629,16.399,1.92],['Polarstern',2.530,89.264,1.98],['Mirzam',6.378,-17.956,1.98],['Alphard',9.460,-8.659,1.98],['Hamal',2.120,23.462,2.00],['Diphda',0.727,-17.987,2.02],['Nunki',18.921,-26.297,2.05],['Mizar',13.399,54.925,2.04],['Alpheratz',0.140,29.090,2.06],['Mirach',1.162,35.621,2.06],['Kochab',14.845,74.156,2.08],['Rasalhague',17.582,12.560,2.08],['Algol',3.136,40.956,2.10],['Alamak',2.065,42.330,2.10],['Denebola',11.818,14.572,2.13],['Schedir',0.675,56.537,2.24],['Caph',0.153,59.150,2.28],['Navi',0.945,60.717,2.47],['Ruchbah',1.430,60.235,2.68],['Segin',1.907,63.670,3.37],['Merak',11.031,56.382,2.37],['Phekda',11.897,53.695,2.44],['Megrez',12.257,57.033,3.31],['Sadr',20.370,40.257,2.23],['Gienah',20.770,33.970,2.48],['Albireo',19.512,27.960,3.08],['Fawaris',19.750,45.131,2.87],['Eltanin',17.943,51.489,2.24],['Rastaban',17.507,52.301,2.79],['Grumium',17.892,56.873,3.75],['Thuban',14.073,64.376,3.65],['Eta Dra',16.400,61.514,2.73],['Zeta Dra',17.146,65.715,3.17],['Edasich',15.415,58.966,3.29],['Altais',19.209,67.661,3.07],['Alphekka',15.578,26.715,2.23],['Izar',14.750,27.074,2.37],['Muphrid',13.911,18.398,2.68],['Seginus',14.535,38.308,3.03],['Nekkar',15.032,40.390,3.50],['Delta Boo',15.258,33.315,3.47],['Algieba',10.333,19.842,2.08],['Zosma',11.235,20.524,2.56],['Chertan',11.237,15.430,3.33],['Epsilon Leo',9.764,23.774,2.98],['Rasalas',9.879,26.007,3.88],['Adhafera',10.278,23.417,3.44],['Eta Leo',10.122,16.763,3.52],['Markab',23.079,15.205,2.49],['Scheat',23.063,28.083,2.42],['Algenib',0.220,15.184,2.83],['Enif',21.736,9.875,2.39],['Sheliak',18.835,33.363,3.45],['Sulafat',18.982,32.690,3.24],['Zeta Lyr',18.746,37.605,4.30],['Delta Lyr',18.908,36.899,4.30],['Epsilon Lyr',18.739,39.670,4.60],['Tarazed',19.771,10.613,2.72],['Alshain',19.922,6.407,3.71],['Menkar',3.038,4.090,2.54],['Alkione',3.791,24.105,2.87],['Atlas',3.819,24.053,3.62],['Elektra',3.748,24.113,3.70],['Maia',3.763,24.368,3.87],['Merope',3.772,23.948,4.18],['Taygeta',3.754,24.467,4.30],['Ain',4.477,19.180,3.53],['Theta Tau',4.478,15.871,3.40],['Gamma Tau',4.330,15.628,3.65],['Delta Tau',4.382,17.543,3.76],['Zeta Tau',5.627,21.143,3.00],['Almaaz',5.032,43.823,3.00],['Haedus',5.109,41.234,3.17],['Theta Aur',5.995,37.213,2.62],['Hassaleh',4.950,33.166,2.69],['Mebsuta',6.732,25.131,3.06],['Tejat',6.383,22.514,2.87],['Wasat',7.335,21.982,3.53],['Meissa',5.585,9.934,3.39],['Aludra',7.402,-29.303,2.45],['Sigma Sco',16.353,-25.593,2.90],['Dschubba',16.006,-22.622,2.32],['Acrab',16.091,-19.806,2.62],['Pi Sco',15.981,-26.114,2.89],['Tau Sco',16.598,-28.216,2.82],['Epsilon Sco',16.836,-34.293,2.29],['Sargas',17.622,-42.998,1.86],['Kaus Australis',18.403,-34.385,1.85],['Phi Sgr',18.761,-26.991,3.17],['Kaus Media',18.350,-29.828,2.70],['Kaus Borealis',18.466,-25.422,2.81],['Ascella',19.043,-29.880,2.60],['Tau Sgr',19.116,-27.671,3.32],['Alnasl',18.097,-30.424,2.99],['Delta Per',3.715,47.788,3.01],['Epsilon Per',3.964,40.010,2.89],['Gamma Per',3.080,53.506,2.93],['Zeta Per',3.902,31.884,2.85],['Pherkad',15.346,71.834,3.00],['Yildun',17.537,86.586,4.36],['Epsilon UMi',16.766,82.037,4.20],['Zeta UMi',15.734,77.794,4.30],['Eta UMi',16.292,75.755,4.95],['Porrima',12.694,-1.449,2.74],['Vindemiatrix',13.036,10.959,2.80],['Nusakan',15.464,29.106,3.68],['Gamma CrB',15.712,26.296,3.84],['Theta CrB',15.549,31.359,4.10],['Delta CrB',15.826,26.068,4.60],['Epsilon CrB',15.960,26.878,4.15],['Zeta Her',16.688,31.603,2.81],['Eta Her',16.715,38.922,3.53],['Pi Her',17.251,36.809,3.16],['Epsilon Her',17.005,30.926,3.92],['Kornephoros',16.504,21.490,2.77],['Gienah Crv',12.263,-17.542,2.59],['Kraz',12.573,-23.397,2.65],['Algorab',12.498,-16.515,2.94],['Minkar',12.169,-22.620,3.00],['Gomeisa',7.453,8.289,2.89],['Arneb',5.546,-17.822,2.58],['Zubenelgenubi',14.848,-16.042,2.75],['Zubeneschamali',15.283,-9.383,2.61],['Sadalsuud',21.526,-5.571,2.90],['Sadalmelik',22.096,-0.320,2.95],['Deneb Algedi',21.784,-16.127,2.85],['Sheratan',1.911,20.808,2.64]];
+// Sternbildlinien (Großer Wagen, Kleiner Wagen, Kassiopeia, Orion, Sommerdreieck-Sternbilder, Löwe, Zwillinge, Stier, Fuhrmann, Perseus, Andromeda, Pegasus, Bärenhüter, Nördliche Krone, Herkules, Skorpion, Schütze, Großer und Kleiner Hund, Drache, Rabe, Jungfrau, Waage)
+const CLINES=[['Dubhe','Merak'],['Merak','Phekda'],['Phekda','Megrez'],['Megrez','Dubhe'],['Megrez','Alioth'],['Alioth','Mizar'],['Mizar','Alkaid'],
+ ['Polarstern','Yildun'],['Yildun','Epsilon UMi'],['Epsilon UMi','Zeta UMi'],['Zeta UMi','Kochab'],['Kochab','Pherkad'],['Pherkad','Eta UMi'],['Eta UMi','Zeta UMi'],
+ ['Caph','Schedir'],['Schedir','Navi'],['Navi','Ruchbah'],['Ruchbah','Segin'],
+ ['Beteigeuze','Alnitak'],['Bellatrix','Mintaka'],['Alnitak','Alnilam'],['Alnilam','Mintaka'],['Alnitak','Saiph'],['Mintaka','Rigel'],['Beteigeuze','Meissa'],['Bellatrix','Meissa'],['Beteigeuze','Bellatrix'],
+ ['Deneb','Sadr'],['Sadr','Albireo'],['Sadr','Fawaris'],['Sadr','Gienah'],
+ ['Wega','Epsilon Lyr'],['Wega','Zeta Lyr'],['Zeta Lyr','Sheliak'],['Sheliak','Sulafat'],['Sulafat','Delta Lyr'],['Delta Lyr','Zeta Lyr'],
+ ['Atair','Tarazed'],['Atair','Alshain'],
+ ['Regulus','Eta Leo'],['Eta Leo','Algieba'],['Algieba','Adhafera'],['Adhafera','Rasalas'],['Rasalas','Epsilon Leo'],['Algieba','Zosma'],['Zosma','Denebola'],['Denebola','Chertan'],['Chertan','Regulus'],
+ ['Kastor','Mebsuta'],['Mebsuta','Tejat'],['Pollux','Wasat'],['Wasat','Alhena'],['Kastor','Pollux'],
+ ['Gamma Tau','Delta Tau'],['Delta Tau','Ain'],['Gamma Tau','Theta Tau'],['Theta Tau','Aldebaran'],['Ain','Elnath'],['Aldebaran','Zeta Tau'],
+ ['Kapella','Menkalinan'],['Menkalinan','Theta Aur'],['Theta Aur','Elnath'],['Elnath','Hassaleh'],['Hassaleh','Kapella'],['Kapella','Almaaz'],['Almaaz','Haedus'],
+ ['Mirfak','Gamma Per'],['Mirfak','Delta Per'],['Delta Per','Epsilon Per'],['Epsilon Per','Zeta Per'],['Mirfak','Algol'],
+ ['Alpheratz','Mirach'],['Mirach','Alamak'],['Alpheratz','Scheat'],['Scheat','Markab'],['Markab','Algenib'],['Algenib','Alpheratz'],['Markab','Enif'],
+ ['Arktur','Izar'],['Izar','Delta Boo'],['Delta Boo','Nekkar'],['Nekkar','Seginus'],['Seginus','Arktur'],['Arktur','Muphrid'],
+ ['Theta CrB','Nusakan'],['Nusakan','Alphekka'],['Alphekka','Gamma CrB'],['Gamma CrB','Delta CrB'],['Delta CrB','Epsilon CrB'],
+ ['Zeta Her','Eta Her'],['Eta Her','Pi Her'],['Pi Her','Epsilon Her'],['Epsilon Her','Zeta Her'],['Zeta Her','Kornephoros'],
+ ['Acrab','Dschubba'],['Dschubba','Pi Sco'],['Dschubba','Sigma Sco'],['Sigma Sco','Antares'],['Antares','Tau Sco'],['Tau Sco','Epsilon Sco'],['Epsilon Sco','Sargas'],['Sargas','Shaula'],
+ ['Alnasl','Kaus Media'],['Kaus Media','Kaus Australis'],['Kaus Australis','Alnasl'],['Kaus Media','Kaus Borealis'],['Kaus Borealis','Phi Sgr'],['Phi Sgr','Nunki'],['Nunki','Tau Sgr'],['Tau Sgr','Ascella'],['Ascella','Phi Sgr'],['Ascella','Kaus Australis'],['Phi Sgr','Kaus Media'],
+ ['Sirius','Mirzam'],['Sirius','Adhara'],['Adhara','Wezen'],['Wezen','Aludra'],['Prokyon','Gomeisa'],
+ ['Eltanin','Grumium'],['Grumium','Rastaban'],['Rastaban','Eltanin'],['Grumium','Altais'],['Altais','Zeta Dra'],['Zeta Dra','Eta Dra'],['Eta Dra','Edasich'],['Edasich','Thuban'],
+ ['Gienah Crv','Algorab'],['Algorab','Kraz'],['Kraz','Minkar'],['Minkar','Gienah Crv'],['Spica','Porrima'],['Porrima','Vindemiatrix'],['Zubenelgenubi','Zubeneschamali']];
+const ASTRO={pts:null,lines:null,moon:null,last:-1e9,t:null,moonW:null,moonK:0.5,moonUp:false,starA:0};
+function astroSite(){return (typeof wxSite==='function')?wxSite():{lat:51.2686,lon:12.3392};}
+function astroTime(){const now=Date.now()/1000;if(S.sunLive)return now;const s=astroSite();const sp=sunPos(now,s.lat,s.lon);if(sp.el<-8)return now;
+  const d=new Date();const off=-d.getTimezoneOffset()*60;let t=Math.floor((now+off)/86400)*86400-off+23*3600;if(t<now-6*3600)t+=86400;return t;}
+function astroLST(t,lon){const d=t/86400+2440587.5-2451545.0;return (((18.697374558+24.06570982441908*d)*15+lon)%360+360)%360;}
+function astroHor(raDeg,decDeg,lst,lat){const H=(lst-raDeg)*DEG,de=decDeg*DEG,la=lat*DEG;const el=Math.asin(Math.sin(la)*Math.sin(de)+Math.cos(la)*Math.cos(de)*Math.cos(H));
+  const az=Math.atan2(-Math.cos(de)*Math.sin(H),Math.sin(de)*Math.cos(la)-Math.cos(de)*Math.sin(la)*Math.cos(H));return [az,el];}
+function astroW(az,el,r){const E=Math.sin(az)*Math.cos(el),N=Math.cos(az)*Math.cos(el),U=Math.sin(el);const wf=(Number(S.windFrom)||0)*DEG,cs=Math.cos(wf),sn=Math.sin(wf);
+  const x=E*cs-N*sn,y=E*sn+N*cs;return [x*r,U*r,-y*r];}
+function moonEq(t){const d=t/86400+2440587.5-2451545.0,r=DEG;const L=218.316+13.176396*d,M=134.963+13.064993*d,F=93.272+13.229350*d,D=297.850+12.190749*d,Ms=357.529+0.98560028*d;
+  const lam=L+6.289*Math.sin(M*r)-1.274*Math.sin((2*D-M)*r)+0.658*Math.sin(2*D*r)+0.214*Math.sin(2*M*r)-0.186*Math.sin(Ms*r)-0.114*Math.sin(2*F*r);
+  const bet=5.128*Math.sin(F*r)+0.280*Math.sin((M+F)*r)-0.278*Math.sin((F-M)*r);const e=23.439*r,l=lam*r,b=bet*r;
+  const ra=Math.atan2(Math.sin(l)*Math.cos(e)-Math.tan(b)*Math.sin(e),Math.cos(l))/r,dec=Math.asin(Math.sin(b)*Math.cos(e)+Math.cos(b)*Math.sin(e)*Math.sin(l))/r;
+  const q=(280.459+0.98564736*d)%360,g=Ms*r,ls=q+1.915*Math.sin(g)+0.020*Math.sin(2*g);const el=((lam-ls)%360+360)%360;const cpsi=Math.cos(b)*Math.cos((lam-ls)*r);
+  return {ra:(ra+360)%360,dec,k:(1-cpsi)/2,wax:el<180};}
+function astroMoonTex(k,wax){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');const R=56,cx=64,cy=64;
+  const gl=x.createRadialGradient(cx,cy,R*0.9,cx,cy,64);gl.addColorStop(0,'rgba(220,230,255,0.25)');gl.addColorStop(1,'rgba(220,230,255,0)');x.fillStyle=gl;x.fillRect(0,0,128,128);
+  // beleuchteter Teil, helle Seite zeigt nach rechts (+x); die Drehung zur Sonne erfolgt im Spiel
+  x.save();x.beginPath();x.arc(cx,cy,R,-Math.PI/2,Math.PI/2,false);const tx=R*(1-2*k);x.ellipse(cx,cy,Math.abs(tx),R,0,Math.PI/2,-Math.PI/2,tx>0);x.closePath();
+  const mg=x.createRadialGradient(cx-10,cy-10,4,cx,cy,R);mg.addColorStop(0,'#fbfaf2');mg.addColorStop(1,'#d9d6c8');x.fillStyle=mg;x.fill();x.clip();
+  x.fillStyle='rgba(120,120,110,0.22)';for(const [a,b2,rr] of [[-14,-18,13],[8,-6,10],[-4,16,9],[18,14,7],[-22,6,6]]){x.beginPath();x.arc(cx+a,cy+b2,rr,0,Math.PI*2);x.fill();}x.restore();
+  const tex=new THREE.CanvasTexture(c);return tex;}
+function astroBuild(){if(ASTRO.pts)return;
+  // Sterne: Katalog plus schwache Hintergrundsterne, fest an der Himmelskugel
+  const cat=STARS.map(s=>[s[1]*15,s[2],s[3]]);let sd=7;const rr=()=>{sd=(sd*16807)%2147483647;return sd/2147483647;};
+  for(let i=0;i<1400;i++){const ra=rr()*360,dec=Math.asin(rr()*2-1)/DEG;cat.push([ra,dec,4.2+rr()*1.9]);}
+  ASTRO.cat=cat;const n=cat.length;const pos=new Float32Array(n*3),sz=new Float32Array(n),ph=new Float32Array(n),col=new Float32Array(n*3);
+  for(let i=0;i<n;i++){const m=cat[i][2];sz[i]=Math.max(1.3,4.6-0.75*m);ph[i]=rr()*6.28;const w=rr();const c=w<0.15?[1,0.85,0.72]:w<0.3?[0.8,0.88,1]:[1,1,0.97];const b=Math.min(1,Math.pow(2.512,(2.2-m)/2));col.set([c[0]*b,c[1]*b,c[2]*b],i*3);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('aS',new THREE.BufferAttribute(sz,1));g.setAttribute('aP',new THREE.BufferAttribute(ph,1));g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  const mat=new THREE.ShaderMaterial({uniforms:{uA:{value:0},uT:{value:0},uPR:{value:Math.min(2,window.devicePixelRatio||1)}},transparent:false,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,fog:false,vertexColors:true,
+    vertexShader:'attribute float aS;attribute float aP;uniform float uT;uniform float uPR;varying vec3 vC;varying float vA;void main(){vC=color;vec4 mv=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mv;float h=normalize(position).y;vA=smoothstep(-.01,.08,h)*(.82+.18*sin(uT*2.3+aP*7.));gl_PointSize=aS*uPR;}',
+    fragmentShader:'uniform float uA;varying vec3 vC;varying float vA;void main(){vec2 p=gl_PointCoord-.5;float d=length(p);if(d>.5)discard;float a=smoothstep(.5,.0,d);gl_FragColor=vec4(vC*a*uA*vA,1.);}'});
+  ASTRO.pts=new THREE.Points(g,mat);ASTRO.pts.frustumCulled=false;ASTRO.pts.renderOrder=-999;sky.add(ASTRO.pts);
+  const lp=new Float32Array(CLINES.length*6),lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.BufferAttribute(lp,3));
+  ASTRO.lines=new THREE.LineSegments(lg,new THREE.LineBasicMaterial({color:'#000000',transparent:false,blending:THREE.AdditiveBlending,depthTest:false,depthWrite:false,fog:false}));ASTRO.lines.frustumCulled=false;ASTRO.lines.renderOrder=-999;sky.add(ASTRO.lines);
+  ASTRO.moon=new THREE.Sprite(new THREE.SpriteMaterial({transparent:false,blending:THREE.AdditiveBlending,depthTest:false,depthWrite:false,fog:false}));ASTRO.moon.renderOrder=-998;ASTRO.moon.frustumCulled=false;sky.add(ASTRO.moon);ASTRO.idx={};STARS.forEach((s,i)=>ASTRO.idx[s[0]]=i);}
+function astroUpdate(force){astroBuild();const t=astroTime();const site=astroSite();const lst=astroLST(t,site.lat===undefined?12.34:site.lon);const lat=site.lat;const R=2200;
+  const pa=ASTRO.pts.geometry.attributes.position.array,cat=ASTRO.cat;for(let i=0;i<cat.length;i++){const h=astroHor(cat[i][0],cat[i][1],lst,lat);const w=astroW(h[0],h[1],R);pa[i*3]=w[0];pa[i*3+1]=w[1];pa[i*3+2]=w[2];}
+  ASTRO.pts.geometry.attributes.position.needsUpdate=true;
+  const la=ASTRO.lines.geometry.attributes.position.array;CLINES.forEach((c,k)=>{const a=ASTRO.idx[c[0]],b=ASTRO.idx[c[1]];if(a===undefined||b===undefined)return;for(let j=0;j<3;j++){la[k*6+j]=pa[a*3+j];la[k*6+3+j]=pa[b*3+j];}});ASTRO.lines.geometry.attributes.position.needsUpdate=true;
+  const m=moonEq(t);const h=astroHor(m.ra,m.dec,lst,lat);const el=h[1]-0.95*DEG*Math.cos(h[1]);ASTRO.moonUp=el>-0.6*DEG;ASTRO.moonK=m.k;ASTRO.moonEl=el/DEG;ASTRO.moonAz=((h[0]/DEG)+360)%360;
+  const mw=astroW(h[0],el,2100);ASTRO.moon.position.set(mw[0],mw[1],mw[2]);const sc=2100*0.0091*2.4;ASTRO.moon.scale.set(sc,sc,1);ASTRO.moonW=astroW(h[0],Math.max(el,9*DEG),700);
+  const kk=Math.round(m.k*40)/40;if(force||ASTRO.mk!==kk){ASTRO.mk=kk;if(ASTRO.moon.material.map)ASTRO.moon.material.map.dispose();ASTRO.moon.material.map=astroMoonTex(m.k,m.wax);ASTRO.moon.material.needsUpdate=true;}
+  const sp=sunPos(t,lat,site.lon);ASTRO.sunW=astroW(sp.az*DEG,sp.el*DEG,1);ASTRO.t=t;}
+function moonLightDir(){if(!ASTRO.pts)try{astroUpdate(true);}catch(e){return null;}return ASTRO.moonUp?ASTRO.moonW:null;}
+const _av=new THREE.Vector3(),_bv=new THREE.Vector3();
+function astroTick(now){try{if(now-ASTRO.last>20||ASTRO.last<0){ASTRO.last=now;astroUpdate(false);}
+  const Lk=S.licht,night=!!(LIGHTS[Lk]&&LIGHTS[Lk].night),dusk=Lk==='daemmerung',gold=Lk==='gold';const cl=sky.material.uniforms.uCl.value;
+  const a=(night?1:dusk?0.35:0)*(1-0.92*cl);ASTRO.pts.material.uniforms.uA.value=a;ASTRO.pts.material.uniforms.uT.value=now;ASTRO.pts.visible=a>0.01;
+  const lo2=S.starLines&&night?0.35*(1-cl):0;ASTRO.lines.material.color.setRGB(0.49*lo2,0.61*lo2,0.77*lo2);ASTRO.lines.visible=lo2>0.01;
+  const mo=ASTRO.moonUp?(night?1:dusk?0.9:gold?0.55:0.4)*(1-0.85*cl):0;ASTRO.moon.material.opacity=mo;ASTRO.moon.visible=mo>0.02;
+  if(ASTRO.moon.visible&&ASTRO.sunW){// helle Seite zur Sonne drehen (auf dem Bildschirm)
+    _av.copy(ASTRO.moon.position).add(sky.position).project(camera);_bv.copy(ASTRO.moon.position).normalize().multiplyScalar(2100).addScaledVector(new THREE.Vector3(ASTRO.sunW[0],ASTRO.sunW[1],ASTRO.sunW[2]),300).add(sky.position).project(camera);
+    ASTRO.moon.material.rotation=Math.atan2((_bv.y-_av.y)/(camera.aspect?1:1),(_bv.x-_av.x)*(camera.aspect||1));}}catch(e){}}
+
+scene.background=new THREE.Color('#9ec6e0');
 const envRT=new THREE.WebGLCubeRenderTarget(128,{generateMipmaps:true,minFilter:THREE.LinearMipmapLinearFilter});const cubeCam=new THREE.CubeCamera(1,20000,envRT);
 const envScene=new THREE.Scene();envScene.add(new THREE.Mesh(sky.geometry,sky.material));let envDone=false;
 const glare=(function(){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');const g=x.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,'rgba(255,248,230,.55)');g.addColorStop(0.2,'rgba(255,236,200,.18)');g.addColorStop(1,'rgba(255,230,190,0)');x.fillStyle=g;x.fillRect(0,0,128,128);
@@ -3227,8 +3308,8 @@ function applyLight(){const L=LIGHTS[S.licht]||LIGHTS.mittag;const {cl,pr}=wxSta
   const cl2=pr?Math.max(cl,0.85+0.05*Math.min(pr,3)):cl;                       // Niederschlag setzt immer Wolken voraus
   const ov=clamp(cl2*0.9+(pr?0.05*Math.min(pr,3):0),0,1);                       // Verdunkelung durch Wolken
   const dk=pr>=1&&pr<=3?pr/3:(pr===4?0.3:0);                                    // Regenwolken dunkler
-  const sd=sunLiveDir()||L.dir;SUN_DIR.set(sd[0],sd[1],sd[2]).normalize();
-  sun.color.set(L.sun);sun.intensity=L.si*(1-0.82*ov)*(seasonNow()==='winter'?0.85:1);HEMI.color.set(L.hs);HEMI.groundColor.set(L.hg);HEMI.intensity=L.hi*(1+(night?0:0.3*ov));
+  const mdir=night?moonLightDir():null;const sd=sunLiveDir()||mdir||L.dir;SUN_DIR.set(sd[0],sd[1],sd[2]).normalize();
+  sun.color.set(L.sun);sun.intensity=L.si*(1-0.82*ov)*(seasonNow()==='winter'?0.85:1);if(night)sun.intensity*=mdir?(0.3+0.9*ASTRO.moonK):0.3;try{astroUpdate(true);ASTRO.last=-1e9;}catch(e){}HEMI.color.set(L.hs);HEMI.groundColor.set(L.hg);HEMI.intensity=L.hi*(1+(night?0:0.3*ov));
   const fg=new THREE.Color(L.fog),g1=_lum(fg);const grey=new THREE.Color().setRGB(g1,g1,g1*1.02).multiplyScalar((1-0.28*dk)*(pr===4?1.06:1));
   FOG.copy(fg).lerp(grey,ov*0.85);{const sz=seasonNow();if(sz==='winter')FOG.lerp(new THREE.Color('#dde5ec'),0.3);else if(sz==='herbst')FOG.lerp(new THREE.Color('#ddd6c4'),0.15);}const tp=new THREE.Color(L.top);SKY_TOP.copy(tp).lerp(grey.clone().multiplyScalar(0.88),ov*0.8);if(scene.fog)scene.fog.color.copy(FOG);
   const vis=pr===0?0:pr===4?0.55:[0,0.25,0.5,0.8][pr];const fn=450*(1-0.55*vis),ff=3000*(1-0.7*vis);if(scene.fog){scene.fog.near=fn;scene.fog.far=ff;}waterMat.uniforms.uFogN.value=fn;waterMat.uniforms.uFogF.value=ff;
@@ -5052,7 +5133,7 @@ function render(dt,now){
   updateRoundArrow(now);updateVectors();updateFan(dt);updateLadder();
   updateCam(dt,now);
   camera.getWorldDirection(_c);_c.y=0;if(_c.lengthSq()>1e-6)_c.normalize();const sx=camera.position.x+_c.x*14,sz=camera.position.z+_c.z*14;waterNear.position.set(sx,0,sz);waterFar.position.set(camera.position.x,-0.04,camera.position.z);
-  sky.position.copy(camera.position);camera.updateMatrixWorld();wxUpdate(dt,now);navUpdate();glare.position.copy(camera.position).addScaledVector(SUN_DIR,5000);
+  sky.position.copy(camera.position);astroTick(now);camera.updateMatrixWorld();wxUpdate(dt,now);navUpdate();glare.position.copy(camera.position).addScaledVector(SUN_DIR,5000);
   const fx=G.running?pl.x:0,fz=G.running?-pl.y:20;sun.position.set(fx+SUN_DIR.x*160,SUN_DIR.y*160,fz+SUN_DIR.z*160);sun.target.position.set(fx,0,fz);sun.target.updateMatrixWorld();
   if(S.gfx==='hoch'||S.gfx==='ultra'){renderReflection();waterMat.uniforms.uUseRefl.value=1;}else waterMat.uniforms.uUseRefl.value=0;
   renderer.shadowMap.needsUpdate=S.gfx!=='niedrig';
