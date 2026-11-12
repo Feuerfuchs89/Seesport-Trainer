@@ -54,7 +54,8 @@ body{background:var(--water);color:var(--ink);font-family:var(--f-body);font-siz
 #map{display:block;width:150px;height:170px;border-radius:4px;touch-action:none}
 .mapz{position:absolute;top:9px;right:9px;display:flex;flex-direction:column;align-items:center;gap:2px;z-index:2}
 .mapz button{width:22px;height:22px;padding:0;border-radius:6px;background:rgba(12,36,48,.82);border:1px solid var(--rule);color:var(--ink);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.mapz #mapZhome{font-size:13px;margin-top:3px}.mapz button.on{background:rgba(63,208,138,.38);border-color:#3fd08a}
+.mapz #mapZhome{font-size:13px;margin-top:3px}
+#mapBeam{font-size:13px;margin-top:3px}#mapBeam.on{background:#ffd23f;color:#111}.mapz button.on{background:rgba(63,208,138,.38);border-color:#3fd08a}
 .mapz span{font-size:9px;line-height:1;color:var(--ink);text-shadow:0 0 3px rgba(0,0,0,.8);font-variant-numeric:tabular-nums}
 .mapfoot{font-size:11px;color:var(--ink-dim);display:flex;justify-content:space-between;gap:6px;padding:3px 1px 0;font-variant-numeric:tabular-nums}
 .tools{display:flex;gap:4px}
@@ -375,7 +376,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
     <div id="chatRow"><input id="chatIn" type="text" maxlength="140" autocomplete="off" placeholder="Nachricht … (Enter = senden)"><button type="button" class="tbtn" id="chatSend">Senden</button></div>
   </div>
   <div class="tr">
-    <div class="plate mapbox"><canvas id="map" class="ia" title="Karte steuern: Ziehen = verschieben · Mausrad oder zwei Finger = zoomen · Doppeltipp = 4× / zurück · ◎ = zu meinem Boot"></canvas><div class="mapz ia"><button type="button" id="mapZin" aria-label="Karte vergrößern">+</button><span id="mapZlbl">1×</span><button type="button" id="mapZout" aria-label="Karte verkleinern">−</button><button type="button" id="mapZhome" aria-label="Karte auf mein Boot zentrieren" title="Karte auf mein Boot zentrieren">◎</button></div><div class="mapfoot"><span id="windInfo"></span><span id="shiftInfo"></span></div></div>
+    <div class="plate mapbox"><canvas id="map" class="ia" title="Karte steuern: Ziehen = verschieben · Mausrad oder zwei Finger = zoomen · Doppeltipp = 4× / zurück · ◎ = zu meinem Boot"></canvas><div class="mapz ia"><button type="button" id="mapZin" aria-label="Karte vergrößern">+</button><span id="mapZlbl">1×</span><button type="button" id="mapZout" aria-label="Karte verkleinern">−</button><button type="button" id="mapZhome" aria-label="Karte auf mein Boot zentrieren" title="Karte auf mein Boot zentrieren">◎</button><button type="button" id="mapBeam" hidden aria-label="Hinbeamen" title="Hinbeamen: danach auf einen Punkt in der Karte tippen">📍</button></div><div class="mapfoot"><span id="windInfo"></span><span id="shiftInfo"></span></div></div>
     <div class="tools ia">
       <button class="tbtn" id="bMenu" title="Zurück ins Hauptmenü">Menü</button>
       <button class="tbtn" id="bVec" title="Windpfeile an/aus (V)">Pfeile</button>
@@ -757,7 +758,7 @@ var REV_DRAFT = { jolle: 1.0, opti: 0.75, topcat: 0.7, viking: 1.0, imoca: 4.5, 
 var REV_KURSE = { bb: 'Blaues Band vom Strelasund', rund: 'Rund Hiddensee', bahn: 'Regattabahn vor Hiddensee' };
 
 function revDraft() { return REV_DRAFT[CL.key] || 1.0; }
-function revKey() { return ['hid', !!REVH, S.windFrom, S.revKurs || 'bb', S.gfx === 'niedrig' ? 'lo' : 'hi', seasonNow()].join('|'); }
+function revKey() { const ku = S.revKurs || 'bb', cu = ku.indexOf('u:') === 0 ? (revStrecken().find(q => 'u:' + q.id === ku) || {}).t : ''; return ['hid', !!REVH, S.windFrom, ku, cu, S.gfx === 'niedrig' ? 'lo' : 'hi', seasonNow()].join('|'); }
 function revActive() { return S.revier === 'hiddensee' && !!REVH && SHORE && SHORE.kind === 'revier'; }
 
 /* ---------- Laden ---------- */
@@ -798,9 +799,11 @@ function revDepth(x, y) { return -revH(x, y); }
 
 /* ---------- Aufbau ---------- */
 function revBuild() {
-  const R = REVH, K = R.courses, kurs = S.revKurs || 'bb';
+  const R = REVH; let kurs = S.revKurs || 'bb';
+  let KK = kurs === 'bahn' ? null : revK(kurs); if (kurs !== 'bahn' && !KK) { kurs = S.revKurs = 'bb'; KK = R.courses.bb; }
   const wf = (Number(S.windFrom) || 0) * DEG, cs = Math.cos(wf), sn = Math.sin(wf);
-  const st = kurs === 'bahn' ? K.bahn.center : K[kurs].start;
+  const st = kurs === 'bahn' ? R.courses.bahn.center : KK.start;
+  try { MZ_MIN = 0.02; } catch (e) {}
   const bo = [st[0] * cs - st[1] * sn, st[0] * sn + st[1] * cs];
   const fwd = (E, N) => [E * cs - N * sn - bo[0], E * sn + N * cs - bo[1]];
   const realOf = (x, y) => { const X = x + bo[0], Y = y + bo[1]; return [X * cs + Y * sn, -X * sn + Y * cs]; };
@@ -959,14 +962,22 @@ function revAvoid(b, hd) {
 
 /* ---------- Kurs (Wegpunkt-Tore) ---------- */
 function revCourse(C) {
-  const K = REVH.courses[S.revKurs || 'bb']; if (!K || !K.gates) return false;
+  const K = revK(S.revKurs || 'bb'); if (!K || !K.gates) return false;
   const F = SHORE.fwd, rv = SHORE.rotv;
   const mkGate = (g, kind) => {
     const [x, y] = F(g.x, g.y), u = rv(g.u), r = [u[1], -u[0]];
     return { x, y, kind, name: g.name, u, r, hw: g.hw, a: { x: x - r[0] * g.hw, y: y - r[1] * g.hw }, b: { x: x + r[0] * g.hw, y: y + r[1] * g.hw } };
   };
   C.wps = K.gates.map(g => mkGate(g, 'wp'));
-  const f = mkGate(K.finish, 'fin');
+  let f;
+  if (K.finish.windLine) { /* eigene Strecke: Ziellinie quer zum Wind, bei Raumschots-Zielschenkel quer zum Schenkel */
+    const [fx, fy] = F(K.finish.x, K.finish.y), pv = K.gates.length ? K.gates[K.gates.length - 1] : { x: K.start[0], y: K.start[1] }, [px, py] = F(pv.x, pv.y);
+    const Ld = Math.hypot(fx - px, fy - py) || 1, d = [(fx - px) / Ld, (fy - py) / Ld], dot = d[0] * C.U[0] + d[1] * C.U[1];
+    const u = Math.abs(dot) >= 0.5 ? [C.U[0] * Math.sign(dot), C.U[1] * Math.sign(dot)] : d, r = [u[1], -u[0]];
+    const side = s2 => { let q = 0; while (q < 90 && revDepth(fx + r[0] * s2 * (q + 10), fy + r[1] * s2 * (q + 10)) >= 1.3) q += 10; return q; };
+    const hw = Math.max(30, Math.min(side(1), side(-1), 90));
+    f = { x: fx, y: fy, u, r, hw, a: { x: fx - r[0] * hw, y: fy - r[1] * hw }, b: { x: fx + r[0] * hw, y: fy + r[1] * hw } };
+  } else f = mkGate(K.finish, 'fin');
   C.fin = { c: { x: f.x, y: f.y }, len: f.hw * 2, a: f.a, b: f.b, u: f.u, r: f.r };
   C.finishUp = true; C.wm = C.lm = C.om = C.wing = null;
   C.seq = C.wps.slice(); C.seq.push('finish');
@@ -1334,7 +1345,8 @@ const SCHEMA=[
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
   {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont'],['hiddensee','Hiddensee · Bodden · Strelasund (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
-  {k:'revKurs',label:'Kurs im Revier Hiddensee',type:'select',options:[['bb','Blaues Band vom Strelasund (ca. 12 sm)'],['rund','Rund Hiddensee (ca. 31 sm)'],['bahn','Regattabahn vor Hiddensee (Westseite)']],hint:'Nur im Revier Hiddensee. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
+  {k:'revKurs',label:'Kurs im Revier Hiddensee',type:'select',get options(){return revKursOptions();},hint:'Nur im Revier Hiddensee. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
+  {k:'revEdit',label:'Eigene Strecken (Revier Hiddensee)',type:'button',btn:'Strecken-Editor öffnen',act:'revEdit',hint:'Start, Wegpunkte und Ziel auf der Karte antippen und speichern. Gespeicherte Strecken erscheinen oben unter „Kurs im Revier Hiddensee“. Start- und Ziellinie richten sich nach dem Wind.'},
   {k:'windFrom',label:'Windrichtung (See-Reviere)',type:'select',num:true,live:v=>v+'° (Live)',options:[[225,'Südwest'],[270,'West'],[315,'Nordwest'],[0,'Nord'],[45,'Nordost'],[90,'Ost'],[135,'Südost'],[180,'Süd']],hint:'Am See zählt, über welches Ufer der Wind kommt: Nordwind über den Auwald ist löchrig, Westwind über die Neue Harth drehig'},
   {k:'rowDist',label:'Ruderstrecke',type:'select',num:true,options:[[250,'250 m'],[500,'500 m'],[1000,'1000 m']],hint:'Für die Ruderregatta (Knopf „Rudern“)'},
   {k:'rowBoat',label:'Ruderboot',type:'select',options:[['zk10','Kutter ZK 10 (10 Riemen)'],['viking','Wikingerschiff (8 Riemen, Wikinger-Crew)']]},
@@ -1392,7 +1404,7 @@ function buildForm(){
       const row=document.createElement('div');row.className='row';const id='s_'+it.k;
       const lab=document.createElement('label');lab.htmlFor=id;lab.textContent=it.label;
       if(it.type==='check'){const c=document.createElement('input');c.type='checkbox';c.id=id;c.checked=!!S[it.k];c.onchange=()=>{S[it.k]=c.checked;saveS();onSetting(it.k);};row.append(lab,c);}
-      else if(it.type==='button'){const bt=document.createElement('button');bt.type='button';bt.className='btn blue';bt.style.cssText='font-size:15px;padding:7px 16px';bt.textContent=it.btn;bt.onclick=()=>{if(it.act==='liveWx')loadLiveWx();};row.append(lab,bt);const st=document.createElement('div');st.className='hint';st.id='wxStatus';st.textContent=S.wxInfo||'';row.appendChild(st);}
+      else if(it.type==='button'){const bt=document.createElement('button');bt.type='button';bt.className='btn blue';bt.style.cssText='font-size:15px;padding:7px 16px';bt.textContent=it.btn;bt.onclick=()=>{if(it.act==='liveWx')loadLiveWx();if(it.act==='revEdit')revEditOpen();};row.append(lab,bt);if(it.act==='liveWx'){const st=document.createElement('div');st.className='hint';st.id='wxStatus';st.textContent=S.wxInfo||'';row.appendChild(st);}}
       else if(it.type==='select'){const s=document.createElement('select');s.id=id;for(const [v,t] of it.options){const o=document.createElement('option');o.value=v;o.textContent=t;s.appendChild(o);}if(it.live&&!it.options.some(o=>String(o[0])===String(S[it.k]))){const o=document.createElement('option');o.value=S[it.k];o.textContent=it.live(S[it.k]);s.appendChild(o);}s.value=String(S[it.k]);s.onchange=()=>{S[it.k]=it.num?Number(s.value):s.value;saveS();onSetting(it.k);};row.append(lab,s);}
       else if(it.type==='text'){const t=document.createElement('input');t.type='text';t.id=id;t.maxLength=9;t.value=S[it.k];t.oninput=()=>{S[it.k]=t.value.trim().toUpperCase()||'GER 1';saveS();};row.append(lab,t);}
       else{const out=document.createElement('output');out.htmlFor=id;const r=document.createElement('input');r.type='range';r.id=id;r.min=it.min;r.max=it.max;r.step=it.step;r.value=S[it.k];
@@ -2202,6 +2214,7 @@ function objSync(){if(!shoreG)return;const st=objState();for(const e of [...OBJ_
 function buildShore(){try{waterMat.uniforms.uShOn.value=0;}catch(e){}
   if(shoreG){scene.remove(shoreG);shoreG.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material)(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>m&&m.dispose&&m.dispose());});}
   shoreG=new THREE.Group();scene.add(shoreG);
+  try{if(S.revier!=='hiddensee'){MZ_MIN=0.25;if(mz.z<MZ_MIN)mapZset(MZ_MIN);}}catch(e){}
   if(S.revier==='hiddensee'){TGM=null;if(REVH){try{revBuild();}catch(e){console.error('Revier Hiddensee',e);}return;}revLoad();}
   if(S.revier==='cospu'||isGL()){objStart();try{buildCospu();}finally{objFinish();}try{seasonApply(shoreG);}catch(e){console.error('Jahreszeit',e);}try{shoreFoamBuild();}catch(e){console.error('Uferschaum',e);}try{shoreDampBuild();}catch(e){console.error('Uferwellen',e);}return;}
   const rev=S.revier||'open';let R0=1660,a0=0,a1=Math.PI*2;
@@ -5164,7 +5177,7 @@ function targetPoint(b){const C=G.course;if(!b.started)return {x:0,y:0,name:'Sta
   if(t==='finish'){if(C.finishUp){const fc=C.fin.c,FR=C.fin.r||C.R;const lt=clamp((b.x-fc.x)*FR[0]+(b.y-fc.y)*FR[1],-C.fin.len/2,C.fin.len/2);return {x:fc.x+FR[0]*lt,y:fc.y+FR[1]*lt,name:C.fin.u?'Ziel':'Ziel (Luv)'};}
     const lat=clamp(b.x*C.R[0]+b.y*C.R[1],-C.lineLen/2,C.lineLen/2);return {x:C.R[0]*lat,y:C.R[1]*lat,name:'Ziel'};}
   if(isMark(t))return {x:t.x,y:t.y,name:t.name};const f=dirv(b.h);return {x:b.x+f[0]*50,y:b.y+f[1]*50,name:''};}
-function updateHud(){try{revSpeedBtn();}catch(e){}
+function updateHud(){try{revSpeedBtn();const mb=$('mapBeam');if(mb)mb.hidden=!(G&&G.free);}catch(e){}
   const b=P(),C=G.course;
   renderFlags();wlUi();
   if(b.spec){hudSpec(b);return;}
@@ -5226,7 +5239,7 @@ function drawRose(b){const x=rctx,W=104,c=52;x.clearRect(0,0,W,W);x.strokeStyle=
 const mapCv=$('map'),mctx=mapCv.getContext('2d');
 /* Karte frei steuern: Ziehen = verschieben (überall, auch bei 1×), Mausrad / Pinch = zoomen um den Finger- bzw. Mauspunkt,
    +/− = zoomen, ◎ = zurück zu meinem Boot, Doppeltipp = 4× an der Stelle bzw. zurück. Zoom 0,25× (ganzer See) bis 24×. */
-const mz={z:1,px:0,py:0,free:false,fx:75,fy:85,_fx:75,_fy:85};const MZ_MIN=0.25,MZ_MAX=24;
+const mz={z:1,px:0,py:0,free:false,fx:75,fy:85,_fx:75,_fy:85};let MZ_MIN=0.25;const MZ_MAX=24;
 try{const v=parseFloat(localStorage.getItem('regattakoje.mapz'));if(v>=MZ_MIN&&v<=MZ_MAX)mz.z=v;}catch(_){}
 function mapUi(){const z=mz.z;$('mapZlbl').textContent=(z<1?Math.round(z*100)/100:Math.round(z*10)/10).toString().replace('.',',')+'×';$('mapZhome').classList.toggle('on',mz.free||z<1);}
 function mapZset(z){z=clamp(z,MZ_MIN,MZ_MAX);if(Math.abs(z-1)<0.06)z=1;mz.z=z;try{localStorage.setItem('regattakoje.mapz',String(Math.round(z*100)/100));}catch(_){}mapUi();}
@@ -5239,6 +5252,7 @@ mapZset(mz.z);
 $('mapZin').addEventListener('click',e=>{e.stopPropagation();if(mz.free)mapZoomAt(mz.z*2);else mapZset(mz.z*2);});
 $('mapZout').addEventListener('click',e=>{e.stopPropagation();if(mz.free)mapZoomAt(mz.z/2);else mapZset(mz.z/2);});
 $('mapZhome').addEventListener('click',e=>{e.stopPropagation();mapHome();});
+$('mapBeam').addEventListener('click',e=>{e.stopPropagation();beamToggle();});
 {const ptr=new Map();let pin=null,lastTap=0,moved=0,tx=0,ty=0;
   const rel=(cx,cy)=>{const r=mapCv.getBoundingClientRect();const k=mapCv.clientWidth/(r.width||1);return [(cx-r.left)*k,(cy-r.top)*k];};
   mapCv.addEventListener('pointerdown',e=>{e.preventDefault();try{mapCv.setPointerCapture(e.pointerId);}catch(_){}ptr.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;[tx,ty]=rel(e.clientX,e.clientY);
@@ -5247,6 +5261,7 @@ $('mapZhome').addEventListener('click',e=>{e.stopPropagation();mapHome();});
     if(ptr.size>=2&&pin){const [a,b]=[...ptr.values()];const [cx,cy]=rel((a.x+b.x)/2,(a.y+b.y)/2);mapFree();mz.fx-=(cx-pin.cx)/mz.z;mz.fy-=(cy-pin.cy)/mz.z;mapZoomAt(pin.z*(Math.hypot(a.x-b.x,a.y-b.y)||1)/pin.d,cx,cy);pin.cx=cx;pin.cy=cy;}
     else if(ptr.size===1&&moved>3){mapFree();mz.fx-=dx/mz.z;mz.fy-=dy/mz.z;}});
   const up=e=>{if(!ptr.has(e.pointerId))return;const was=ptr.size;ptr.delete(e.pointerId);if(ptr.size<2)pin=null;
+    if(was===1&&moved<6&&BEAMON){beamTo(tx,ty);return;}
     if(was===1&&moved<6){const now=performance.now();if(now-lastTap<320){if(mz.free||mz.z!==1)mapReset();else mapZoomAt(4,tx,ty);lastTap=0;}else lastTap=now;}};
   mapCv.addEventListener('pointerup',up);mapCv.addEventListener('pointercancel',up);
   mapCv.addEventListener('wheel',e=>{e.preventDefault();const [sx,sy]=rel(e.clientX,e.clientY);mapZoomAt(mz.z*(e.deltaY<0?1.25:0.8),sx,sy);},{passive:false});}
@@ -5267,7 +5282,7 @@ function drawMap(){
     else if(Z>1){const [bx,by]=mp(pl.x,pl.y);fx=bx-mz.px/Z;fy=by-mz.py/Z;}else{fx=W/2;fy=H/2;}
     mz._fx=fx;mz._fy=fy;
     if(Z!==1||fx!==W/2||fy!==H/2){const mp0=mp;mp=(wx,wy)=>{const [a,b]=mp0(wx,wy);return [W/2+(a-fx)*Z,H/2+(b-fy)*Z];};sc*=Z;}}
-  x.fillStyle='rgba(14,52,70,.55)';x.fillRect(0,0,W,H);if(S.ladder&&!C.lesson&&!G.row&&!C.wps)drawLadderMap(x,mp);drawShoreMap(x,mp,W,H);revMapDraw(x,mp,W,H);hbMapDraw(x,mp);
+  mapAff(mp);x.fillStyle='rgba(14,52,70,.55)';x.fillRect(0,0,W,H);if(S.ladder&&!C.lesson&&!G.row&&!C.wps)drawLadderMap(x,mp);drawShoreMap(x,mp,W,H);revMapDraw(x,mp,W,H);hbMapDraw(x,mp);
   for(const p of G.wind.puffs){if(p.env<0.05)continue;const [px,py]=mp(p.x,p.y);x.beginPath();x.arc(px,py,p.r*sc,0,Math.PI*2);x.fillStyle=p.str>0?'rgba(2,14,26,'+(0.45*p.env*Math.min(1,p.str*3))+')':'rgba(210,235,245,'+(0.22*p.env)+')';x.fill();}
   if(S.laylines){const ll=laylines(pl);if(ll){const [mx,my]=mp(ll.m.x,ll.m.y);[[ll.b1,'#3fd08a'],[ll.b2,'#ff4f5f']].forEach(([bb,c])=>{const d=dirv(bb);const [ex,ey]=mp(ll.m.x+d[0]*1500,ll.m.y+d[1]*1500);x.strokeStyle=c;x.globalAlpha=0.6;x.lineWidth=1;x.beginPath();x.moveTo(mx,my);x.lineTo(ex,ey);x.stroke();x.globalAlpha=1;});}}
   if(!C.lesson){const [ax,ay]=mp(C.pin.x,C.pin.y),[bx,by]=mp(C.cb.x,C.cb.y);x.setLineDash(G.t<0?[]:[3,3]);x.strokeStyle=G.t<0?'#ff4f5f':'#3fd08a';x.lineWidth=G.t<0?2:1.5;x.beginPath();x.moveTo(ax,ay);x.lineTo(bx,by);x.stroke();x.setLineDash([]);
@@ -7081,6 +7096,195 @@ function ixyUpd(b,m){const K=m.ixy;if(!K)return;const S=K.S;
   if(S.grp.rud&&m.rud[0])S.grp.rud.rotation.y=m.rud[0].rotation.y;
   // Kimmschwerter: Hochklappen nach achtern in den Schwertkasten (85° = ganz oben)
   if(m.ixyB)for(const B of m.ixyB){const G2=S.grp[B.sd>0?'bS':'bB'];if(G2)G2.rotation.x=-B.up*1.48;}}
+/* ---------- Eigene Strecken (Revier Hiddensee) ---------- */
+var REV_SK = 'regattakoje.strecken', RVE = null;
+function revStrecken() { try { const a = JSON.parse(localStorage.getItem(REV_SK) || '[]'); return Array.isArray(a) ? a.filter(s => s && s.rev === 'hiddensee' && Array.isArray(s.pts) && s.pts.length >= 2) : []; } catch (e) { return []; } }
+function revStreckenSave(a) { try { localStorage.setItem(REV_SK, JSON.stringify(a)); return true; } catch (e) { return false; } }
+function revLenSm(p) { let L = 0; for (let k = 1; k < p.length; k++) L += Math.hypot(p[k][0] - p[k - 1][0], p[k][1] - p[k - 1][1]); return L / 1852; }
+function revFmt(v, d) { return v.toFixed(d).replace('.', ','); }
+function revKursOptions() {
+  const o = [['bb', 'Blaues Band vom Strelasund (ca. 12 sm)'], ['rund', 'Rund Hiddensee (ca. 31 sm)'], ['bahn', 'Regattabahn vor Hiddensee (Westseite)']];
+  for (const s of revStrecken()) o.push(['u:' + s.id, 'Eigene: ' + s.name + ' (' + revFmt(revLenSm(s.pts), 1) + ' sm)']);
+  return o;
+}
+function revNearName(p) { if (!REVH) return ''; let best = null; for (const q of REVH.places) { const d = Math.hypot(q[0] - p[0], q[1] - p[1]) + q[3] * 700; if (d < 6000 && (!best || d < best[0])) best = [d, q[2]]; } return best ? best[1] : ''; }
+function revGateHw(E, N, u, cap) { const r = [-u[1], u[0]]; const side = s => { let d = 0; while (d < cap && revZ(E + r[0] * s * (d + 10), N + r[1] * s * (d + 10)) <= -1.3) d += 10; return d; }; return Math.max(25, Math.min(side(1), side(-1), cap)); }
+function revCustom(id) {
+  const s = revStrecken().find(q => q.id === id); if (!s || !REVH) return null; const P = s.pts, gates = [];
+  for (let k = 1; k < P.length - 1; k++) {
+    const a = P[k - 1], b = P[k], c = P[k + 1]; const u1 = [b[0] - a[0], b[1] - a[1]], u2 = [c[0] - b[0], c[1] - b[1]]; const l1 = Math.hypot(u1[0], u1[1]) || 1, l2 = Math.hypot(u2[0], u2[1]) || 1;
+    let u = [u1[0] / l1 + u2[0] / l2, u1[1] / l1 + u2[1] / l2], lu = Math.hypot(u[0], u[1]); if (lu < 1e-6) { u = [u1[0] / l1, u1[1] / l1]; lu = 1; } u = [u[0] / lu, u[1] / lu];
+    const nn = revNearName(b); gates.push({ x: b[0], y: b[1], u, hw: revGateHw(b[0], b[1], u, 150), name: 'Tor ' + k + (nn ? ' · ' + nn : '') });
+  }
+  const f = P[P.length - 1], nf = revNearName(f);
+  return { name: s.name, sm: +revLenSm(P).toFixed(1), start: P[0], gates, finish: { x: f[0], y: f[1], windLine: true, name: 'Ziel' + (nf ? ' · ' + nf : '') }, route: P, custom: true, t: s.t };
+}
+function revK(kurs) { if (kurs && kurs.indexOf('u:') === 0) return revCustom(kurs.slice(2)); return REVH.courses[kurs]; }
+
+/* Editor: Karte mit Tiefen, Tippen = Punkt, Ziehen = verschieben / Karte schieben */
+function revEditOpen() {
+  if (!REVH) { const pr = revLoad(); msg('Revierdaten werden geladen – der Editor öffnet gleich.', 'info'); if (pr) pr.then(() => { if (REVH) revEditOpen(); }); return; }
+  if (!RVE) revEditBuild();
+  RVE.ov.hidden = false; RVE.pts = []; RVE.editId = null; RVE.name = '';
+  requestAnimationFrame(() => { revEditFit(); revEditList(); revEditDraw(); });
+}
+function revEditClose() {
+  RVE.ov.hidden = true;
+  try { buildForm(); } catch (e) {}
+  if (S.revier === 'hiddensee' && String(S.revKurs || '').indexOf('u:') === 0) { try { onSetting('revKurs'); } catch (e) {} }
+}
+function revEditBuild() {
+  const ov = document.createElement('div'); ov.id = 'revEdit'; ov.hidden = true;
+  ov.style.cssText = 'position:fixed;inset:0;z-index:300;background:#0c1820;color:#e8f0f2;font:14px system-ui,-apple-system,sans-serif;display:flex;flex-direction:column';
+  ov.innerHTML = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 8px 6px">'
+    + '<b style="font-size:16px;margin-right:auto">Eigene Strecke · Hiddensee</b>'
+    + '<button type="button" data-a="undo">↶ Punkt zurück</button><button type="button" data-a="new">＋ Neu</button><button type="button" data-a="save">💾 Speichern</button><button type="button" data-a="close">✕ Fertig</button></div>'
+    + '<div style="position:relative;flex:1;min-height:0"><canvas style="position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair"></canvas>'
+    + '<div data-r="info" style="position:absolute;left:8px;right:8px;bottom:8px;background:rgba(12,24,32,.9);border:1px solid #2a4553;border-radius:10px;padding:7px 10px;font-size:13px;line-height:1.4"></div></div>'
+    + '<div data-r="list" style="max-height:30vh;overflow:auto;padding:6px 8px 10px;border-top:1px solid #2a4553"></div>';
+  ov.querySelectorAll('button').forEach(b => b.style.cssText = 'font:600 14px system-ui,sans-serif;color:#fff;background:#183342;border:1px solid #2f5a6e;border-radius:9px;padding:7px 10px;cursor:pointer');
+  document.body.appendChild(ov);
+  const cv = ov.querySelector('canvas'), R = REVH, nx = R.grid.nx, ny = R.grid.ny;
+  const img = document.createElement('canvas'); img.width = nx; img.height = ny; const c2 = img.getContext('2d'), id = c2.createImageData(nx, ny);
+  const T = [[1, [96, 150, 205]], [2, [128, 176, 222]], [3, [160, 198, 234]], [5, [188, 215, 240]], [10, [213, 230, 246]], [1e9, [236, 244, 251]]];
+  const LC = { 0: [222, 212, 176], 1: [176, 198, 146], 2: [208, 196, 184], 3: [232, 224, 186], 4: [240, 226, 176], 5: [196, 208, 176], 6: [196, 210, 160], 7: [212, 222, 178] };
+  for (let k = 0; k < nx * ny; k++) {
+    const z = R.z[k] / 100; let c;
+    if (z < 0) { c = T[T.length - 1][1]; for (const [g, cc] of T) if (-z < g) { c = cc; break; } } else c = LC[R.lu[k]] || LC[0];
+    id.data[k * 4] = c[0]; id.data[k * 4 + 1] = c[1]; id.data[k * 4 + 2] = c[2]; id.data[k * 4 + 3] = 255;
+  }
+  c2.putImageData(id, 0, 0);
+  RVE = { ov, cv, img, pts: [], view: { s: 0.02, cE: R.W / 2, cN: R.H / 2 }, editId: null, name: '', info: ov.querySelector('[data-r=info]'), list: ov.querySelector('[data-r=list]') };
+  ov.querySelector('[data-a=undo]').onclick = () => { RVE.pts.pop(); revEditDraw(); };
+  ov.querySelector('[data-a=new]').onclick = () => { RVE.pts = []; RVE.editId = null; RVE.name = ''; revEditDraw(); };
+  ov.querySelector('[data-a=save]').onclick = revEditSave;
+  ov.querySelector('[data-a=close]').onclick = revEditClose;
+  const toW = (sx, sy) => { const v = RVE.view, W = cv.clientWidth, H = cv.clientHeight; return [v.cE + (sx - W / 2) / v.s, v.cN - (sy - H / 2) / v.s]; };
+  const toS = (E, N) => { const v = RVE.view, W = cv.clientWidth, H = cv.clientHeight; return [W / 2 + (E - v.cE) * v.s, H / 2 - (N - v.cN) * v.s]; };
+  RVE.toS = toS; RVE.toW = toW;
+  const ptr = new Map(); let moved = 0, dragPt = -1, pin = null;
+  const rel = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const zoomAt = (f, sx, sy) => { const v = RVE.view, [E, N] = toW(sx, sy); v.s = clamp(v.s * f, 0.004, 1.2); const [E2, N2] = toW(sx, sy); v.cE += E - E2; v.cN += N - N2; revEditDraw(); };
+  cv.addEventListener('pointerdown', e => {
+    e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (_) {} const [sx, sy] = rel(e); ptr.set(e.pointerId, { x: sx, y: sy }); moved = 0; dragPt = -1;
+    if (ptr.size === 1) { let bd = 18; RVE.pts.forEach((p, i) => { const q = toS(p[0], p[1]), d = Math.hypot(q[0] - sx, q[1] - sy); if (d < bd) { bd = d; dragPt = i; } }); }
+    if (ptr.size === 2) { const [a, b] = [...ptr.values()]; pin = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1 }; dragPt = -1; }
+  });
+  cv.addEventListener('pointermove', e => {
+    const p = ptr.get(e.pointerId); if (!p) return; const [sx, sy] = rel(e); const dx = sx - p.x, dy = sy - p.y; p.x = sx; p.y = sy; moved += Math.abs(dx) + Math.abs(dy);
+    if (ptr.size >= 2 && pin) { const [a, b] = [...ptr.values()], d = Math.hypot(a.x - b.x, a.y - b.y) || 1; zoomAt(d / pin.d, (a.x + b.x) / 2, (a.y + b.y) / 2); pin.d = d; return; }
+    if (dragPt >= 0 && moved > 3) { RVE.pts[dragPt] = toW(sx, sy); revEditDraw(); return; }
+    if (moved > 3) { RVE.view.cE -= dx / RVE.view.s; RVE.view.cN += dy / RVE.view.s; revEditDraw(); }
+  });
+  const up = e => {
+    if (!ptr.has(e.pointerId)) return; const was = ptr.size; const p = ptr.get(e.pointerId); ptr.delete(e.pointerId); if (ptr.size < 2) pin = null;
+    if (was === 1 && moved < 6 && dragPt < 0 && e.type === 'pointerup') {
+      const [E, N] = toW(p.x, p.y);
+      if (revZ(E, N) > -0.3) { RVE.warn = 'Dieser Punkt liegt an Land – bitte ins Wasser tippen.'; revEditDraw(); return; }
+      RVE.warn = ''; RVE.pts.push([E, N]); revEditDraw();
+    }
+    dragPt = -1;
+  };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('wheel', e => { e.preventDefault(); const [sx, sy] = rel(e); zoomAt(e.deltaY < 0 ? 1.25 : 0.8, sx, sy); }, { passive: false });
+  addEventListener('resize', () => { if (RVE && !RVE.ov.hidden) revEditDraw(); });
+}
+function revEditFit() { const cv = RVE.cv, W = cv.clientWidth || 360, H = cv.clientHeight || 500; const v = RVE.view; v.s = Math.min(W / REVH.W, H / REVH.H) * 0.95; v.cE = REVH.W / 2; v.cN = REVH.H / 2; }
+/* Prüfung einer Strecke: flachste Stelle je Schenkel, Platz am Start */
+function revEditCheck(P) {
+  const dr = revDraft(), legs = []; let minAll = 99;
+  for (let k = 1; k < P.length; k++) {
+    const a = P[k - 1], b = P[k], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(2, Math.ceil(L / 20)); let mn = 99;
+    for (let i = 0; i <= n; i++) { const t = i / n; mn = Math.min(mn, -revZ(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)); }
+    legs.push({ L, mn, bad: mn < dr + 0.2 }); minAll = Math.min(minAll, mn);
+  }
+  let startOk = true; if (P.length) { const s = P[0]; for (let a = 0; a < 16; a++) { const w = a * Math.PI / 8; if (-revZ(s[0] + Math.cos(w) * 160, s[1] + Math.sin(w) * 160) < dr + 0.3) { startOk = false; break; } } }
+  return { legs, minAll, startOk, dr };
+}
+function revEditDraw() {
+  const cv = RVE.cv, dpr = Math.min(2, devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.fillStyle = '#e9e2cc'; x.fillRect(0, 0, W, H);
+  const R = REVH, cs = R.grid.cs, toS = RVE.toS, v = RVE.view, [ox, oy] = toS(0, R.H);
+  x.imageSmoothingEnabled = v.s * cs < 3; x.drawImage(RVE.img, ox, oy, R.grid.nx * cs * v.s, R.grid.ny * cs * v.s);
+  /* Orte */
+  x.font = '600 11px system-ui,sans-serif'; x.textAlign = 'center';
+  for (const p of R.places) { if (p[3] > (v.s > 0.08 ? 3 : v.s > 0.03 ? 2 : 1)) continue; const q = toS(p[0], p[1]); if (q[0] < -50 || q[0] > W + 50 || q[1] < -20 || q[1] > H + 20) continue; x.lineWidth = 3; x.strokeStyle = 'rgba(255,255,255,.8)'; x.strokeText(p[2], q[0], q[1]); x.fillStyle = '#333'; x.fillText(p[2], q[0], q[1]); }
+  /* Fahrwassertonnen ab mittlerer Nähe */
+  if (v.s > 0.06) for (const s of R.seamarks) { if (s[2] !== 'L' && s[2] !== 'C') continue; const q = toS(s[0], s[1]); x.fillStyle = { r: '#c62828', g: '#2e7d32' }[s[3][0]] || '#d4a017'; x.beginPath(); x.arc(q[0], q[1], 2.6, 0, 7); x.fill(); }
+  const P = RVE.pts, ck = revEditCheck(P), wf = (Number(S.windFrom) || 0) * DEG, w = [Math.sin(wf), Math.cos(wf)], perp = [w[1], -w[0]];
+  /* Schenkel */
+  for (let k = 1; k < P.length; k++) { const a = toS(P[k - 1][0], P[k - 1][1]), b = toS(P[k][0], P[k][1]); x.strokeStyle = ck.legs[k - 1].bad ? '#e53935' : '#f5b400'; x.lineWidth = 3; x.setLineDash(ck.legs[k - 1].bad ? [6, 4] : []); x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke(); }
+  x.setLineDash([]);
+  const line = (p, d, len, col) => { const hl = Math.max(len * v.s, 16), q = toS(p[0], p[1]); x.strokeStyle = col; x.lineWidth = 3; x.beginPath(); x.moveTo(q[0] - d[0] * hl, q[1] + d[1] * hl); x.lineTo(q[0] + d[0] * hl, q[1] - d[1] * hl); x.stroke(); };
+  if (P.length) line(P[0], perp, 120, '#2e7d32');
+  if (P.length >= 2) { const a = P[P.length - 2], b = P[P.length - 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, d = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; const along = Math.abs(d[0] * w[0] + d[1] * w[1]) >= 0.5; line(b, along ? perp : [d[1], -d[0]], 80, '#1565c0'); }
+  P.forEach((p, i) => {
+    const q = toS(p[0], p[1]), last = i === P.length - 1 && i > 0, first = i === 0;
+    x.beginPath(); x.arc(q[0], q[1], 9, 0, 7); x.fillStyle = first ? '#2e7d32' : last ? '#1565c0' : '#f5b400'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#fff'; x.stroke();
+    x.fillStyle = '#fff'; x.font = '700 10px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(first ? 'S' : last ? 'Z' : String(i), q[0], q[1] + 0.5); x.textBaseline = 'alphabetic';
+  });
+  /* Windpfeil */
+  { const cx = W - 42, cy = 40; x.fillStyle = 'rgba(12,24,32,.75)'; x.beginPath(); x.arc(cx, cy, 24, 0, 7); x.fill(); x.save(); x.translate(cx, cy); x.rotate(wf + Math.PI); x.strokeStyle = '#7fd3ff'; x.fillStyle = '#7fd3ff'; x.lineWidth = 3; x.beginPath(); x.moveTo(0, -14); x.lineTo(0, 10); x.stroke(); x.beginPath(); x.moveTo(0, 15); x.lineTo(-6, 6); x.lineTo(6, 6); x.closePath(); x.fill(); x.restore(); x.fillStyle = '#cfe6ee'; x.font = '600 10px system-ui'; x.textAlign = 'center'; x.fillText('Wind', cx, cy + 36); x.fillText('N ↑', 22, 18); }
+  /* Infozeile */
+  let t;
+  if (!P.length) t = '<b>Tippe den Startpunkt ins Wasser.</b> Danach die Wegpunkte (werden zu Toren), der letzte Punkt ist das Ziel. Punkte lassen sich verschieben, Karte mit einem Finger schieben, mit zwei Fingern zoomen.';
+  else if (P.length === 1) t = '<b>Start gesetzt.</b> Jetzt Wegpunkte tippen – der zuletzt getippte Punkt wird das Ziel.' + (ck.startOk ? '' : '<br>⚠ Am Start ist es eng oder flach – für die Startlinie besser auf freies Wasser legen.');
+  else {
+    const bad = ck.legs.map((l, i) => l.bad ? i + 1 : 0).filter(Boolean);
+    t = '<b>' + (P.length - 2) + ' Tore · ' + revFmt(revLenSm(P), 1) + ' sm</b> · flachste Stelle auf der Linie ' + revFmt(Math.max(0, ck.minAll), 1) + ' m (Tiefgang ' + CL.name + ': ' + revFmt(ck.dr, 1) + ' m)'
+      + (bad.length ? '<br>⚠ Schenkel ' + bad.join(', ') + ' führt durch zu flaches Wasser (rot gestrichelt) – Wegpunkt dazwischen setzen oder verschieben.' : '')
+      + (ck.startOk ? '' : '<br>⚠ Am Start ist es eng oder flach.')
+      + '<br><span style="color:#9fc0cc">Start- und Ziellinie richten sich beim Rennen nach dem Wind (grün = Start, blau = Ziel, Vorschau für die eingestellte Windrichtung).</span>';
+  }
+  if (RVE.warn) t = '⚠ ' + RVE.warn + '<br>' + t;
+  if (RVE.editId) t = '✎ Bearbeite „' + revEsc(RVE.name) + '“ · ' + t;
+  RVE.info.innerHTML = t;
+}
+function revEsc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function revEditSave() {
+  const P = RVE.pts; if (P.length < 2) { RVE.warn = 'Mindestens Start und Ziel setzen.'; revEditDraw(); return; }
+  const all = revStrecken(); let name = RVE.name || ('Strecke ' + (all.length + 1));
+  const nn = prompt('Name der Strecke:', name); if (nn === null) return; name = (nn.trim() || name).slice(0, 40);
+  const pts = P.map(p => [Math.round(p[0]), Math.round(p[1])]);
+  if (RVE.editId) { const s = all.find(q => q.id === RVE.editId); if (s) { s.name = name; s.pts = pts; s.t = Date.now(); } }
+  else { RVE.editId = Date.now().toString(36); all.push({ id: RVE.editId, name, rev: 'hiddensee', pts, t: Date.now() }); }
+  RVE.name = name;
+  if (!revStreckenSave(all)) { RVE.warn = 'Speichern ging nicht – der Browser-Speicher ist voll oder gesperrt.'; revEditDraw(); return; }
+  RVE.warn = ''; revEditList(); revEditDraw(); msg('Strecke „' + name + '“ gespeichert.', 'good');
+}
+function revEditList() {
+  const all = revStrecken(), L = RVE.list;
+  if (!all.length) { L.innerHTML = '<div style="color:#9fc0cc;font-size:13px">Noch keine eigenen Strecken gespeichert.</div>'; return; }
+  L.innerHTML = '<div style="color:#9fc0cc;font-size:12px;margin-bottom:4px">Gespeicherte Strecken (nur auf diesem Gerät)</div>';
+  for (const s of all) {
+    const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid #1d3542;flex-wrap:wrap';
+    const sel = S.revKurs === 'u:' + s.id;
+    row.innerHTML = '<span style="flex:1;min-width:140px">' + (sel ? '✅ ' : '') + '<b>' + revEsc(s.name) + '</b> · ' + revFmt(revLenSm(s.pts), 1) + ' sm · ' + Math.max(0, s.pts.length - 2) + ' Tore</span>';
+    const mk = (txt, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; b.style.cssText = 'font:600 13px system-ui;color:#fff;background:#183342;border:1px solid #2f5a6e;border-radius:8px;padding:5px 9px;cursor:pointer'; b.onclick = fn; row.appendChild(b); };
+    mk('▶ Segeln', () => { S.revier = 'hiddensee'; S.revKurs = 'u:' + s.id; saveS(); revEditClose(); onSetting('revKurs'); msg('Kurs „' + s.name + '“ gewählt – Regatta starten.', 'good'); });
+    mk('✎ Bearbeiten', () => { RVE.pts = s.pts.map(p => p.slice()); RVE.editId = s.id; RVE.name = s.name; revEditDraw(); });
+    mk('🗑', () => { if (!confirm('Strecke „' + s.name + '“ löschen?')) return; revStreckenSave(revStrecken().filter(q => q.id !== s.id)); if (S.revKurs === 'u:' + s.id) { S.revKurs = 'bb'; saveS(); } if (RVE.editId === s.id) { RVE.editId = null; } revEditList(); revEditDraw(); });
+    L.appendChild(row);
+  }
+}
+
+/* ---------- Freies Segeln: auf der Minikarte hinbeamen ---------- */
+var MAPAFF = null, BEAMON = false;
+function mapAff(mp) { const o = mp(0, 0), a = mp(1, 0), b = mp(0, 1); const m = [a[0] - o[0], b[0] - o[0], a[1] - o[1], b[1] - o[1]]; const det = m[0] * m[3] - m[1] * m[2]; if (Math.abs(det) > 1e-12) MAPAFF = { o, m, det }; }
+function mapToWorld(sx, sy) { if (!MAPAFF) return null; const { o, m, det } = MAPAFF, dx = sx - o[0], dy = sy - o[1]; return [(m[3] * dx - m[1] * dy) / det, (-m[2] * dx + m[0] * dy) / det]; }
+function beamToggle() { BEAMON = !BEAMON; const bt = document.getElementById('mapBeam'); if (bt) bt.classList.toggle('on', BEAMON); if (BEAMON) msg('Hinbeamen: Tippe in der Karte auf einen Punkt im Wasser. Mit „−“ zoomst du weiter heraus.', 'info'); }
+function beamTo(sx, sy) {
+  BEAMON = false; const bt = document.getElementById('mapBeam'); if (bt) bt.classList.remove('on');
+  const w = mapToWorld(sx, sy); if (!w || !G || !G.free) return; const pl = P(), x = w[0], y = w[1];
+  let ok = onWater(x, y); if (SHORE.kind === 'revier' && REVH) ok = revDepth(x, y) >= (pl.rib ? 0.6 : revDraft()) + 0.3;
+  if (!ok) { msg('Dort ist kein ausreichend tiefes Wasser – such dir einen anderen Punkt.', 'warn'); return; }
+  const d = Math.hypot(x - pl.x, y - pl.y);
+  for (const b of G.boats) if (b !== pl && b.cpuTrainer) { b.x = x + 10; b.y = y - 9; b.v = 0; }
+  pl.x = x; pl.y = y; pl.v = Math.min(pl.v, 1); snapCam = true;
+  msg('Hingebeamt (' + (d >= 1000 ? revFmt(d / 1000, 1) + ' km' : Math.round(d) + ' m') + ').', 'good');
+}
+
 function ixyBoardsBuild(g){const sh=HSHAPE.ixylon;const zOf=u=>-sh.len/2+u*sh.len;const geo=new THREE.BoxGeometry(0.028,0.95,0.36);geo.translate(0,-0.475,0.12);const out=[];
   for(const sd of [1,-1]){const tilt=new THREE.Group();tilt.position.set(sd*0.47,sh.dims(0.47)[1]-0.06,zOf(0.44));tilt.rotation.z=sd*0.14;g.add(tilt);const lift=new THREE.Group();tilt.add(lift);
     const m=new THREE.Mesh(geo,IXY_BOARD);m.castShadow=true;lift.add(m);out.push({sd,lift,up:0});}return out;}
