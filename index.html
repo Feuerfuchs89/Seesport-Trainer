@@ -493,6 +493,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
     <p><b>Zweck</b><br>Die Regattakoje ist ein privates, nicht kommerzielles Trainingsspiel. Sie wurde entwickelt für den Leipziger Seesportclub e.V. (Am Stausee 4, 04249 Leipzig, Cospudener See) und dessen Vereinsfreunde. Der Verein ist nicht Betreiber dieses Angebots.</p>
     <p><b>Urheberrecht</b><br>Das Spiel mit Programmcode, Grafiken, 3D-Modellen, Texten und Gestaltung ist urheberrechtlich geschützt und Eigentum von Michael Assmann. Alle Rechte vorbehalten. Vervielfältigung, Verbreitung, Bearbeitung und jede Verwertung außerhalb der privaten Nutzung im Browser sind ohne schriftliche Zustimmung nicht gestattet. Ausgenommen ist das Vereinswappen: Es gehört dem Leipziger Seesportclub e.V.</p>
     <p><b>Kartendaten</b><br>Ufer, Gebäude und Wälder des Reviers Rangsdorfer See: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap-Mitwirkende</a>, Lizenz ODbL 1.0.</p>
+    <p><b>Revier Hiddensee · Kubitzer Bodden · Strelasund</b><br>Küste, Orte, Häuser, Wälder: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap-Mitwirkende</a>, ODbL 1.0 · Seezeichen: OpenSeaMap (aus OpenStreetMap) · Wassertiefe: EMODnet Bathymetry Consortium, EMODnet Digital Bathymetry (DTM), CC BY 4.0 · Gelände: Copernicus DEM GLO-30 © DLR e.V. 2010–2014 und © Airbus Defence and Space GmbH 2014–2018, bereitgestellt im Rahmen von COPERNICUS durch die Europäische Union und ESA. Die Regattabahnen „Blaues Band vom Strelasund“ und „Rund Hiddensee“ sind vereinfacht und folgen tiefem Wasser laut Datensatz – keine Navigationskarte, keine offiziellen Bahnen.</p>
     <p><b>Haftung</b><br>Das Spiel dient der Übung von Taktik und Regeln. Es ersetzt keine Ausbildung auf dem Wasser und keine verbindliche Auslegung der Wettfahrtregeln. Für Inhalte externer Links sind deren Betreiber verantwortlich.</p>
     </section>
     <section id="legDs">
@@ -740,6 +741,290 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
 <script>
 (function(){
 'use strict';
+/* =====================================================================
+   Regattakoje – Küstenrevier Hiddensee · Kubitzer Bodden · Strelasund
+   ---------------------------------------------------------------------
+   Lädt hiddensee-spiel.json + hiddensee-spiel.bin (erzeugt aus den
+   Seekoje-Revierdaten: OSM/OpenSeaMap, EMODnet-Tiefen, Copernicus-DEM)
+   und baut daraus Gelände, Bäume, Häuser, Fahrwassertonnen sowie die
+   Langstrecken „Blaues Band vom Strelasund“ und „Rund Hiddensee“.
+   Grundberührung nach Tiefgang der Bootsklasse. KEINE Navigationskarte.
+   Teil des Hauptskripts.
+   ===================================================================== */
+var REVH = null, REVH_LOAD = null, REVH_ERR = null;
+/* Tiefgang (m) für die Grundberührung – vereinfachte Spielwerte */
+var REV_DRAFT = { jolle: 1.0, opti: 0.75, topcat: 0.7, viking: 1.0, imoca: 4.5, zk10: 1.0, ixylon: 0.9, k6: 0.9, moth: 1.0 };
+var REV_KURSE = { bb: 'Blaues Band vom Strelasund', rund: 'Rund Hiddensee', bahn: 'Regattabahn vor Hiddensee' };
+
+function revDraft() { return REV_DRAFT[CL.key] || 1.0; }
+function revKey() { return ['hid', !!REVH, S.windFrom, S.revKurs || 'bb', S.gfx === 'niedrig' ? 'lo' : 'hi', seasonNow()].join('|'); }
+function revActive() { return S.revier === 'hiddensee' && !!REVH && SHORE && SHORE.kind === 'revier'; }
+
+/* ---------- Laden ---------- */
+function revLoad() {
+  if (REVH || REVH_LOAD) return REVH_LOAD;
+  try { msg('Küstenrevier Hiddensee wird geladen …', 'info'); } catch (e) {}
+  REVH_LOAD = Promise.all([
+    fetch('hiddensee-spiel.json').then(r => { if (!r.ok) throw new Error('hiddensee-spiel.json: HTTP ' + r.status); return r.json(); }),
+    fetch('hiddensee-spiel.bin').then(r => { if (!r.ok) throw new Error('hiddensee-spiel.bin: HTTP ' + r.status); return r.arrayBuffer(); })
+  ]).then(([j, buf]) => {
+    const g = j.grid, n = g.nx * g.ny;
+    REVH = j; REVH.z = new Int16Array(buf, 0, n); REVH.lu = new Uint8Array(buf, 2 * n, n); REVH.cd = new Uint8Array(buf, 3 * n, n);
+    REVH.W = j.size.w; REVH.H = j.size.h;
+    if (S.revier === 'hiddensee') { buildShore(); if (typeof G !== 'undefined' && G && !G.running) newRace(null); try { applyLight(); } catch (e) {} }
+  }).catch(e => {
+    REVH_ERR = e; REVH_LOAD = null; console.error('Revier Hiddensee', e);
+    try { msg('Revier Hiddensee konnte nicht geladen werden (' + e.message + ').', 'bad'); } catch (_) {}
+  });
+  return REVH_LOAD;
+}
+
+/* ---------- Raster ---------- */
+/* Höhe (m) im Revier-Koordinatensystem E/N (Meter ab Südwest-Ecke). <0 = Wassertiefe */
+function revZ(E, N) {
+  const R = REVH, cs = R.grid.cs, nx = R.grid.nx, ny = R.grid.ny;
+  const fx = E / cs - 0.5, fy = (R.H - N) / cs - 0.5;
+  const i0 = Math.floor(fx), j0 = Math.floor(fy), tx = fx - i0, ty = fy - j0;
+  const v = (i, j) => (i < 0 || j < 0 || i >= nx || j >= ny) ? -8 * 100 : R.z[j * nx + i];
+  return ((v(i0, j0) * (1 - tx) + v(i0 + 1, j0) * tx) * (1 - ty) + (v(i0, j0 + 1) * (1 - tx) + v(i0 + 1, j0 + 1) * tx) * ty) / 100;
+}
+function revCell(E, N, arr) {
+  const R = REVH, cs = R.grid.cs, i = Math.floor(E / cs), j = Math.floor((R.H - N) / cs);
+  if (i < 0 || j < 0 || i >= R.grid.nx || j >= R.grid.ny) return 0; return arr[j * R.grid.nx + i];
+}
+/* Spielkoordinaten */
+function revH(x, y) { const q = SHORE.realOf(x, y); return revZ(q[0], q[1]); }
+function revDepth(x, y) { return -revH(x, y); }
+
+/* ---------- Aufbau ---------- */
+function revBuild() {
+  const R = REVH, K = R.courses, kurs = S.revKurs || 'bb';
+  const wf = (Number(S.windFrom) || 0) * DEG, cs = Math.cos(wf), sn = Math.sin(wf);
+  const st = kurs === 'bahn' ? K.bahn.center : K[kurs].start;
+  const bo = [st[0] * cs - st[1] * sn, st[0] * sn + st[1] * cs];
+  const fwd = (E, N) => [E * cs - N * sn - bo[0], E * sn + N * cs - bo[1]];
+  const realOf = (x, y) => { const X = x + bo[0], Y = y + bo[1]; return [X * cs + Y * sn, -X * sn + Y * cs]; };
+  const rotv = (u) => [u[0] * cs - u[1] * sn, u[0] * sn + u[1] * cs];
+  SHORE = { kind: 'revier', key: revKey(), fwd, realOf, rotv, c: [0, 0], R: 30000, fit: 999, P: null };
+  TGM = { h: (x, y) => revH(x, y) };
+  try { waterMat.uniforms.uShOn.value = 0; } catch (e) {}
+  const lo = S.gfx === 'niedrig';
+  revTerrain(lo); revTrees(lo); revHouses(lo); revLights(); revSeamarks(lo);
+  /* Landflächen für die Karte (Spielkoordinaten) */
+  SHORE.landMap = R.land.map(f => { const p = []; for (let k = 0; k < f.length; k += 2) p.push(fwd(f[k], f[k + 1])); return p; });
+  SHORE.places = R.places.filter(p => p[3] <= 1).map(p => { const q = fwd(p[0], p[1]); return [q[0], q[1], p[2]]; });
+  try { seasonApply(shoreG); } catch (e) { console.error('Jahreszeit', e); }
+}
+
+const REV_LU_COL = { 0: '#7f9a5a', 1: '#3f5a33', 2: '#a59c8c', 3: '#b9b56f', 4: '#d8c99a', 5: '#6f7f55', 6: '#5f7a45', 7: '#86a35e' };
+function revTerrain(lo) {
+  const R = REVH, nx = R.grid.nx, ny = R.grid.ny, cs = R.grid.cs, st = lo ? 2 : 1, F = SHORE.fwd;
+  const cols = {}; for (const k in REV_LU_COL) cols[k] = new THREE.Color(REV_LU_COL[k]);
+  const cSand = new THREE.Color('#cdbd8f'), cWet = new THREE.Color('#9c8f6a'), cBed = new THREE.Color('#8f8a6a'), cRock = new THREE.Color('#9a9488'), tmp = new THREE.Color();
+  const CH = 64; /* Zellen je Kachel und Achse */
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  for (let cj = 0; cj < ny - 1; cj += CH * st) for (let ci = 0; ci < nx - 1; ci += CH * st) {
+    const j1 = Math.min(ny - 1, cj + CH * st), i1 = Math.min(nx - 1, ci + CH * st);
+    const js = [], is = []; for (let j = cj; j <= j1; j += st) js.push(j); if (js[js.length - 1] !== j1) js.push(j1);
+    for (let i = ci; i <= i1; i += st) is.push(i); if (is[is.length - 1] !== i1) is.push(i1);
+    let anyLand = false, anyShallow = false;
+    for (const j of js) for (const i of is) { const z = R.z[j * nx + i]; if (z > -50) anyShallow = true; if (z > 0) anyLand = true; }
+    if (!anyShallow) continue; /* reine tiefe See: keine Kachel nötig */
+    const W = is.length, H = js.length, pos = new Float32Array(W * H * 3), col = new Float32Array(W * H * 3), idx = [];
+    let k = 0;
+    for (const j of js) for (const i of is) {
+      const E = (i + 0.5) * cs, N = R.H - (j + 0.5) * cs, z = R.z[j * nx + i] / 100;
+      const [x, y] = F(E, N);
+      const h = z > 0 ? z + 0.35 : z * 1.0 - 0.6;    /* Land minimal anheben, Seegrund absenken: saubere Uferlinie */
+      pos[k * 3] = x; pos[k * 3 + 1] = h; pos[k * 3 + 2] = -y;
+      const lu = R.lu[j * nx + i], cd = R.cd[j * nx + i];
+      if (z <= 0) tmp.copy(cBed); else if (z < 1.2 || (cd <= 1 && lu !== 2 && lu !== 1)) tmp.copy(z < 0.6 ? cWet : cSand);
+      else { tmp.copy(cols[lu] || cols[0]); if (z > 35) tmp.lerp(cRock, Math.min(1, (z - 35) / 40) * 0.35); }
+      const v = 0.92 + 0.16 * Math.sin(i * 12.9898 + j * 78.233) * Math.sin(i * 3.1 + j * 1.7);
+      col[k * 3] = tmp.r * v; col[k * 3 + 1] = tmp.g * v; col[k * 3 + 2] = tmp.b * v; k++;
+    }
+    for (let a = 0; a < H - 1; a++) for (let b = 0; b < W - 1; b++) { const p = a * W + b; idx.push(p, p + W, p + 1, p + 1, p + W, p + W + 1); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, mat); m.userData.revTerrain = true; shoreG.add(m);
+  }
+}
+function revTrees(lo) {
+  const R = REVH, nx = R.grid.nx, ny = R.grid.ny, cs = R.grid.cs, F = SHORE.fwd;
+  const CAP = lo ? 7000 : 24000, maxCd = lo ? 14 : 24, pts = [];
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i, lu = R.lu[k]; if (lu !== 1 && lu !== 6) continue; if (R.cd[k] > maxCd || R.z[k] < 80) continue;
+    const n = lu === 1 ? (R.cd[k] < 6 ? 3 : 2) : 1;
+    for (let q = 0; q < n; q++) pts.push([(i + Math.random()) * cs, R.H - (j + Math.random()) * cs, lu]);
+  }
+  for (let a = pts.length - 1; a > 0; a--) { const b = Math.floor(Math.random() * (a + 1)); const t = pts[a]; pts[a] = pts[b]; pts[b] = t; }
+  const use = pts.slice(0, CAP); if (!use.length) return;
+  const cone = new THREE.ConeGeometry(1, 1, 6); cone.translate(0, 0.5, 0); const blob = new THREE.IcosahedronGeometry(1, 0);
+  const nC = use.filter((p, k) => k % 3 === 0).length, nB = use.length - nC;
+  const imC = new THREE.InstancedMesh(cone, new THREE.MeshLambertMaterial({ color: 0xffffff }), nC);
+  const imB = new THREE.InstancedMesh(blob, new THREE.MeshLambertMaterial({ color: 0xffffff }), nB);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color();
+  let a = 0, b = 0;
+  use.forEach((t, k) => {
+    const [x, y] = F(t[0], t[1]); const h0 = revZ(t[0], t[1]) + 0.35; if (h0 < 0.8) return;
+    if (k % 3 === 0) { const hh = t[2] === 6 ? rnd(3, 6) : rnd(11, 19); sc.set(hh * 0.28, hh, hh * 0.28); p.set(x, h0 - 0.3, -y); m4.compose(p, q, sc); imC.setMatrixAt(a, m4); c.setHSL(rnd(0.27, 0.33), rnd(0.3, 0.45), rnd(0.16, 0.24)); imC.setColorAt(a++, c); }
+    else { const r = t[2] === 6 ? rnd(1.5, 3) : rnd(3.5, 6.5); sc.set(r, r * rnd(1.1, 1.5), r); p.set(x, h0 + r * 0.9, -y); m4.compose(p, q, sc); imB.setMatrixAt(b, m4); c.setHSL(rnd(0.2, 0.3), rnd(0.32, 0.5), rnd(0.2, 0.3)); imB.setColorAt(b++, c); }
+  });
+  imC.count = a; imB.count = b; imC.frustumCulled = imB.frustumCulled = false; shoreG.add(imC, imB);
+}
+function revHouses(lo) {
+  const R = REVH, F = SHORE.fwd, list = R.houses.slice(0, lo ? 2500 : 6000); if (!list.length) return;
+  const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0);
+  const roof = new THREE.ConeGeometry(0.75, 1, 4, 1); roof.rotateY(Math.PI / 4); roof.translate(0, 0.5, 0);
+  const imW = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: 0xffffff }), list.length);
+  const imR = new THREE.InstancedMesh(roof, new THREE.MeshLambertMaterial({ color: 0xffffff }), list.length);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
+  const wf = (Number(S.windFrom) || 0) * DEG; let n = 0;
+  for (const hs of list) {
+    const [E, N, l, w, ang, hh] = hs; const [x, y] = F(E, N); const h0 = revZ(E, N) + 0.35; if (h0 < 0.5) continue;
+    const H = Math.min(hh, 25); q.setFromAxisAngle(up, ang + wf);
+    sc.set(l, H * 0.72, w); p.set(x, h0 - 0.2, -y); m4.compose(p, q, sc); imW.setMatrixAt(n, m4);
+    c.set(['#e8e1d2', '#d9cdb5', '#f1ece2', '#c9b79a', '#b4553f'][Math.floor(Math.random() * 5)]); imW.setColorAt(n, c);
+    sc.set(l * 1.05, Math.min(H * 0.38, 6), w * 1.05); p.set(x, h0 - 0.2 + H * 0.72, -y); m4.compose(p, q, sc); imR.setMatrixAt(n, m4);
+    c.set(Math.random() < 0.55 ? '#8c3b2a' : Math.random() < 0.5 ? '#5a4a3a' : '#c8b27a'); imR.setColorAt(n, c); n++;
+  }
+  imW.count = imR.count = n; imW.frustumCulled = imR.frustumCulled = false; shoreG.add(imW, imR);
+}
+function revLights() {
+  const R = REVH, F = SHORE.fwd;
+  const white = new THREE.MeshLambertMaterial({ color: '#f4f2ec' }), red = new THREE.MeshLambertMaterial({ color: '#b3362c' }), lamp = new THREE.MeshBasicMaterial({ color: '#fff3b0' });
+  for (const L of R.lights) {
+    const [x, y] = F(L[0], L[1]), h0 = Math.max(0.5, revZ(L[0], L[1]) + 0.35), H = Math.max(10, Math.min(L[3] || 20, 30));
+    const g = new THREE.Group();
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.07, H * 0.11, H, 12), white); t.position.y = H / 2; g.add(t);
+    const bnd = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.085, H * 0.09, H * 0.15, 12), red); bnd.position.y = H * 0.55; g.add(bnd);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.06, H * 0.06, H * 0.1, 10), lamp); top.position.y = H + H * 0.05; g.add(top);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(H * 0.09, H * 0.1, 10), red); cap.position.y = H * 1.15; g.add(cap);
+    g.position.set(x, h0, -y); shoreG.add(g);
+  }
+}
+/* Echte Fahrwassertonnen (OpenSeaMap): rot = Spiere/Stumpf, grün = Spitz, gelb-schwarz = Kardinal */
+function revSeamarks(lo) {
+  const R = REVH, F = SHORE.fwd;
+  const C = { r: '#c62828', g: '#2e7d32', y: '#f2c230', k: '#1b1b1b', w: '#f4f4f4', o: '#ef7d1a' };
+  const can = new THREE.CylinderGeometry(0.45, 0.45, 1.6, 10); can.translate(0, 0.8, 0);
+  const cone = new THREE.ConeGeometry(0.55, 1.7, 10); cone.translate(0, 0.85, 0);
+  const pil = new THREE.CylinderGeometry(0.25, 0.55, 2.6, 10); pil.translate(0, 1.3, 0);
+  const sph = new THREE.SphereGeometry(0.6, 12, 8); sph.translate(0, 0.6, 0);
+  const mats = {}; const M = c => mats[c] || (mats[c] = new THREE.MeshLambertMaterial({ color: C[c] || '#888' }));
+  SHORE.smFloats = [];
+  for (const s of R.seamarks) {
+    const [E, N, k, col, form] = s; if (k === 'F') continue; if (revZ(E, N) > -0.2) continue;
+    const [x, y] = F(E, N), c0 = (col || 'y')[0], c1 = col && col[1];
+    let geo = sph; if (k === 'L') geo = /con/.test(form) ? cone : can; else if (k === 'C' || k === 'I') geo = pil; else if (k === 'S') geo = /con/.test(form) ? cone : /can|barrel/.test(form) ? can : sph;
+    const g = new THREE.Group(), m = new THREE.Mesh(geo, M(c0)); g.add(m);
+    if (c1) { const b2 = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.7, 10), M(c1)); b2.position.y = 1.1; g.add(b2); }
+    g.position.set(x, -0.1, -y); g.scale.setScalar(1.15); shoreG.add(g);
+  }
+}
+
+/* ---------- Grundberührung ---------- */
+function revKeepIn(b) {
+  if (!REVH) return;
+  const dr = b.rib ? 0.5 : revDraft(); let d = revDepth(b.x, b.y);
+  if (d >= dr) return;
+  const e = 15, gx = revDepth(b.x + e, b.y) - revDepth(b.x - e, b.y), gy = revDepth(b.x, b.y + e) - revDepth(b.x, b.y - e);
+  let l = Math.hypot(gx, gy); let ux = l > 1e-6 ? gx / l : -dirv(b.h)[0], uy = l > 1e-6 ? gy / l : -dirv(b.h)[1];
+  for (let k = 0; k < 12 && d < dr; k++) { b.x += ux * 1.5; b.y += uy * 1.5; d = revDepth(b.x, b.y); }
+  /* Bug Richtung tieferes Wasser drehen (KI ganz, Spieler etwas), nie in den Wind */
+  const gh = wrap360(Math.atan2(ux, uy) / DEG); let want = gh; const offW = wrap180(want - b.W);
+  if (Math.abs(offW) < 50) want = wrap360(b.W + (offW >= 0 ? 50 : -50));
+  const turn = wrap180(want - b.h), lim = b.isPlayer ? 20 : 180;
+  b.h = wrap360(b.h + clamp(turn, -lim, lim));
+  b.v = b.isPlayer ? Math.max(b.v * 0.3, 0.3) : Math.max(b.v * 0.4, 0.8);
+  if (b.isPlayer && (!b.groundT || G.t - b.groundT > 5)) {
+    b.groundT = G.t; const w = Math.max(0, -revH(b.x, b.y) + 0);
+    msg(revH(b.x, b.y) > 0 ? 'Auf Grund gelaufen – Ufer!' : 'Auf Grund gelaufen – hier sind nur ' + w.toFixed(1).replace('.', ',') + ' m Wasser (Tiefgang ' + dr.toFixed(1).replace('.', ',') + ' m).', 'bad');
+    beep(150, 0.4, 'square', 0.05);
+  }
+}
+/* KI: rechtzeitig vor Flachwasser wenden bzw. abfallen */
+function revAvoid(b, hd) {
+  if (!REVH) return hd;
+  const dr = revDraft() + 0.35, la = clamp(b.v * 22, 45, 170), ai = b.ai;
+  const clear = h => { const u = dirv(h), w = dirv(b.W), lee = Math.abs(wrap180(b.W - h)) < 80 ? 14 : 0;
+    const lx = -w[0] * lee, ly = -w[1] * lee;
+    for (let t = 12; t <= la; t += 12) { if (revDepth(b.x + u[0] * t, b.y + u[1] * t) < dr) return false; if (lee && revDepth(b.x + u[0] * t + lx, b.y + u[1] * t + ly) < dr) return false; } return true; };
+  if (clear(hd)) return hd;
+  const off = wrap180(b.W - hd), up = Math.abs(off) < 70;
+  if (up) { const h2 = wrap360(2 * b.W - hd); if (clear(h2)) { if (ai) { ai.commitSide = -b.side; ai.commitUntil = G.t + 14; ai.lastTack = G.t; } return h2; } }
+  for (let dv = 10; dv <= 120; dv += 10) for (const s of [1, -1]) { const h = wrap360(hd + s * dv); if (Math.abs(wrap180(b.W - h)) < 38) continue; if (clear(h)) return h; }
+  return wrap360(2 * b.W - hd);
+}
+
+/* ---------- Kurs (Wegpunkt-Tore) ---------- */
+function revCourse(C) {
+  const K = REVH.courses[S.revKurs || 'bb']; if (!K || !K.gates) return false;
+  const F = SHORE.fwd, rv = SHORE.rotv;
+  const mkGate = (g, kind) => {
+    const [x, y] = F(g.x, g.y), u = rv(g.u), r = [u[1], -u[0]];
+    return { x, y, kind, name: g.name, u, r, hw: g.hw, a: { x: x - r[0] * g.hw, y: y - r[1] * g.hw }, b: { x: x + r[0] * g.hw, y: y + r[1] * g.hw } };
+  };
+  C.wps = K.gates.map(g => mkGate(g, 'wp'));
+  const f = mkGate(K.finish, 'fin');
+  C.fin = { c: { x: f.x, y: f.y }, len: f.hw * 2, a: f.a, b: f.b, u: f.u, r: f.r };
+  C.finishUp = true; C.wm = C.lm = C.om = C.wing = null;
+  C.seq = C.wps.slice(); C.seq.push('finish');
+  C.rev = { name: K.name, sm: K.sm, route: K.route.map(p => F(p[0], p[1])) };
+  return true;
+}
+/* Ziel für die KI an einem Wegpunkt-Tor: mittig ins Tor, dann ein Stück durch */
+function revWpAim(b, m) {
+  const lat = (b.x - m.x) * m.r[0] + (b.y - m.y) * m.r[1], al = (b.x - m.x) * m.u[0] + (b.y - m.y) * m.u[1];
+  const lt = clamp(lat, -m.hw * 0.45, m.hw * 0.45), ahead = Math.max(25, L * 3);
+  if (al > L && Math.abs(lat) > m.hw) return { x: m.x + m.r[0] * lt - m.u[0] * 40, y: m.y + m.r[1] * lt - m.u[1] * 40 }; /* am Tor vorbei: zurück */
+  return { x: m.x + m.r[0] * lt + m.u[0] * ahead, y: m.y + m.r[1] * lt + m.u[1] * ahead };
+}
+/* Tor passiert? (Bug kreuzt die Torlinie in Kursrichtung innerhalb der Torbreite) */
+function revWpStuck(b, m) {
+  if (b.isPlayer || b.remote || !b.ai) return false; const ai = b.ai, d = Math.hypot(b.x - m.x, b.y - m.y);
+  if (ai.wpLeg !== b.leg) { ai.wpLeg = b.leg; ai.wpBest = d; ai.wpT = G.t; return false; }
+  if (d < ai.wpBest - 30) { ai.wpBest = d; ai.wpT = G.t; return false; }
+  return G.t - ai.wpT > 420 && d < 700;
+}
+function revWpCheck(b, m) {
+  const f = dirv(b.h), bx = b.x + f[0] * L / 2 - m.x, by = b.y + f[1] * L / 2 - m.y;
+  const al = bx * m.u[0] + by * m.u[1], lat = bx * m.r[0] + by * m.r[1];
+  const ok = b.prevW != null && b.prevW <= 0 && al > 0 && Math.abs(lat) <= m.hw * 1.4;
+  b.prevW = al; if (ok) b.prevW = null; return ok;
+}
+
+/* ---------- Karte ---------- */
+function revMapDraw(x, mp, W, H) {
+  if (!SHORE || SHORE.kind !== 'revier' || !SHORE.landMap) return;
+  x.save(); x.fillStyle = 'rgba(206,196,160,.85)'; x.strokeStyle = 'rgba(70,60,40,.7)'; x.lineWidth = 0.8;
+  for (const ring of SHORE.landMap) {
+    let any = false; x.beginPath();
+    for (let k = 0; k < ring.length; k++) { const q = mp(ring[k][0], ring[k][1]); if (q[0] > -400 && q[0] < W + 400 && q[1] > -400 && q[1] < H + 400) any = true; k ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1]); }
+    if (any) { x.closePath(); x.fill(); x.stroke(); }
+  }
+  const C = G && G.course;
+  if (C && C.rev) { x.setLineDash([4, 4]); x.strokeStyle = 'rgba(255,210,63,.75)'; x.lineWidth = 1.2; x.beginPath(); C.rev.route.forEach((p, k) => { const q = mp(p[0], p[1]); k ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1]); }); x.stroke(); x.setLineDash([]); }
+  x.font = '600 10px system-ui,sans-serif'; x.fillStyle = 'rgba(30,30,30,.85)';
+  for (const p of SHORE.places) { const q = mp(p[0], p[1]); if (q[0] > 0 && q[0] < W && q[1] > 0 && q[1] < H) x.fillText(p[2], q[0] + 3, q[1] - 3); }
+  x.restore();
+}
+
+/* ---------- Tempo-Knopf für Langstrecken ---------- */
+function revSpeedBtn() {
+  let el = document.getElementById('revSpeed');
+  const long = S.revier === 'hiddensee' && (S.revKurs || 'bb') !== 'bahn' && G && G.running && !G.over;
+  if (!el) {
+    el = document.createElement('button'); el.id = 'revSpeed'; el.type = 'button';
+    el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:8px;z-index:60;font:600 14px system-ui,sans-serif;color:#fff;background:rgba(12,30,40,.82);border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:6px 12px;cursor:pointer;display:none';
+    el.title = 'Spieltempo für die Langstrecke';
+    el.onclick = () => { const v = [1, 1.5, 3, 5, 10, 20], i = v.indexOf(Number(S.gameSpeed)); S.gameSpeed = v[(i + 1) % v.length]; try { saveS(); } catch (e) {} revSpeedBtn(); };
+    document.body.appendChild(el);
+  }
+  el.style.display = long ? 'block' : 'none';
+  el.textContent = '⏩ Tempo ' + String(S.gameSpeed).replace('.', ',') + '×';
+}
+
 /* ================= Grundlagen ================= */
 const DEG=Math.PI/180, KN=0.514444;
 let L=4.7, BEAM=1.6;
@@ -1013,7 +1298,7 @@ const RIG=()=>RIGS[CL.key];
 /* ================= Einstellungen ================= */
 const DEFAULTS={tws:10,shiftAmp:8,shiftPeriod:70,puffs:2,puffStrength:25,dirtyAir:true,waveH:0,legLength:450,laps:2,startTime:60,zone:3,
   boatClass:'jolle',sailNo:'GER 1',headsail:'fock',autoTrim:true,gameSpeed:1.5,laylines:true,showZone:true,roundArrow:true,vectors:true,cpuCount:6,lineScale:100,cpuSkill:1,
-  rules:true,cpuCalm:true,markRules:true,markTouch:true,ocs:true,penaltyMode:'one',allMsgs:false,gfx:isTouch?'mittel':'hoch',courseType:'wl',finishUp:false,series:1,revier:'open',mapTrack:false,ladder:true,count10:true,startSound:'horn',rowBoat:'zk10',courseFan:true,windFrom:225,rowDist:500,current:0,currentDir:'lee',coach:true,ghost:true,touchMode:'slider',wxCloud:25,wxPrecip:'none',wxUseWind:true,wxUseWx:true,wxUseTime:true,season:'auto'};
+  rules:true,cpuCalm:true,markRules:true,markTouch:true,ocs:true,penaltyMode:'one',allMsgs:false,gfx:isTouch?'mittel':'hoch',courseType:'wl',finishUp:false,series:1,revier:'open',revKurs:'bb',mapTrack:false,ladder:true,count10:true,startSound:'horn',rowBoat:'zk10',courseFan:true,windFrom:225,rowDist:500,current:0,currentDir:'lee',coach:true,ghost:true,touchMode:'slider',wxCloud:25,wxPrecip:'none',wxUseWind:true,wxUseWx:true,wxUseTime:true,season:'auto'};
 let S=Object.assign({},DEFAULTS),S_main=null;
 try{const raw=localStorage.getItem('regattakoje.v1');if(raw)Object.assign(S,JSON.parse(raw));}catch(e){}
 if(!CLASSES[S.boatClass])S.boatClass='jolle';
@@ -1048,7 +1333,8 @@ const SCHEMA=[
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
-  {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont'],['hiddensee','Hiddensee · Bodden · Strelasund (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revKurs',label:'Kurs im Revier Hiddensee',type:'select',options:[['bb','Blaues Band vom Strelasund (ca. 12 sm)'],['rund','Rund Hiddensee (ca. 31 sm)'],['bahn','Regattabahn vor Hiddensee (Westseite)']],hint:'Nur im Revier Hiddensee. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
   {k:'windFrom',label:'Windrichtung (See-Reviere)',type:'select',num:true,live:v=>v+'° (Live)',options:[[225,'Südwest'],[270,'West'],[315,'Nordwest'],[0,'Nord'],[45,'Nordost'],[90,'Ost'],[135,'Südost'],[180,'Süd']],hint:'Am See zählt, über welches Ufer der Wind kommt: Nordwind über den Auwald ist löchrig, Westwind über die Neue Harth drehig'},
   {k:'rowDist',label:'Ruderstrecke',type:'select',num:true,options:[[250,'250 m'],[500,'500 m'],[1000,'1000 m']],hint:'Für die Ruderregatta (Knopf „Rudern“)'},
   {k:'rowBoat',label:'Ruderboot',type:'select',options:[['zk10','Kutter ZK 10 (10 Riemen)'],['viking','Wikingerschiff (8 Riemen, Wikinger-Crew)']]},
@@ -1063,7 +1349,7 @@ const SCHEMA=[
   {k:'sailNo',label:'Segelnummer',type:'text'},
   {k:'headsail',label:'Vorsegel (Jolle)',type:'select',options:[['fock','Fock'],['genua','Genua']],hint:'Genua: mehr Druck bei Leichtwind, überpowert ab ca. 14 kn'},
   {k:'autoTrim',label:'Autotrimm',type:'check'},
-  {k:'gameSpeed',label:'Spieltempo',type:'select',num:true,options:[[1,'1× (echtzeit)'],[1.5,'1,5×'],[2,'2×'],[3,'3×']]},
+  {k:'gameSpeed',label:'Spieltempo',type:'select',num:true,options:[[1,'1× (echtzeit)'],[1.5,'1,5×'],[2,'2×'],[3,'3×'],[5,'5×'],[10,'10× (Langstrecke)'],[20,'20× (Langstrecke)']]},
   {k:'laylines',label:'Laylines anzeigen',type:'check'},
   {k:'ladder',label:'Lineal (Abstandslinien quer zum Wind)',type:'check',hint:'Linien alle 50 m quer zum aktuellen Wind, auf der Karte und auf dem Wasser: wer auf derselben Linie liegt, ist gleich weit in Luv'},
   {k:'mapTrack',label:'Eigene Spur auf der Karte',type:'check'},
@@ -1093,7 +1379,7 @@ const form=document.getElementById('setForm');
 function onSetting(k){if(k==='revier'&&S.wxSite&&(S.revier==='cospu'||S.revier==='rangs')&&wxSite().name!==S.wxSite&&!(G&&G.running&&!G.over))setTimeout(()=>loadLiveWx(),0);if(k==='season'){applyLight();buildShore();if(G&&!G.running)newRace(null);return;}if(k==='licht')S.sunLive=null;if(k==='licht'||k==='wxCloud'||k==='wxPrecip'||k==='windFrom'||k==='revier'||k==='gfx')applyLight();if(k==='gfx'&&(S.revier==='cospu'||isGL())&&G&&!G.running){buildShore();}if(!G)return;
   if((k==='tws'||k==='waveH')&&!G.running)setupWaves();
   if((k==='boatClass'||k==='courseType'||k==='finishUp'||k==='legLength'||k==='laps')&&!G.running){newRace(null);}
-  if(k==='revier'||k==='windFrom'){buildShore();if(!G.running)newRace(null);}
+  if(k==='revier'||k==='windFrom'||k==='revKurs'){buildShore();if(!G.running)newRace(null);}
   if(k==='touchMode'||k==='autoTrim')updateTouch();
   if(k==='boatClass'||k==='courseType')renderBest();
   if(k==='gfx')applyGfx();}
@@ -1133,10 +1419,10 @@ const WX_TXT={none:'kein Niederschlag',r1:'leichter Regen',r2:'mäßiger Regen',
 const WX_COMP=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 const LIGHT_TXT={mittag:'Mittag',nachmittag:'Nachmittag',gold:'Goldene Stunde',daemmerung:'Dämmerung',nacht:'Nacht'};
 let wxBusy=false;
-function wxSite(){return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
+function wxSite(){if(S.revier==='hiddensee')return {lat:54.47,lon:13.09,name:'Hiddensee'};return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
 async function loadLiveWx(){if(wxBusy)return;wxBusy=true;const say=t=>{S.wxInfo=t;const st=document.getElementById('wxStatus');if(st)st.textContent=t;saveS();};
   try{say('Lade Live-Daten …');const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),9000);
-    if(S.revier!=='rangs'&&S.revier!=='cospu'&&!(G&&G.running&&!G.over))S.revier='cospu';const site=wxSite();const r=await fetch(WX_URL.replace('latitude='+WX_LAT,'latitude='+site.lat).replace('longitude='+WX_LON,'longitude='+site.lon),{signal:ctl.signal,cache:'no-store'});clearTimeout(to);if(!r.ok)throw new Error('HTTP '+r.status);
+    if(S.revier!=='rangs'&&S.revier!=='cospu'&&S.revier!=='hiddensee'&&!(G&&G.running&&!G.over))S.revier='cospu';const site=wxSite();const r=await fetch(WX_URL.replace('latitude='+WX_LAT,'latitude='+site.lat).replace('longitude='+WX_LON,'longitude='+site.lon),{signal:ctl.signal,cache:'no-store'});clearTimeout(to);if(!r.ok)throw new Error('HTTP '+r.status);
     const j=await r.json(),c=j&&j.current;if(!c||typeof c.wind_speed_10m!=='number')throw new Error('keine Daten');
     const running=!!(G&&G.running&&!G.over);const parts=[];const t=Number(c.time)||Math.floor(Date.now()/1000);
     const hhmm=new Date(t*1000).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Berlin'});
@@ -1657,7 +1943,7 @@ function inShoal(x,y){if(SHORE.shoalX)for(const c of SHORE.shoalX)if(Math.hypot(
 function shoalPush(b){if(SHORE.shoalX)for(const c of SHORE.shoalX){let ox=b.x-c[0],oy=b.y-c[1];const d=Math.hypot(ox,oy);if(d<c[2]){if(d<1e-6){ox=1;oy=0;}else{ox/=d;oy/=d;}b.x=c[0]+ox*c[2];b.y=c[1]+oy*c[2];}}const S2=SHORE.shoal;if(!S2)return;const dx=S2[2]-S2[0],dy=S2[3]-S2[1],l2=dx*dx+dy*dy||1,t=clamp(((b.x-S2[0])*dx+(b.y-S2[1])*dy)/l2,0,1),cx=S2[0]+dx*t,cy=S2[1]+dy*t;let ox=b.x-cx,oy=b.y-cy;const d=Math.hypot(ox,oy);if(d>=S2[4])return;
   if(d<0.01){const l=Math.sqrt(l2);ox=-dy/l;oy=dx/l;}else{ox/=d;oy/=d;}b.x=cx+ox*(S2[4]+0.3);b.y=cy+oy*(S2[4]+0.3);b.v*=0.3;
   if(b.isPlayer&&(!b.groundT||G.t-b.groundT>5)){b.groundT=G.t;msg('Auf Grund gelaufen – Flachwasser an den Inseln!','bad');beep(150,0.4,'square',0.05);}}
-function shoreKeepIn(b,dt){if(SHORE.kind!=='poly')return;shoalPush(b);const P=SHORE.P;if(polyInside(P,b.x,b.y))return;
+function shoreKeepIn(b,dt){if(SHORE.kind==='revier'){revKeepIn(b);return;}if(SHORE.kind!=='poly')return;shoalPush(b);const P=SHORE.P;if(polyInside(P,b.x,b.y))return;
   const [,i]=polyDist(P,b.x,b.y);const a=P[(i-1+P.length)%P.length],c=P[i];const ex=c.x-a.x,ey=c.y-a.y,el=Math.hypot(ex,ey)||1;
   let t=((b.x-a.x)*ex+(b.y-a.y)*ey)/(el*el);t=clamp(t,0,1);const nx=-ey/el,ny=ex/el;const cx=a.x+ex*t,cy=a.y+ey*t;
   const sg=polyInside(P,cx+nx*2,cy+ny*2)?1:-1;b.x=cx+nx*sg*2;b.y=cy+ny*sg*2;b.v*=0.3;
@@ -1916,6 +2202,7 @@ function objSync(){if(!shoreG)return;const st=objState();for(const e of [...OBJ_
 function buildShore(){try{waterMat.uniforms.uShOn.value=0;}catch(e){}
   if(shoreG){scene.remove(shoreG);shoreG.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material)(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>m&&m.dispose&&m.dispose());});}
   shoreG=new THREE.Group();scene.add(shoreG);
+  if(S.revier==='hiddensee'){TGM=null;if(REVH){try{revBuild();}catch(e){console.error('Revier Hiddensee',e);}return;}revLoad();}
   if(S.revier==='cospu'||isGL()){objStart();try{buildCospu();}finally{objFinish();}try{seasonApply(shoreG);}catch(e){console.error('Jahreszeit',e);}try{shoreFoamBuild();}catch(e){console.error('Uferschaum',e);}try{shoreDampBuild();}catch(e){console.error('Uferwellen',e);}return;}
   const rev=S.revier||'open';let R0=1660,a0=0,a1=Math.PI*2;
   if(rev==='small')R0=Math.max(560,S.legLength*0.62+380);
@@ -3312,7 +3599,7 @@ function applyLight(){const L=LIGHTS[S.licht]||LIGHTS.mittag;const {cl,pr}=wxSta
   sun.color.set(L.sun);sun.intensity=L.si*(1-0.82*ov)*(seasonNow()==='winter'?0.85:1);if(night)sun.intensity*=mdir?(0.3+0.9*ASTRO.moonK):0.3;try{astroUpdate(true);ASTRO.last=-1e9;}catch(e){}HEMI.color.set(L.hs);HEMI.groundColor.set(L.hg);HEMI.intensity=L.hi*(1+(night?0:0.3*ov));
   const fg=new THREE.Color(L.fog),g1=_lum(fg);const grey=new THREE.Color().setRGB(g1,g1,g1*1.02).multiplyScalar((1-0.28*dk)*(pr===4?1.06:1));
   FOG.copy(fg).lerp(grey,ov*0.85);{const sz=seasonNow();if(sz==='winter')FOG.lerp(new THREE.Color('#dde5ec'),0.3);else if(sz==='herbst')FOG.lerp(new THREE.Color('#ddd6c4'),0.15);}const tp=new THREE.Color(L.top);SKY_TOP.copy(tp).lerp(grey.clone().multiplyScalar(0.88),ov*0.8);if(scene.fog)scene.fog.color.copy(FOG);
-  const vis=pr===0?0:pr===4?0.55:[0,0.25,0.5,0.8][pr];const fn=450*(1-0.55*vis),ff=3000*(1-0.7*vis);if(scene.fog){scene.fog.near=fn;scene.fog.far=ff;}waterMat.uniforms.uFogN.value=fn;waterMat.uniforms.uFogF.value=ff;
+  const vis=pr===0?0:pr===4?0.55:[0,0.25,0.5,0.8][pr];const fk=S.revier==='hiddensee'?2.8:1,fn=450*fk*(1-0.55*vis),ff=3000*fk*(1-0.7*vis);if(scene.fog){scene.fog.near=fn;scene.fog.far=ff;}waterMat.uniforms.uFogN.value=fn;waterMat.uniforms.uFogF.value=ff;
   const su=sky.material.uniforms;su.uCl.value=cl2;su.uDk.value=dk;waterMat.uniforms.uCl.value=cl2;
   if(typeof envDone!=='undefined')envDone=false;
   NIGHT=L.night?1:0;su.uN.value=NIGHT;waterMat.uniforms.uN.value=NIGHT;scene.background.set(L.bg||'#9ec6e0');glare.material.opacity=(NIGHT?0.12:1)*(1-0.9*cl2);updateHaze();
@@ -3751,6 +4038,7 @@ function buildBoat(b){
   if(k6pending)k6Apply(b,g,b.m);
   if(CL.key==='topcat'){try{skuaApply(b,g,b.m);}catch(e){console.error('Skua V1',e);}}
   if(CL.key==='zk10'){try{zkApply(b,g,b.m);}catch(e){console.error('ZK 10 GFK',e);}}
+  if(CL.key==='ixylon'&&!G.row){try{ixyApply(b,g,b.m);}catch(e){console.error('Ixylon',e);}}
   if(G.row&&ROWCFG[CL.key]){rowInit(b);rowGear(b);}
   labelCanvas(b);
 }
@@ -3777,7 +4065,7 @@ function isClassGeo(g){for(const k in CGEO){const o=CGEO[k];for(const v of Objec
 function newRace(lesson,opts){
   clearRoot();
   CL=CLASSES[S.boatClass]||CLASSES.jolle;L=CL.len;BEAM=CL.key==='topcat'?2.3:CL.beam*0.95;
-  {const lake=S.revier==='cospu'||isGL();if(lake&&SHORE.key!==cospuKey())buildShore();else if(!lake&&SHORE.kind==='poly')buildShore();}
+  {const lake=S.revier==='cospu'||isGL();if(S.revier==='hiddensee'){if(SHORE.key!==revKey())buildShore();}else if(lake&&SHORE.key!==cospuKey())buildShore();else if(!lake&&(SHORE.kind==='poly'||SHORE.kind==='revier'))buildShore();}
   const W0=0,U=dirv(W0),R=[U[1],-U[0]];
   const n=lesson?2:(opts&&opts.mp?opts.mp.total:S.cpuCount+1);const lineLen=lesson?Math.max(60,(n+1)*Math.max(L,3.5)*1.9):lineLenFor(n,Math.max(L,3.5));
   const C={W0,U,R,lineLen,lesson:!!lesson};
@@ -3798,12 +4086,13 @@ function newRace(lesson,opts){
   const ptOf=e=>e==='finish'?(C.finishUp?C.fin.c:{x:0,y:0}):isMark(e)?e:null;
   for(let i=0;i<C.seq.length;i++){const m=C.seq[i];if(!isMark(m)||m.d)continue;const pv=i>0?ptOf(C.seq[i-1]):{x:0,y:0},nx=ptOf(C.seq[i+1]);if(!pv||!nx){m.d=[-U[0],-U[1]];continue;}
     const ax=m.x-pv.x,ay=m.y-pv.y,an=Math.hypot(ax,ay)||1,dx=nx.x-m.x,dy=nx.y-m.y,dn=Math.hypot(dx,dy)||1;const vx=ax/an-dx/dn,vy=ay/an-dy/dn,vn=Math.hypot(vx,vy)||1;m.d=[vx/vn,vy/vn];}
+  if(!lesson&&!(opts&&(opts.row||opts.free))&&S.revier==='hiddensee'&&(S.revKurs||'bb')!=='bahn'&&SHORE.kind==='revier')revCourse(C);
   for(const m of [C.wm,C.lm,C.om,C.wing])if(m){if(!m.d)m.d=[-U[0],-U[1]];m.n=[-m.d[1],m.d[0]];}
-  C.marks=[C.wm,C.lm,C.om,C.wing].filter(Boolean);
-  C.buoys=[];for(const m of C.marks){if(m.kind==='gate')C.buoys.push({x:m.a.x,y:m.a.y,m},{x:m.b.x,y:m.b.y,m});else C.buoys.push({x:m.x,y:m.y,m});}
+  C.marks=C.wps||[C.wm,C.lm,C.om,C.wing].filter(Boolean);
+  C.buoys=[];for(const m of C.marks){if(m.kind==='gate'||m.kind==='wp')C.buoys.push({x:m.a.x,y:m.a.y,m},{x:m.b.x,y:m.b.y,m});else C.buoys.push({x:m.x,y:m.y,m});}
   if(lesson)C.buoys=C.buoys.filter(bu=>lesson.mark==='wind'?bu.m===C.wm:lesson.mark?bu.m===C.lm:false);
   const ob=(q,r,name)=>({ax:q.x,ay:q.y,bx:q.x,by:q.y,r,name});
-  C.obst=C.buoys.map(bu=>Object.assign(ob(bu,0.9,bu.m.kind==='gate'?'Tor-Tonne':bu.m.name),{mk:bu.m}));
+  C.obst=C.buoys.map(bu=>Object.assign(ob(bu,0.9,bu.m.kind==='gate'||bu.m.kind==='wp'?'Tor-Tonne':bu.m.name),{mk:bu.m}));
   if(!lesson){C.obst.push(Object.assign(ob(C.pin,0.7,'Pin-Tonne'),{mk:'start'}),{ax:C.cb.x-U[0]*3.4,ay:C.cb.y-U[1]*3.4,bx:C.cb.x+U[0]*3.4,by:C.cb.y+U[1]*3.4,r:1.75,name:'Startschiff',mk:'start'});
     if(C.finishUp)C.obst.push(Object.assign(ob(C.fin.a,0.7,'Zieltonne'),{mk:'fin'}),{ax:C.fin.b.x-U[0]*3.4,ay:C.fin.b.y-U[1]*3.4,bx:C.fin.b.x+U[0]*3.4,by:C.fin.b.y+U[1]*3.4,r:1.75,name:'Zielschiff',mk:'fin'});}
   if(S.revier==='cospu'&&SHORE.lsc)for(const o of SHORE.lsc.obst)C.obst.push(o);shoreObst(C);
@@ -4029,7 +4318,7 @@ function buildCourse3D(){
       const zs=committeeBoat('finish');zs.rotation.y=-C.W0*DEG;at(zs,F.b.x,F.b.y);C3.floats.push({o:zs,x:F.b.x,y:F.b.y,k:0.4});tag(zs,'Zielschiff „Achim“',5.0,'#2d6cdf');
       const fl2=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(F.a.x,0.35,-F.a.y),new THREE.Vector3(F.b.x,0.35,-F.b.y)]),new THREE.LineDashedMaterial({color:0x5fb4ff,dashSize:2,gapSize:1.5,transparent:true,opacity:0.6}));fl2.computeLineDistances();raceRoot.add(fl2);G.noRefl.push(fl2);}
   }
-  for(const m of marks){const z=new THREE.Mesh(new THREE.RingGeometry(S.zone*L-0.15,S.zone*L+0.15,72).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.28,depthWrite:false}));z.position.set(m.x,0.3,-m.y);raceRoot.add(z);C3.zones.push(z);G.noRefl.push(z);}
+  for(const m of marks){if(m.m&&m.m.kind==='wp')continue;const z=new THREE.Mesh(new THREE.RingGeometry(S.zone*L-0.15,S.zone*L+0.15,72).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.28,depthWrite:false}));z.position.set(m.x,0.3,-m.y);raceRoot.add(z);C3.zones.push(z);G.noRefl.push(z);}
   C3.lay=[];for(let k=0;k<2;k++){const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:k?0xff4f5f:0x3fd08a,transparent:true,opacity:0.45}));l.frustumCulled=false;raceRoot.add(l);C3.lay.push(l);G.noRefl.push(l);}
   C3.round=new THREE.Mesh(new THREE.BufferGeometry(),roundMat);C3.round.frustumCulled=false;C3.round.renderOrder=6;C3.round.key=null;raceRoot.add(C3.round);G.noRefl.push(C3.round);
   C3.vec=['#5fb4ff','#eef3f5','#ff7a1a'].map(col=>{const mat=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.92,depthTest:false,depthWrite:false});
@@ -4055,7 +4344,7 @@ function updateVectors(){const pl=P();const on=S.vectors&&G.running&&cam.mode!==
   const ex=pl.x+f[0]*0.4,ey=pl.y+f[1]*0.4;_s0.set(ex,y,-ey);_sA.set(ex-ax,y,-(ey-ay));_sB.set(ex-ax+twx,y,-(ey-ay+twy));
   setArrow(C3.vec[0],_sA,_sB);setArrow(C3.vec[1],_sB,_s0);setArrow(C3.vec[2],_sA,_s0);}
 function updateRoundArrow(now){const pl=P();const C=G.course;const t=pl.finished?null:(pl.started?C.seq[pl.leg]:C.wm);
-  const on=S.roundArrow&&G.running&&!pl.rib&&!G.row&&isMark(t)&&(!C.lesson||!!G.lesson.def.mark);C3.round.visible=!!on;if(!on)return;
+  const on=S.roundArrow&&G.running&&!pl.rib&&!G.row&&isMark(t)&&t.kind!=='wp'&&(!C.lesson||!!G.lesson.def.mark);C3.round.visible=!!on;if(!on)return;
   if(C3.round.key!==t){C3.round.geometry.dispose();C3.round.geometry=t.kind==='gate'?gateArrowGeo(t):roundArrowGeo(t);C3.round.key=t;}
   C3.round.position.y=0.25+WAMP*1.2;roundMat.uniforms.uT.value=now;if(t.kind==='gate'){C3.round.position.x=0;C3.round.position.z=0;C3.round.rotation.y=0;}else{C3.round.position.x=t.x;C3.round.position.z=-t.y;C3.round.rotation.y=(now*0.55)%(Math.PI*2);}}
 
@@ -4189,6 +4478,7 @@ function avoid(b,hd){
   for(const ob of G.course.obst){const cx=(ob.ax+ob.bx)/2,cy=(ob.ay+ob.by)/2;if(Math.hypot(cx-b.x,cy-b.y)>30)continue;
     let hit=false;for(let t=0;t<=5;t+=0.5){const px=b.x+fo[0]*vv*t,py=b.y+fo[1]*vv*t;if(ptSeg(px,py,ob.ax,ob.ay,ob.bx,ob.by)<ob.r+BEAM/2+1.8){hit=true;break;}}
     if(hit){const cr=fo[0]*(cy-b.y)-fo[1]*(cx-b.x);let pk=wrap360(out+(cr<0?-35:35));const ap=wrap180(b.W-pk);if(Math.abs(ap)<32)pk=wrap360(out+(cr<0?35:-35));out=pk;break;}}
+  if(SHORE.kind==='revier')out=revAvoid(b,out);
   return out;
 }
 function lineAim(b,lp){const C=G.course,al=bowAlong(b)[0],lat=bowAlong(b)[1],lpl=lp.x*C.R[0]+lp.y*C.R[1];
@@ -4196,14 +4486,14 @@ function lineAim(b,lp){const C=G.course,al=bowAlong(b)[0],lat=bowAlong(b)[1],lpl
   return [lp.x+C.U[0]*20,lp.y+C.U[1]*20];}
 /* Zielansteuerung: Zielpunkt liegt knapp hinter der Linie und seitlich in der MITTLEREN Linienhälfte, damit die Linie auch bei flachem Anlaufwinkel
    (Raumschots/Am-Wind-Winkel) sicher INNERHALB der Tonnen gekreuzt wird. Wer die Ebene der Linie ausserhalb passiert hat, kehrt auf die Kursseite zurück. */
-function finishAim(b){const C=G.course;const fc=C.finishUp?C.fin.c:{x:0,y:0},half=(C.finishUp?C.fin.len:C.lineLen)/2;
+function finishAim(b){const C0=G.course;const C=C0.fin&&C0.fin.u&&C0.finishUp?Object.assign({},C0,{U:C0.fin.u,R:C0.fin.r}):C0;const fc=C.finishUp?C.fin.c:{x:0,y:0},half=(C.finishUp?C.fin.len:C.lineLen)/2;
   const dx=b.x-fc.x,dy=b.y-fc.y,lat=dx*C.R[0]+dy*C.R[1],al=dx*C.U[0]+dy*C.U[1];
   const inner=half*(C.finishUp?0.3:0.5),lt=clamp(lat,-inner,inner),ahead=Math.max(3,L*0.8),dirS=C.finishUp?1:-1; /* dirS: Fahrtrichtung durch die Linie entlang U */
   if(al*dirS>L*1.5){ /* schon hinter der Linie, aber nicht durchgefahren -> zurück auf die Kursseite, dann neu durch die Linie */
     const back=Math.max(14,L*3);return {x:fc.x+C.R[0]*lt-C.U[0]*dirS*back,y:fc.y+C.R[1]*lt-C.U[1]*dirS*back};}
   return {x:fc.x+C.R[0]*lt+C.U[0]*dirS*ahead,y:fc.y+C.R[1]*lt+C.U[1]*dirS*ahead};}
 function finishFix(b,hd){
-  const C=G.course,ai=b.ai;if(C.lesson)return hd;
+  const C0=G.course,ai=b.ai;const C=C0.fin&&C0.fin.u&&C0.finishUp?Object.assign({},C0,{U:C0.fin.u,R:C0.fin.r}):C0;if(C.lesson)return hd;
   const fc=C.finishUp?C.fin.c:{x:0,y:0},half=(C.finishUp?C.fin.len:C.lineLen)/2,dirS=C.finishUp?1:-1;
   const f=dirv(b.h),bx=b.x+f[0]*L/2-fc.x,by=b.y+f[1]*L/2-fc.y;
   const al=(bx*C.U[0]+by*C.U[1])*dirS,lat=bx*C.R[0]+by*C.R[1];
@@ -4240,6 +4530,7 @@ function aiDecide(b){
   const tgt=C.seq[b.leg];let tx,ty,down=false,far=true;
   if(tgt==='free'){b.spiWant=false;return avoid(b,wrap360(W-b.side*45));}
   if(tgt==='finish'){const fa=finishAim(b);tx=fa.x;ty=fa.y;down=!C.finishUp;}
+  else if(tgt.kind==='wp'){const q=revWpAim(b,tgt);tx=q.x;ty=q.y;down=Math.abs(wrap180(W-brg(b.x,b.y,tx,ty)))>75;far=Math.hypot(tgt.x-b.x,tgt.y-b.y)>60;}
   else if(tgt.kind==='gate'){down=true;if(ai.gateLeg!==b.leg){ai.gateLeg=b.leg;const sh=wrap180(G.wind.cur-C.W0);ai.gateSide=sh>2?1:sh<-2?-1:(Math.random()<0.5?1:-1);}
     const gm=ai.gateSide>0?tgt.b:tgt.a;
     /* Zielpunkt mittig im Tor (nicht dicht an der Tonne) und nur knapp hinter der Torlinie; wer unterhalb des Tores ausserhalb durchgerutscht ist, kehrt zurück */
@@ -4270,7 +4561,7 @@ function aiControl(b,dt){
 
 /* ================= Regeln ================= */
 function clearAstern(A,B){const fB=dirv(B.h),fA=dirv(A.h);const sx=B.x-fB[0]*L/2,sy=B.y-fB[1]*L/2,bx=A.x+fA[0]*L/2,by=A.y+fA[1]*L/2;return (bx-sx)*fB[0]+(by-sy)*fB[1]<0;}
-function markZone(A,B){if(!S.markRules||!A.started||!B.started||A.leg!==B.leg)return null;const m=G.course.seq[A.leg];if(!isMark(m))return null;
+function markZone(A,B){if(!S.markRules||!A.started||!B.started||A.leg!==B.leg)return null;const m=G.course.seq[A.leg];if(!isMark(m)||m.kind==='wp')return null;
   const mp=b=>m.kind==='gate'?(Math.hypot(b.x-m.a.x,b.y-m.a.y)<Math.hypot(b.x-m.b.x,b.y-m.b.y)?m.a:m.b):m;const qa=mp(A),qb=mp(B);if(qa!==qb)return null;
   const R=S.zone*L+L/2,dA=Math.hypot(A.x-qa.x,A.y-qa.y),dB=Math.hypot(B.x-qa.x,B.y-qa.y);if(Math.min(dA,dB)>R)return null;if(m.kind==='wind'&&A.side!==B.side)return null;return {m,dA,dB,R};}
 const tackOf=b=>Math.abs(b.a)>165?(b.sailSide||b.side):b.side;
@@ -4389,8 +4680,9 @@ function raceChecks(b){
       if(b.ocs){if(al<0){b.ocs=false;if(b.isPlayer)msg('Zurück – jetzt neu starten.','good');}}
       else if(pa<=0&&al>0&&Math.abs(lat)<=C.lineLen/2){b.started=true;b.legT=G.t;b.startT=G.t;b.leg=0;if(b.isPlayer){msg('Gestartet '+(G.t<3?'– perfekt!':'+'+G.t.toFixed(1)+' s'),'good');ev('start','Start '+(G.t<2?'pünktlich':G.t.toFixed(1).replace('.',',')+' s nach dem Schuss'),G.t<3);}}}}
   else if(!b.finished){const tgt=C.seq[b.leg];
-    if(tgt==='finish'){if(C.finishUp){const f=dirv(b.h);const bx=b.x+f[0]*L/2-C.fin.c.x,by=b.y+f[1]*L/2-C.fin.c.y;const aF=bx*C.U[0]+by*C.U[1],lF=bx*C.R[0]+by*C.R[1];if(b.prevF!=null&&b.prevF<=0&&aF>0&&Math.abs(lF)<=C.fin.len/2)finish(b);b.prevF=aF;}
+    if(tgt==='finish'){if(C.finishUp){const f=dirv(b.h);const bx=b.x+f[0]*L/2-C.fin.c.x,by=b.y+f[1]*L/2-C.fin.c.y;const FU=C.fin.u||C.U,FR=C.fin.r||C.R;const aF=bx*FU[0]+by*FU[1],lF=bx*FR[0]+by*FR[1];if(b.prevF!=null&&b.prevF<=0&&aF>0&&Math.abs(lF)<=C.fin.len/2)finish(b);b.prevF=aF;}
       else if(pa>0&&al<=0&&Math.abs(lat)<=C.lineLen/2)finish(b);}
+    else if(isMark(tgt)&&tgt.kind==='wp'){if(revWpCheck(b,tgt)||revWpStuck(b,tgt)){b.leg++;b.prevW=null;b.legT=G.t;roundedEv(b,tgt);}}
     else if(isMark(tgt)&&tgt.kind==='gate'){const f=dirv(b.h);const bx=b.x+f[0]*L/2-tgt.x,by=b.y+f[1]*L/2-tgt.y;const aG=bx*C.U[0]+by*C.U[1],lG=bx*C.R[0]+by*C.R[1];
       if(b.prevG!=null&&b.prevG>0&&aG<=0&&Math.abs(lG)<=tgt.hw){b.leg++;b.prevG=null;b.legT=G.t;roundedEv(b,tgt);}else b.prevG=aG;}
     else if(isMark(tgt)){const m=tgt,px=b.x-m.x,py=b.y-m.y;const s=m.d[0]*py-m.d[1]*px,a2=px*m.d[0]+py*m.d[1];
@@ -4398,7 +4690,7 @@ function raceChecks(b){
       else b.roundS=s;}}
   b.prevAlong=al;
 }
-function roundedEv(b,m){if(!b.isPlayer)return;const C=G.course;const nx=C.seq[b.leg];msg(m.name+(m.kind==='gate'?' passiert':' gerundet')+(nx==='finish'?' → Ziel':isMark(nx)?' → '+nx.name:''),'good');beep(990,0.1);
+function roundedEv(b,m){if(!b.isPlayer)return;const C=G.course;const nx=C.seq[b.leg];msg(m.name+(m.kind==='gate'||m.kind==='wp'?' passiert':' gerundet')+(nx==='finish'?' → Ziel':isMark(nx)?' → '+nx.name:''),'good');beep(990,0.1);
   const rk=[...G.boats].sort((x,y)=>progress(y)-progress(x)).indexOf(b)+1;ev('mark',m.name+': als '+rk+'. von '+G.boats.length,rk<=Math.ceil(G.boats.length/2));}
 function finish(b){b.finished=true;b.finishT=G.t;b.spiWant=false;
   if(b.penalty>0){b.dsq=true;if(b.isPlayer)msg('Im Ziel mit offener Strafe → DSQ','bad');}
@@ -4410,7 +4702,7 @@ function step(dt){
   G.t+=dt;signals();G.wind.update(dt);
   if(G.flags&&G.flags.ap&&G.t<0)G.t-=dt;
   if(G.row){rowStep(dt);return;}
-  for(const b of G.boats){if(b.remote){remoteStep(b,dt);continue;}if(b.rib){if(!b.spec)ribPhysics(b,dt);if(SHORE.kind==='poly')shoreKeepIn(b,dt);continue;}if(b.isPlayer)playerControl(b,dt);else aiControl(b,dt);physics(b,dt);if(b.isPlayer&&CL.key==='zk10')cmdUpdate(b,dt);if(SHORE.kind==='poly')shoreKeepIn(b,dt);}
+  for(const b of G.boats){if(b.remote){remoteStep(b,dt);continue;}if(b.rib){if(!b.spec)ribPhysics(b,dt);if(SHORE.kind==='poly'||SHORE.kind==='revier')shoreKeepIn(b,dt);continue;}if(b.isPlayer)playerControl(b,dt);else aiControl(b,dt);physics(b,dt);if(b.isPlayer&&CL.key==='zk10')cmdUpdate(b,dt);if(SHORE.kind==='poly'||SHORE.kind==='revier')shoreKeepIn(b,dt);}
   for(const b of G.boats)if(!b.remote&&!b.rib)raceChecks(b);
   ruleTrack(dt);collisions(dt);
   for(const b of G.boats)if(!b.remote&&!b.rib)penTrack(b);
@@ -4617,7 +4909,7 @@ function updateChips(){{const j=!!RIG().jib&&!(G&&G.row);$('tFurlIn').hidden=!j;
 function togglePause(){if(!G||!G.running||G.over)return;if(G.mp){pauseEl.hidden=!pauseEl.hidden;$('restartBtn').hidden=true;for(const k in keys)keys[k]=false;return;}$('restartBtn').hidden=false;G.paused=!G.paused;pauseEl.hidden=!G.paused;for(const k in keys)keys[k]=false;}
 function startRace(keepSeries){audioInit();restoreS();if(keepSeries!==true)SERIES=null;newRace(null);G.running=true;hideAllOv();hudEl.hidden=false;$('touch').hidden=!isTouch;$('tPen').hidden=false;updateTouch();if(S.ghost){const gh=loadGhost();if(gh&&gh.cls===CL.key)createGhost(gh);}
   cam.mode='chase';cam.yaw=0;cam.h=P().h;cam.dist=clamp(L*3.6,12,60);camera.up.set(0,1,0);snapCam=true;
-  msg(CL.name+' · Startverfahren läuft. Tonnen an Backbord runden.','info');if(SHORE.kind==='poly'&&SHORE.fit<25)msg('Achtung: Die Bahn passt nicht ganz in den See – Kreuzlänge im Menü kürzen.','warn');if(S.courseFan)setTimeout(()=>{if(G&&G.running)msg('Farbfächer am Bug: grün = Kurs bringt dich am schnellsten zum Ziel, rot = verschenkt Weg. Abschaltbar im Menü.','coach');},2500);}
+  if(G.course.rev){msg(G.course.rev.name+' · '+String(G.course.rev.sm).replace('.',',')+' sm · '+G.course.wps.length+' Tore entlang der Fahrrinne, dann ins Ziel. Startverfahren läuft.','info');msg('Tipp: Mit ⏩ oben in der Mitte stellst du das Tempo hoch (bis 20×). Tiefgang '+String(revDraft()).replace('.',',')+' m – außerhalb der Rinne wird es flach.','info');}else msg(CL.name+' · Startverfahren läuft. Tonnen an Backbord runden.','info');if(S.revier==='hiddensee'&&revDraft()>2.5)msg('Achtung: '+CL.name+' hat zu viel Tiefgang für die Bodden – nimm die Regattabahn vor Hiddensee oder ein flacheres Boot.','warn');if(SHORE.kind==='poly'&&SHORE.fit<25)msg('Achtung: Die Bahn passt nicht ganz in den See – Kreuzlänge im Menü kürzen.','warn');if(S.courseFan)setTimeout(()=>{if(G&&G.running)msg('Farbfächer am Bug: grün = Kurs bringt dich am schnellsten zum Ziel, rot = verschenkt Weg. Abschaltbar im Menü.','coach');},2500);}
 function startDrill(){audioInit();restoreS();newRace(null,{drill:true});G.running=true;hideAllOv();hudEl.hidden=false;$('touch').hidden=!isTouch;$('tPen').hidden=false;updateTouch();
   cam.mode='chase';cam.yaw=0;cam.h=P().h;cam.dist=clamp(L*3.6,12,60);camera.up.set(0,1,0);snapCam=true;msg('Startübung: 60 s bis zum Schuss. Sei pünktlich, schnell und am bevorteilten Ende.','info');}
 function toMenu(){const wasLesson=!!S_main;restoreS();if(G){G.running=false;G.paused=false;}hideAllOv();hudEl.hidden=true;buildForm();renderBest();menuEl.hidden=false;if(wasLesson||CL.key!==S.boatClass)newRace(null);else setupWaves();}
@@ -4869,10 +5161,10 @@ function quizNext(){if(qi<QUIZ.length-1){qi++;showQ();return;}
 const el={clock:$('clock'),leg:$('legInfo'),rank:$('rankInfo'),bsp:$('iBsp'),twa:$('iTwa'),vmg:$('iVmg'),hdg:$('iHdg'),tws:$('iTws'),banner:$('banner'),
   head:$('cHead'),spi:$('cSpi'),trim:$('cTrim'),zone:$('tZone'),needle:$('tNeedle'),tstate:$('tState'),wind:$('windInfo'),shift:$('shiftInfo'),tSpi:$('tSpi')};
 function targetPoint(b){const C=G.course;if(!b.started)return {x:0,y:0,name:'Startlinie'};const t=C.seq[b.leg];
-  if(t==='finish'){if(C.finishUp){const fc=C.fin.c;const lt=clamp((b.x-fc.x)*C.R[0]+(b.y-fc.y)*C.R[1],-C.fin.len/2,C.fin.len/2);return {x:fc.x+C.R[0]*lt,y:fc.y+C.R[1]*lt,name:'Ziel (Luv)'};}
+  if(t==='finish'){if(C.finishUp){const fc=C.fin.c,FR=C.fin.r||C.R;const lt=clamp((b.x-fc.x)*FR[0]+(b.y-fc.y)*FR[1],-C.fin.len/2,C.fin.len/2);return {x:fc.x+FR[0]*lt,y:fc.y+FR[1]*lt,name:C.fin.u?'Ziel':'Ziel (Luv)'};}
     const lat=clamp(b.x*C.R[0]+b.y*C.R[1],-C.lineLen/2,C.lineLen/2);return {x:C.R[0]*lat,y:C.R[1]*lat,name:'Ziel'};}
   if(isMark(t))return {x:t.x,y:t.y,name:t.name};const f=dirv(b.h);return {x:b.x+f[0]*50,y:b.y+f[1]*50,name:''};}
-function updateHud(){
+function updateHud(){try{revSpeedBtn();}catch(e){}
   const b=P(),C=G.course;
   renderFlags();wlUi();
   if(b.spec){hudSpec(b);return;}
@@ -4967,6 +5259,7 @@ function drawMap(){
   const x=mctx;x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,W,H);
   const C=G.course;const pl=P();let sc,mp;
   if(C.lesson){const cx=pl.x*C.R[0]+pl.y*C.R[1],ca=pl.x*C.U[0]+pl.y*C.U[1];sc=Math.min(W,H)/140;mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+(lat-cx)*sc,H/2-(al-ca)*sc];};}
+  else if(C.wps){const RR=1500;sc=Math.min(W,H)/(2*RR);const cx=pl.x*C.R[0]+pl.y*C.R[1],ca=pl.x*C.U[0]+pl.y*C.U[1];mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+(lat-cx)*sc,H/2-(al-ca)*sc];};}
   else{const LW=Math.max(C.lineLen*1.1,S.legLength*0.5,C.wing||C.om?S.legLength*0.5+60:0);const aMin=-110,aMax=S.legLength+50;const pad=8;sc=Math.min((W-2*pad)/(2*LW),(H-2*pad)/(aMax-aMin));
     mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+lat*sc,H-pad-(al-aMin)*sc];};}
   {const Z=mz.z;let fx,fy;
@@ -4974,7 +5267,7 @@ function drawMap(){
     else if(Z>1){const [bx,by]=mp(pl.x,pl.y);fx=bx-mz.px/Z;fy=by-mz.py/Z;}else{fx=W/2;fy=H/2;}
     mz._fx=fx;mz._fy=fy;
     if(Z!==1||fx!==W/2||fy!==H/2){const mp0=mp;mp=(wx,wy)=>{const [a,b]=mp0(wx,wy);return [W/2+(a-fx)*Z,H/2+(b-fy)*Z];};sc*=Z;}}
-  x.fillStyle='rgba(14,52,70,.55)';x.fillRect(0,0,W,H);if(S.ladder&&!C.lesson&&!G.row)drawLadderMap(x,mp);drawShoreMap(x,mp,W,H);hbMapDraw(x,mp);
+  x.fillStyle='rgba(14,52,70,.55)';x.fillRect(0,0,W,H);if(S.ladder&&!C.lesson&&!G.row&&!C.wps)drawLadderMap(x,mp);drawShoreMap(x,mp,W,H);revMapDraw(x,mp,W,H);hbMapDraw(x,mp);
   for(const p of G.wind.puffs){if(p.env<0.05)continue;const [px,py]=mp(p.x,p.y);x.beginPath();x.arc(px,py,p.r*sc,0,Math.PI*2);x.fillStyle=p.str>0?'rgba(2,14,26,'+(0.45*p.env*Math.min(1,p.str*3))+')':'rgba(210,235,245,'+(0.22*p.env)+')';x.fill();}
   if(S.laylines){const ll=laylines(pl);if(ll){const [mx,my]=mp(ll.m.x,ll.m.y);[[ll.b1,'#3fd08a'],[ll.b2,'#ff4f5f']].forEach(([bb,c])=>{const d=dirv(bb);const [ex,ey]=mp(ll.m.x+d[0]*1500,ll.m.y+d[1]*1500);x.strokeStyle=c;x.globalAlpha=0.6;x.lineWidth=1;x.beginPath();x.moveTo(mx,my);x.lineTo(ex,ey);x.stroke();x.globalAlpha=1;});}}
   if(!C.lesson){const [ax,ay]=mp(C.pin.x,C.pin.y),[bx,by]=mp(C.cb.x,C.cb.y);x.setLineDash(G.t<0?[]:[3,3]);x.strokeStyle=G.t<0?'#ff4f5f':'#3fd08a';x.lineWidth=G.t<0?2:1.5;x.beginPath();x.moveTo(ax,ay);x.lineTo(bx,by);x.stroke();x.setLineDash([]);
@@ -4983,9 +5276,11 @@ function drawMap(){
   if(C.finishUp){const [fx1,fy1]=mp(C.fin.a.x,C.fin.a.y),[fx2,fy2]=mp(C.fin.b.x,C.fin.b.y);x.setLineDash([3,3]);x.strokeStyle='#5fb4ff';x.lineWidth=1;x.beginPath();x.moveTo(fx1,fy1);x.lineTo(fx2,fy2);x.stroke();x.setLineDash([]);}
   if(isMark(tgt)&&tgt.kind==='gate'&&S.roundArrow){const [gx,gy]=mp(tgt.x+C.U[0]*14,tgt.y+C.U[1]*14),[hx,hy]=mp(tgt.x-C.U[0]*8,tgt.y-C.U[1]*8);x.strokeStyle='#ffd23f';x.lineWidth=1.8;x.beginPath();x.moveTo(gx,gy);x.lineTo(hx,hy);x.stroke();x.fillStyle='#ffd23f';x.beginPath();x.moveTo(hx,hy+4);x.lineTo(hx-3.5,hy-2);x.lineTo(hx+3.5,hy-2);x.fill();x.lineWidth=1;}
   if(CUR[0]||CUR[1]){x.save();x.translate(14,H-16);x.rotate(Math.atan2(CUR[0],CUR[1]));x.strokeStyle='#7fd3ff';x.fillStyle='#7fd3ff';x.lineWidth=2;x.beginPath();x.moveTo(0,7);x.lineTo(0,-6);x.stroke();x.beginPath();x.moveTo(0,-10);x.lineTo(-4,-3);x.lineTo(4,-3);x.closePath();x.fill();x.restore();}
-  for(const bu of C.buoys){const m=bu.m;const [mx,my]=mp(bu.x,bu.y);if(S.showZone){x.strokeStyle='rgba(255,255,255,.25)';x.lineWidth=1;x.beginPath();x.arc(mx,my,S.zone*L*sc,0,7);x.stroke();}
+  for(const bu of C.buoys){const m=bu.m;const [mx,my]=mp(bu.x,bu.y);if(S.showZone&&m.kind!=='wp'){x.strokeStyle='rgba(255,255,255,.25)';x.lineWidth=1;x.beginPath();x.arc(mx,my,S.zone*L*sc,0,7);x.stroke();}
     x.fillStyle='#ff7a1a';x.beginPath();x.arc(mx,my,3.5,0,7);x.fill();
-    if(m===tgt&&m.kind==='gate'){}
+    if(m===tgt&&m.kind==='wp'){const [ax,ay]=mp(m.a.x,m.a.y),[bx2,by2]=mp(m.b.x,m.b.y);x.strokeStyle='#ffd23f';x.lineWidth=2;x.beginPath();x.moveTo(ax,ay);x.lineTo(bx2,by2);x.stroke();x.lineWidth=1;}
+    else if(m.kind==='wp'){}
+    else if(m===tgt&&m.kind==='gate'){}
     else if(m===tgt&&S.roundArrow){const dB=Math.atan2(m.d[0],m.d[1])/DEG-C.W0;const a0=(dB+125)*DEG,a1=(dB-115)*DEG,r=9;x.strokeStyle='#ffd23f';x.lineWidth=1.8;x.beginPath();
       for(let k=0;k<=24;k++){const th=a0+(a1-a0)*k/24;const px=mx+Math.sin(th)*r,py=my-Math.cos(th)*r;k?x.lineTo(px,py):x.moveTo(px,py);}x.stroke();
       const ex=mx+Math.sin(a1)*r,ey=my-Math.cos(a1)*r,dx=-Math.cos(a1),dy=-Math.sin(a1);x.fillStyle='#ffd23f';x.beginPath();x.moveTo(ex+dx*5,ey+dy*5);x.lineTo(ex-dy*3.5,ey+dx*3.5);x.lineTo(ex+dy*3.5,ey-dx*3.5);x.fill();x.lineWidth=1;}
@@ -5046,6 +5341,7 @@ function renderBoats(dt,now){
     m.vane.rotation.y=-(b.awa+180)*DEG;
     if(m.mizP){m.mizRot=(m.mizRot||0)+(-ss*(4+b.trim*70)*DEG-(m.mizRot||0))*Math.min(1,dt*4);m.mizP.rotation.y=m.mizRot;m.mizMain.scale.x=(m.mizRot<0?-1:1)*flut;}
     if(m.zk)zkUpd(b,m);
+    if(m.ixy)ixyUpd(b,m);
     m.wlMat.uniforms.uT.value=now;m.wlMat.uniforms.uA.value=b.ghost?0:clamp(b.v/3,0,1)*0.85*(1-(b.foil||0))*(CL.key==='imoca'?1-clamp((b.v/KN-14)/10,0,1)*0.6:1);
     if(m.keelG){m.keelG.rotation.z+=(-m.side*0.55*clamp(b.twsL/12,0.3,1)-m.keelG.rotation.z)*Math.min(1,dt*0.8);
       m.foils.forEach((fl,i)=>{const sd=i===0?1:-1;const down=sd===-ss?1:0;fl.userData.k+=(down-fl.userData.k)*Math.min(1,dt*0.8);const r=1-fl.userData.k;fl.position.set(-sd*1.75*r,1.0*r,0);});}
@@ -5301,10 +5597,10 @@ function mpBegin(d,from){if(!d||!Array.isArray(d.R)||!d.R.some(r=>r[0]===MP.self
   msg(pl.rib?(G.free?'Freies Training – Trainer im Motorboot':'Wettfahrtleitung im Schlauchboot')+' · Gas mit W/S bzw. Gas-Knöpfen. '+sailors+' Boote auf dem Wasser.':G.free?CL.name+' · Freies Training – ohne Start und Wertung. Enter = Chat.':CL.name+' · Mehrspieler mit '+(sailors+(d.cpu|0))+' Booten. Tonnen an Backbord runden.','info');}
 /* Bootsdesign und Hafenobjekte im Mehrspieler: nur geprüfte Werte übernehmen */
 const mpHex=v=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v)?v:'';
-function mpDesignOut(){return {s:DESIGN.sail||'',p:DESIGN.spi||'',c:DESIGN.crew||'',b:DESIGN.band||'',st:DESIGN.stripe||'none',sc:DESIGN.stripeColor||'',e:DESIGN.emblem||'none',ec:DESIGN.emblemColor||''};}
+function mpDesignOut(){return {s:DESIGN.sail||'',p:DESIGN.spi||'',c:DESIGN.crew||'',b:DESIGN.band||'',dk:DESIGN.deck||'',st:DESIGN.stripe||'none',sc:DESIGN.stripeColor||'',e:DESIGN.emblem||'none',ec:DESIGN.emblemColor||''};}
 function mpDesignIn(d){if(!d||typeof d!=='object')return null;const ok=(v,l)=>l.includes(v)?v:'none';
   return {s:mpHex(d.s),p:mpHex(d.p),c:mpHex(d.c),b:mpHex(d.b),st:ok(d.st,['none','single','double','wave','sweep']),sc:mpHex(d.sc)||'#ffffff',e:ok(d.e,['none','anchor','star','gull','compass','flame','wave','heart']),ec:mpHex(d.ec)||'#ffffff'};}
-function mpDesignApply(b,d){if(!d)return;b.spiColor=d.p||'';b.crewColor=d.c||'';b.bandColor=d.b||'';if(d.st!=='none'||d.e!=='none')b.deco={stripe:d.st,stripeColor:d.sc,emblem:d.e,emblemColor:d.ec};}
+function mpDesignApply(b,d){if(!d)return;b.spiColor=d.p||'';b.crewColor=d.c||'';b.bandColor=d.b||'';b.deckColor=/^#[0-9a-f]{6}$/i.test(d.dk||'')?d.dk:'';if(d.st!=='none'||d.e!=='none')b.deco={stripe:d.st,stripeColor:d.sc,emblem:d.e,emblemColor:d.ec};}
 function mpObjsIn(o){if(!o||typeof o!=='object')return null;const num=v=>typeof v==='number'&&isFinite(v)?Math.max(-5000,Math.min(5000,v)):0,vec=a=>Array.isArray(a)&&a.length===3?a.map(num):[0,0,0],id=v=>typeof v==='string'&&v.length<80?v:null;
   const out={ov:{},cp:[]};if(o.ov&&typeof o.ov==='object')for(const k of Object.keys(o.ov).slice(0,500)){const e=o.ov[k];if(!id(k)||!e)continue;out.ov[k]={d:vec(e.d),r:num(e.r)};if(e.x)out.ov[k].x=true;}
   if(Array.isArray(o.cp))for(const c of o.cp.slice(0,200)){if(!c||!id(c.k)||!id(c.src))continue;const q={k:c.k,src:c.src,d:vec(c.d),r:num(c.r),s:typeof c.s==='number'&&isFinite(c.s)?c.s|0:1};if(Array.isArray(c.t))q.t=c.t.slice(0,150).filter(t=>Array.isArray(t)&&typeof t[2]==='string'&&t[2].length<12).map(t=>[num(t[0]),num(t[1]),t[2]]);out.cp.push(q);}return out;}
@@ -5700,12 +5996,12 @@ $('rowBtn').addEventListener('click',startRow);rowPadInit();
 $('wlBar').addEventListener('click',e=>{const t=e.target.closest('[data-wl]');if(t)wlAction(t.dataset.wl);});
 
 /* ================= Bootsdesigner ================= */
-const DESIGN_DEF={name:'HEXE',hull:'',sail:'#ffd23f',spi:'',crew:'',band:'',stripe:'none',stripeColor:'#ffffff',emblem:'none',emblemColor:'#ffffff'};
+const DESIGN_DEF={name:'HEXE',hull:'',sail:'#ffd23f',spi:'',crew:'',band:'',deck:'',stripe:'none',stripeColor:'#ffffff',emblem:'none',emblemColor:'#ffffff'};
 let DESIGN=(()=>{try{return Object.assign({},DESIGN_DEF,JSON.parse(localStorage.getItem('regattakoje.design')||'{}'));}catch(e){return Object.assign({},DESIGN_DEF);}})();
 function saveDesign(){try{localStorage.setItem('regattakoje.design',JSON.stringify(DESIGN));}catch(e){}}
-const PAL={hull:['','#b0201a','#f4f4f0','#1d3557','#2a7a4b','#e8c547','#2b2b2b','#7a4a2a'],sail:['#ffd23f','#ff7a1a','#e5484d','#2bb3a3','#3d8bff','#9b8cff','#7bd148','#eaf2f4'],spi:['','#e5484d','#3d8bff','#ffd23f','#2bb3a3','#ff6fb5','#1d3557','#7bd148'],crew:['','#c0392b','#1d3557','#e8c547','#2a7a4b','#f4f4f0','#2b2b2b','#ff7a1a'],band:['','#b0201a','#1d3557','#2a7a4b','#e8c547','#f4f4f0','#7a4a2a','#ff6fb5']};
-const PALN={hull:'Rumpf',sail:'Bootsfarbe (Segelzeichen, Name)',spi:'Spinnaker',crew:'Jacken der Crew',band:'Schwarzband am Kutter (ZK 10)'};
-function designHullDefault(){return (CLASSES[S.boatClass]||CL).key==='zk10'?'#f4f5f2':DESIGN.sail;}
+const PAL={hull:['','#b0201a','#f4f4f0','#1d3557','#2a7a4b','#e8c547','#2b2b2b','#7a4a2a'],sail:['#ffd23f','#ff7a1a','#e5484d','#2bb3a3','#3d8bff','#9b8cff','#7bd148','#eaf2f4'],spi:['','#e5484d','#3d8bff','#ffd23f','#2bb3a3','#ff6fb5','#1d3557','#7bd148'],crew:['','#c0392b','#1d3557','#e8c547','#2a7a4b','#f4f4f0','#2b2b2b','#ff7a1a'],band:['','#b0201a','#1d3557','#2a7a4b','#e8c547','#f4f4f0','#7a4a2a','#ff6fb5'],deck:['','#1f4f9a','#2a7a4b','#e8c547','#f4f4f0','#2b2b2b','#ff7a1a','#7a4a2a']};
+const PALN={hull:'Rumpf',sail:'Bootsfarbe (Segelzeichen, Name)',spi:'Spinnaker',crew:'Jacken der Crew',band:'Schwarzband am Kutter (ZK 10)',deck:'Deck & Cockpit (Ixylon, Standard rot)'};
+function designHullDefault(){const k=(CLASSES[S.boatClass]||CL).key;return k==='zk10'||k==='ixylon'?'#f4f5f2':DESIGN.sail;}
 function dsDeco(){const sc=DESIGN.stripeColor||'#fff',ec=DESIGN.emblemColor||'#fff';let r='';const st=DESIGN.stripe;
   if(st==='single')r+='<path d="M58 134 L268 134" stroke="'+sc+'" stroke-width="4"/>';else if(st==='double')r+='<path d="M58 133 L268 133 M60 139 L266 139" stroke="'+sc+'" stroke-width="2.5"/>';
   else if(st==='wave'){let d='M60 138';for(let x=60;x<=264;x+=6)d+=' L'+x+' '+(138+Math.sin((x-60)/204*Math.PI*6)*3.5).toFixed(1);r+='<path d="'+d+'" stroke="'+sc+'" stroke-width="3" fill="none"/>';}
@@ -5722,7 +6018,7 @@ function designSvg(){const h=DESIGN.hull||designHullDefault(),sl=DESIGN.sail,sp=
   '<circle cx="190" cy="118" r="6" fill="#e8b996"/><rect x="184" y="122" width="12" height="9" rx="3" fill="'+cr+'"/><circle cx="210" cy="118" r="6" fill="#d9a07a"/><rect x="204" y="122" width="12" height="9" rx="3" fill="'+cr+'"/></svg>';}
 function renderDesigner(){const box=$('dsBox');let h='<div class="dsrow"><label for="dsName">Bootsname (am Bug)</label><input type="text" id="dsName" maxlength="14" value="'+(DESIGN.name||'').replace(/"/g,'')+'"></div>'+
   '<div class="dsrow"><label for="dsNo">Segelnummer</label><input type="text" id="dsNo" maxlength="9" value="'+(S.sailNo||'').replace(/"/g,'')+'"></div>';
-  for(const k of ['hull','sail','spi','crew','band']){h+='<div class="dsrow"><span class="dl">'+PALN[k]+'</span><div class="sws">';for(const c of PAL[k]){const sel=(DESIGN[k]||'')===c;h+='<button type="button" class="swb'+(sel?' sel':'')+'" data-k="'+k+'" data-c="'+c+'" style="background:'+(c||'repeating-linear-gradient(45deg,#456 0 4px,#789 4px 8px)')+'" title="'+(c?c:'Standard')+'" aria-label="'+PALN[k]+' '+(c||'Standard')+'"></button>';}
+  for(const k of ['hull','sail','spi','crew','band','deck']){h+='<div class="dsrow"><span class="dl">'+PALN[k]+'</span><div class="sws">';for(const c of PAL[k]){const sel=(DESIGN[k]||'')===c;h+='<button type="button" class="swb'+(sel?' sel':'')+'" data-k="'+k+'" data-c="'+c+'" style="background:'+(c||'repeating-linear-gradient(45deg,#456 0 4px,#789 4px 8px)')+'" title="'+(c?c:'Standard')+'" aria-label="'+PALN[k]+' '+(c||'Standard')+'"></button>';}
     h+='<input type="color" data-k="'+k+'" value="'+(DESIGN[k]||'#888888')+'" aria-label="eigene Farbe"></div></div>';}
   const opt=(k,lab,list)=>{let r='<div class="dsrow"><span class="dl">'+lab+'</span><div class="sws">';for(const [v,t] of list)r+='<button type="button" class="optb'+((DESIGN[k]||'none')===v?' sel':'')+'" data-o="'+k+'" data-v="'+v+'">'+t+'</button>';return r+'</div></div>';};
   const cols=(k)=>{let r='<div class="sws">';for(const c of ['#ffffff','#ffd23f','#ff7a1a','#e5484d','#3d8bff','#1d3557','#2bb3a3','#2b2b2b'])r+='<button type="button" class="swb'+(DESIGN[k]===c?' sel':'')+'" data-k="'+k+'" data-c="'+c+'" style="background:'+c+'" aria-label="Farbe '+c+'"></button>';return r+'<input type="color" data-k="'+k+'" value="'+(DESIGN[k]||'#ffffff')+'" aria-label="eigene Farbe"></div>';};
@@ -5735,7 +6031,7 @@ function renderDesigner(){const box=$('dsBox');let h='<div class="dsrow"><label 
   box.querySelectorAll('.swb').forEach(b=>b.onclick=()=>{DESIGN[b.dataset.k]=b.dataset.c;saveDesign();renderDesigner();});
   box.querySelectorAll('input[type=color]').forEach(i=>i.oninput=()=>{DESIGN[i.dataset.k]=i.value;saveDesign();box.querySelectorAll('.swb[data-k="'+i.dataset.k+'"]').forEach(b=>b.classList.remove('sel'));$('dsPrev').innerHTML=designSvg();});}
 function openDesigner(){hideAllOv();$('dsOv').hidden=false;renderDesigner();}
-function applyDesign(b){if(!b.isPlayer||G.mp&&!b.human)return;if((DESIGN.stripe&&DESIGN.stripe!=='none')||(DESIGN.emblem&&DESIGN.emblem!=='none'))b.deco={stripe:DESIGN.stripe,stripeColor:DESIGN.stripeColor,emblem:DESIGN.emblem,emblemColor:DESIGN.emblemColor};b.hullColor=DESIGN.hull||'';b.spiColor=DESIGN.spi||'';b.crewColor=DESIGN.crew||'';b.bandColor=DESIGN.band||'';if(!G.mp)b.color=DESIGN.sail||b.color;}
+function applyDesign(b){if(!b.isPlayer||G.mp&&!b.human)return;if((DESIGN.stripe&&DESIGN.stripe!=='none')||(DESIGN.emblem&&DESIGN.emblem!=='none'))b.deco={stripe:DESIGN.stripe,stripeColor:DESIGN.stripeColor,emblem:DESIGN.emblem,emblemColor:DESIGN.emblemColor};b.hullColor=DESIGN.hull||'';b.spiColor=DESIGN.spi||'';b.crewColor=DESIGN.crew||'';b.bandColor=DESIGN.band||'';b.deckColor=DESIGN.deck||'';if(!G.mp)b.color=DESIGN.sail||b.color;}
 
 /* ================= Kursfächer: grün = guter Kurs, rot = schlechter ================= */
 let FAN=null;
@@ -5875,7 +6171,7 @@ function renderRanking(list){const box=$('rankBox');if(!box)return;box.innerHTML
 async function exportCSV(){if(!G)return;const list=G.boats.filter(b=>!b.rib).sort((a,b)=>progress(b)-progress(a));const d=new Date();const ds=d.toLocaleDateString('de-DE');
   const q=v=>'"'+String(v).replace(/"/g,'""')+'"';const rows=[['Platz','Boot','Klasse','Zeit','Zeit (s)','Strafen','Status','Start-Platz','Plätze gewonnen','Wind (kn)','Revier','Datum'].map(q).join(';')];
   list.forEach((b,i)=>{const st=b.dsq?'DSQ':b.finished?'Ziel':(!b.started?(b.ocs?'OCS':'DNS'):'DNF');const pl=b.finished&&!b.dsq?i+1:'';const sr=G.cp&&G.cp.r[G.boats.indexOf(b)]?G.cp.r[G.boats.indexOf(b)].S:'';
-    rows.push([pl,b.name,CL.name,b.finished?fmtT(b.finishT):'',b.finished?b.finishT.toFixed(1).replace('.',','):'',b.penCount||0,st,sr||'',sr&&pl?sr-pl:'',S.tws,({cospu:'Cospudener See',rangs:'Rangsdorfer See',gpx:(GPXLAKE&&GPXLAKE.name)||'eigener See',open:'Binnensee',small:'kleiner See',coast:'Küste'})[S.revier]||'',ds].map(q).join(';'));});
+    rows.push([pl,b.name,CL.name,b.finished?fmtT(b.finishT):'',b.finished?b.finishT.toFixed(1).replace('.',','):'',b.penCount||0,st,sr||'',sr&&pl?sr-pl:'',S.tws,({cospu:'Cospudener See',rangs:'Rangsdorfer See',gpx:(GPXLAKE&&GPXLAKE.name)||'eigener See',open:'Binnensee',small:'kleiner See',coast:'Küste',hiddensee:'Hiddensee · '+(REV_KURSE[S.revKurs||'bb']||'')})[S.revier]||'',ds].map(q).join(';'));});
   const data='﻿'+rows.join('\r\n');const fn='regattakoje-ergebnis-'+d.toISOString().slice(0,10)+'.csv';
   try{const dl=window.claude&&window.claude.use?await window.claude.use('downloads'):null;if(dl){await dl.save({filename:fn,data});return;}}catch(e){if(e&&e.code==='declined')return;}
   try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'text/csv;charset=utf-8'}));a.download=fn;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}catch(e){msg('Export nicht möglich','bad');}}
@@ -6417,7 +6713,7 @@ function makeBird(kind){const g=new THREE.Group();const gull=kind==='gull';const
   const wings=[];for(const sd of [1,-1]){const piv=new THREE.Group();piv.position.set(sd*0.07*sc,0.05*sc,-0.02*sc);g.add(piv);const w=new THREE.Mesh(wg,wm);w.scale.x=sd;piv.add(w);
     if(gull){const t=new THREE.Mesh(wingGeo(0.18,0.12),tipM);t.scale.x=sd;t.position.x=sd*0.48;piv.add(t);}wings.push({piv,sd});}
   return {g,wings,kind};}
-function onWater(x,y){if(SHORE.kind==='poly')return polyInside(SHORE.P,x,y)&&!inShoal(x,y);return Math.hypot(x-(SHORE.c?SHORE.c[0]:0),y-(SHORE.c?SHORE.c[1]:0))<(SHORE.R||1e9)-80;}
+function onWater(x,y){if(SHORE.kind==='revier')return REVH?revDepth(x,y)>0.8:true;if(SHORE.kind==='poly')return polyInside(SHORE.P,x,y)&&!inShoal(x,y);return Math.hypot(x-(SHORE.c?SHORE.c[0]:0),y-(SHORE.c?SHORE.c[1]:0))<(SHORE.R||1e9)-80;}
 function birdsInit(){BIRDS=null;if(S.gfx==='niedrig'||!G||G.row)return;const list=[];const C=G.course;const cx=0,cy=S.legLength*0.4;
   const spot=(r0,r1)=>{for(let k=0;k<40;k++){const a=Math.random()*Math.PI*2,r=rnd(r0,r1);const x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r;if(onWater(x,y))return [x,y];}return [cx+rnd(-200,200),cy+rnd(-200,200)];};
   for(let i=0;i<9;i++){const B=makeBird('gull');const [x,y]=spot(60,500);const swim=Math.random()<0.35;
@@ -6484,7 +6780,7 @@ function fieldRect(){const C=G&&G.course;if(!C||!C.U)return null;if(C._fld)retur
   return C._fld={a0:a0-100,a1:a1+150,l0:l0-150,l1:l1+150};}
 function inField(x,y,m){const F=fieldRect();if(!F)return false;const C=G.course;m=m||0;const al=x*C.U[0]+y*C.U[1],lt=x*C.R[0]+y*C.R[1];return al>F.a0-m&&al<F.a1+m&&lt>F.l0-m&&lt<F.l1+m;}
 function inCourse(x,y){return inField(x,y,0);}
-function shoreD(x,y){return SHORE.kind==='poly'?polyDist(SHORE.P,x,y)[0]:1e9;}
+function shoreD(x,y){if(SHORE.kind==='revier')return REVH?clamp(revDepth(x,y)*25,0,500):1e9;return SHORE.kind==='poly'?polyDist(SHORE.P,x,y)[0]:1e9;}
 // freies Wasser für Freizeitboote: im See, nicht im Flachwasser der Inseln, mit Abstand zum Ufer und m Meter Abstand zum Regattafeld
 function leisureFree(x,y,m){return onWater(x,y)&&shoreD(x,y)>22&&!inField(x,y,m);}
 function waterSpot(r0,r1,avoidCourse,ok){for(let k=0;k<80;k++){const a=Math.random()*Math.PI*2,r=rnd(r0,r1);const x=Math.cos(a)*r,y=S.legLength*0.4+Math.sin(a)*r;if(onWater(x,y)&&shoreD(x,y)>30&&!(avoidCourse&&inField(x,y,40))&&(!ok||ok(x,y)))return [x,y];}return null;}
@@ -6635,7 +6931,7 @@ function achimPhysics(b,dt){playerControl(b,dt);
    Topcat K2 = Skua V1, Kutter ZK 10 = ZK 10 GFK, Motordingi „Achim“. Die Dateien liegen neben der index.html und werden
    erst bei Bedarf geladen. Fehlen sie (z. B. Seite lokal geöffnet), wird von GitHub Pages geladen; geht das auch nicht,
    bleiben die einfachen Spielmodelle. Streifen, Schriftzüge und Unterwasserfarbe stecken als Bild im GLB. */
-const MODEL_FILES={skua:'skua-v1.glb',zk:'zk10-gfk.glb',achim:'achim.glb'},MODEL_WEB='https://feuerfuchs89.github.io/Seesport-Trainer/';
+const MODEL_FILES={skua:'skua-v1.glb',zk:'zk10-gfk.glb',achim:'achim.glb',ixy:'ixylon.glb'},MODEL_WEB='https://feuerfuchs89.github.io/Seesport-Trainer/';
 const MODELS={},MODEL_P={},MODEL_FAIL={};
 /* GLB lesen: Netze je Knoten, Materialien mit Farbe, Textur, Transparenz und Ein-/Zweiseitigkeit */
 async function glbRead(buf){const dv=new DataView(buf);if(buf.byteLength<20||dv.getUint32(0,true)!==0x46546C67)throw new Error('keine GLB-Datei');
@@ -6665,8 +6961,9 @@ function modelReady(k){if(!G||!G.boats)return;const list=G.ghostB?G.boats.concat
   for(const b of list){const m=b.m;if(!m||!m.g)continue;
     if(k==='skua'&&CL.key==='topcat'&&!b.rib&&!m.skua)skuaApply(b,m.g,m);
     else if(k==='zk'&&CL.key==='zk10'&&!b.rib&&!m.zk&&!G.row)zkApply(b,m.g,m);
+    else if(k==='ixy'&&CL.key==='ixylon'&&!b.rib&&!m.ixy&&!G.row)ixyApply(b,m.g,m);
     else if(k==='achim'&&b.achim&&!m.achim){raceRoot.remove(m.g);raceRoot.remove(m.label);raceRoot.remove(m.wake);buildAchim(b);}}}
-function modelPrefetch(){const want=[];const cls=(S&&S.boatClass)||'';if(cls==='topcat')want.push('skua');if(cls==='zk10')want.push('zk');for(const k of ['skua','zk','achim'])if(!want.includes(k))want.push(k);
+function modelPrefetch(){const want=[];const cls=(S&&S.boatClass)||'';if(cls==='topcat')want.push('skua');if(cls==='zk10')want.push('zk');if(cls==='ixylon')want.push('ixy');for(const k of ['skua','zk','ixy','achim'])if(!want.includes(k))want.push(k);
   let p=Promise.resolve();for(const k of want)p=p.then(()=>modelLoad(k));}
 /* Hilfen: Punkte eines Teils, Drehachsen (Mast unten->oben, Vorstag Hals->Kopf), Wölbungsseite eines Segels */
 function mdlPts(T,n){const o=[],nd=T.nodes.find(x=>x.name===n);if(nd)for(const p of nd.prims){const a=p.g.attributes.position;for(let i=0;i<a.count;i++)o.push(new THREE.Vector3().fromBufferAttribute(a,i));}return o;}
@@ -6747,6 +7044,43 @@ function buildAchim(b){const T=MODELS.achim;if(!T){modelLoad('achim');return;}
   b.m={g,label,lc,lt,wake,wp,wa,tr:[],tAcc:0,spAcc:0,penShown:0,pitch:0,roll:0,flagP,flag,crew:[{seat,p:sp}],side:1,achim:{rudG:S.grp.rud||new THREE.Group(),propG:S.grp.prop||new THREE.Group()}};
   labelCanvas(b);}
 function achimUpd(b,m,dt){const A=m.achim;A.rudG.rotation.y=b.rudder*0.6;A.propG.rotation.z+=(b.thr||0)*dt*28;}
+/* ---------- Ixylon = Werftkoje-Modell (Pallungsplan der DDR-Bedienungsanleitung) ----------
+   Rumpf weiß, Deck & Cockpit rot – beides im Bootsdesigner wählbar („Rumpf“, „Deck & Cockpit (Ixylon)“).
+   Kimmschwerter klappen wie bisher je nach Kurs hoch, Ruder/Pinne drehen mit, Groß und Fock drehen um Mast bzw. Vorstag. */
+const IXY_GROSS='Großsegel 8,8 m²',IXY_FOCK='Fock 3,7 m² (Rollfock)',IXY_DECK='#b0120f',IXY_HULL='#f4f5f2',
+  IXY_RIG=['Mast (Leichtmetall, eloxiert)','Vorstag','Want Stb.','Want Bb.','Saling Stb.','Saling Bb.',IXY_GROSS,IXY_FOCK],IXY_HIDE=['Verklicker-Stab','Verklicker-Fahne'];
+function ixyDeckCol(b){return b.isPlayer?IXY_DECK:[IXY_DECK,'#1f4f9a',IXY_DECK,'#2f7a4b','#d9a400',IXY_DECK,'#1d3557'][(b.i||0)%7];}
+/* Wassermaske aus dem Modellrumpf: Draufsicht-Umriss knapp unter der Deckkante, je Schnitt Rand–Mitte–Rand */
+function ixyMaske(T){const P=mdlPts(T,'Rumpf');if(!P.length)return null;let z0=1e9,z1=-1e9;for(const p of P){z0=Math.min(z0,p.z);z1=Math.max(z1,p.z);}
+  const N=72,hw=new Float32Array(N+1),ye=new Float32Array(N+1).fill(-1e9),yt=new Float32Array(N+1).fill(-1e9);
+  for(const p of P){if(p.y<-0.02)continue;const k=Math.round((p.z-z0)/(z1-z0)*N),a=Math.abs(p.x);if(a>hw[k]){hw[k]=a;ye[k]=p.y;}if(a<0.06&&p.y>yt[k])yt[k]=p.y;}
+  for(let k=0;k<=N;k++){if(ye[k]<-1e8){hw[k]=0;}if(yt[k]<-1e8)yt[k]=ye[k]>-1e8?ye[k]:0;}
+  const pos=[],idx=[];for(let k=0;k<=N;k++){const z=z0+(z1-z0)*k/N,w=hw[k]*0.985,e=(ye[k]>-1e8?ye[k]:yt[k])-0.012,t=Math.max(e,yt[k]-0.012);pos.push(-w,e,z,0,t,z,w,e,z);}
+  for(let k=0;k<N;k++){const a=k*3,b=a+3;idx.push(a,b,a+1,a+1,b,b+1,a+1,b+1,a+2,a+2,b+1,b+2);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);return g;}
+function ixyApply(b,g,m){const T=MODELS.ixy;if(!T){modelLoad('ixy');return;}
+  if(!T.ax){const piv={};piv[IXY_GROSS]=mdlMastAx(T,'Mast (Leichtmetall, eloxiert)');piv[IXY_FOCK]=mdlStayAx(T,IXY_FOCK);const rb=mdlBox(T,'Senkruder');
+    const bp=n=>{const P=mdlPts(T,n);if(!P.length)return null;let x=0,y=-1e9,z=1e9;for(const p of P){x+=p.x;y=Math.max(y,p.y);z=Math.min(z,p.z);}return new THREE.Vector3(x/P.length,y,z);};
+    T.ax={piv,rud:rb.isEmpty()?null:new THREE.Vector3(0,0,rb.min.z+0.03),bS:bp('Kimmschwert Stb. (Holz)'),bB:bp('Kimmschwert Bb. (Holz)'),cm:{},mask:ixyMaske(T)};for(const n in piv)T.ax.cm[n]=mdlCamb(T,n,piv[n]);}
+  // Spielteile ausblenden – Crew, Wassermaske, Schaumlinie, Lichter, Bugname, Spinnaker, Genua, Windfahne und Großschot bleiben
+  const keep=new Set([m.spiG,m.vane,m.sheet,m.jibR&&m.jibR.parent,...m.rud]);for(const c of m.crew)for(const v of Object.values(c.p))if(v&&v.isObject3D)keep.add(v);
+  for(const o of g.children){if(keep.has(o)||(o.userData.mask&&!T.ax.mask)||o.userData.wl||o.userData.nav||o.renderOrder===6)continue;o.visible=false;}
+  if(T.ax.mask){const mk=new THREE.Mesh(T.ax.mask,MASK);mk.renderOrder=5;mk.userData.mask=true;g.add(mk);}   // Wassermaske genau nach dem Modellrumpf (die alte war am Heck breiter)
+  for(const r of m.rud)for(const c of r.children)c.visible=false;
+  if(m.fock){m.fock.material=m.fock.material.clone();m.fock.material.visible=false;}   // Fock kommt aus dem Modell, Genua bleibt die Spiel-Genua
+  const hullCol=b.hullColor||IXY_HULL,deckCol=b.deckColor||ixyDeckCol(b),own=new Map();
+  const mat=(n,mt)=>{let c=null;if(n==='Rumpf'&&mt.name===IXY_HULL)c=hullCol;else if(mt.name===IXY_DECK)c=deckCol;if(!c||c===mt.name)return null;if(!own.has(mt)){const k=mt.clone();k.color.set(c);own.set(mt,k);}return own.get(mt);};
+  const root=new THREE.Group();root.name='ixylon';g.add(root);
+  const grp={};if(T.ax.rud)grp.rud={test:n=>n==='Senkruder'||n==='Ruderkopf'||n==='Pinne mit Ausleger',o:T.ax.rud};
+  if(T.ax.bS)grp.bS={test:n=>n==='Kimmschwert Stb. (Holz)',o:T.ax.bS};if(T.ax.bB)grp.bB={test:n=>n==='Kimmschwert Bb. (Holz)',o:T.ax.bB};
+  const S=mdlBuild(T,root,{hide:IXY_HIDE,piv:T.ax.piv,grp,mat,rig:IXY_RIG});for(const n in S.piv)S.piv[n].g.userData.rig=1;
+  m.ixy={S,cm:T.ax.cm,sgM:m.main?mdlMeanX(m.main.geometry):1,sgJ:m.fock?mdlMeanX(m.fock.geometry):1};}
+function ixyUpd(b,m){const K=m.ixy;if(!K)return;const S=K.S;
+  if(m.main)mdlSail(S.piv[IXY_GROSS],m.boomRot,m.main.scale.x*K.sgM*(K.cm[IXY_GROSS]||1));
+  const fp=S.piv[IXY_FOCK];if(fp&&m.fock){mdlSail(fp,m.jibRot,m.fock.scale.x*K.sgJ*(K.cm[IXY_FOCK]||1),Math.max(0.02,m.fock.scale.z));fp.g.visible=m.fock.visible;}
+  if(S.grp.rud&&m.rud[0])S.grp.rud.rotation.y=m.rud[0].rotation.y;
+  // Kimmschwerter: Hochklappen nach achtern in den Schwertkasten (85° = ganz oben)
+  if(m.ixyB)for(const B of m.ixyB){const G2=S.grp[B.sd>0?'bS':'bB'];if(G2)G2.rotation.x=-B.up*1.48;}}
 function ixyBoardsBuild(g){const sh=HSHAPE.ixylon;const zOf=u=>-sh.len/2+u*sh.len;const geo=new THREE.BoxGeometry(0.028,0.95,0.36);geo.translate(0,-0.475,0.12);const out=[];
   for(const sd of [1,-1]){const tilt=new THREE.Group();tilt.position.set(sd*0.47,sh.dims(0.47)[1]-0.06,zOf(0.44));tilt.rotation.z=sd*0.14;g.add(tilt);const lift=new THREE.Group();tilt.add(lift);
     const m=new THREE.Mesh(geo,IXY_BOARD);m.castShadow=true;lift.add(m);out.push({sd,lift,up:0});}return out;}
