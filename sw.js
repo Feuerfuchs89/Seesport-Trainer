@@ -8,7 +8,7 @@
  * Kartenansicht auch offline weiter.
  */
 
-const CACHE_VERSION = 'v39';
+const CACHE_VERSION = 'v42';
 const APP_SHELL_CACHE = `segelcomp-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `segelcomp-runtime-${CACHE_VERSION}`;
 

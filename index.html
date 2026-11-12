@@ -838,6 +838,7 @@ function revCellCd(gi, gj) {
 }
 /* Höhe (m) im Revier-Koordinatensystem E/N (Meter ab Südwest-Ecke). <0 = Wassertiefe */
 function revZ(E, N) {
+  if (revBrHit(E, N)) return 2.5;
   const hf = revHafenAt(E, N); if (hf) return revHafenZ(hf, E, N);
   const X = REVX, cs = X.cs, fx = E / cs - 0.5, fy = (X.H - N) / cs - 0.5;
   const i0 = Math.floor(fx), j0 = Math.floor(fy), tx = fx - i0, ty = fy - j0;
@@ -869,9 +870,10 @@ function revBuild() {
   try { MZ_MIN = 0.01; } catch (e) {}
   X.chunks = new Map(); X.scen = new Map(); X.lastE = null;
   X.matT = new THREE.MeshLambertMaterial({ vertexColors: true });
-  REV_MAT = {}; X.feuerPts = null; X.feuer = null;
+  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null;
   X.haefen = (X.idx.haefen || []).map(h => Object.assign({}, h, { st: null, z: null, m: null, teile: null, grp: null }));
   try { revTuerme(); } catch (e) { console.error('Leuchttürme', e); }
+  try { revBrueckenBuild(); } catch (e) { console.error('Brücken', e); }
   try { revFeuerBuild(); } catch (e) { console.error('Leuchtfeuer', e); }
   revSeamarks();
   SHORE.landMap = X.idx.land.map(f => { const p = []; for (let k = 0; k < f.length; k += 2) p.push(fwd(f[k], f[k + 1])); return p; });
@@ -936,12 +938,14 @@ function revScenBuild(t) {
   const nh = Math.min(t.hs.length / 6, lo ? 2500 : 9000);
   if (nh > 0) {
     const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0); const roof = new THREE.ConeGeometry(0.75, 1, 4, 1); roof.rotateY(Math.PI / 4); roof.translate(0, 0.5, 0);
-    const imW = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: 0xffffff }), nh), imR = new THREE.InstancedMesh(roof, new THREE.MeshLambertMaterial({ color: 0xffffff }), nh);
-    const wf = (Number(S.windFrom) || 0) * DEG, ex0 = t.i1 * cs, ny0 = X.H - (t.j1 + t.ky) * cs; let n2 = 0;
+    const imW = new THREE.InstancedMesh(box, revHausMat(), nh), imR = new THREE.InstancedMesh(roof, new THREE.MeshLambertMaterial({ color: 0xffffff }), nh);
+    const wf = (Number(S.windFrom) || 0) * DEG, ex0 = t.i1 * cs, ny0 = X.H - (t.j1 + t.ky) * cs, lamps = []; let n2 = 0;
     for (let k = 0; k < nh; k++) {
       const h6 = t.hs, E = ex0 + h6[k * 6], N = ny0 + h6[k * 6 + 1], l = h6[k * 6 + 2] / 10, w = h6[k * 6 + 3] / 10, ang = h6[k * 6 + 4] / 1000, hh = h6[k * 6 + 5] / 10;
       const [x, y] = F(E, N), h0 = revZ(E, N) + 0.35; if (h0 < 0.5) continue;
       if (X.lampen && X.lampen.some(L => Math.abs(L[0] - E) < 14 && Math.abs(L[1] - N) < 14)) continue;
+      if (revInWz(E, N)) continue;
+      if (k % 4 === 0) { const la = ang + 1.3, lr = Math.max(l, w) * 0.5 + 3; const [lx, ly] = F(E + Math.cos(la) * lr, N + Math.sin(la) * lr); lamps.push(lx, h0 + 4.5, -ly); }
       const Hh = Math.min(hh, 25); q.setFromAxisAngle(up, ang + wf);
       sc.set(l, Hh * 0.72, w); p.set(x, h0 - 0.2, -y); m4.compose(p, q, sc); imW.setMatrixAt(n2, m4);
       c.set(['#e8e1d2', '#d9cdb5', '#f1ece2', '#c9b79a', '#b4553f'][(k * 7) % 5]); imW.setColorAt(n2, c);
@@ -949,6 +953,7 @@ function revScenBuild(t) {
       c.set((k * 13) % 9 < 5 ? '#8c3b2a' : (k * 13) % 9 < 7 ? '#5a4a3a' : '#c8b27a'); imR.setColorAt(n2, c); n2++;
     }
     imW.count = imR.count = n2; grp.add(imW, imR);
+    const lp = revLampen(lamps); if (lp) grp.add(lp);
   }
   grp.traverse(o => { if (o.isInstancedMesh) o.frustumCulled = false; });
   shoreG.add(grp); try { seasonApply(grp); } catch (e) {}
@@ -989,7 +994,7 @@ function revTick(force) {
     if (d < RS && !s && budget > 0) { X.scen.set(k, revScenBuild(t)); budget -= 3; }
     else if (d > RS + 2500 && s) { revDispose(s); X.scen.delete(k); }
   }
-  try { revHafenTick(E, N); revTurmGrund(); } catch (e) { console.error('Hafen', e); }
+  try { revHafenTick(E, N); revTurmGrund(); revWzTick(E, N); } catch (e) { console.error('Hafen', e); }
 }
 function revRectDist(E, N, x0, y0, size) { const dx = Math.max(x0 - E, 0, E - (x0 + size)), dy = Math.max(y0 - N, 0, N - (y0 + size)); return Math.hypot(dx, dy); }
 
@@ -1153,7 +1158,7 @@ function revFolge(f) {
 }
 function revFarbe(k) { const c = String(k || 'white').split(';')[0].trim().toLowerCase(); return REV_FCOL[c] || REV_FCOL.white; }
 function revFeuerBuild() {
-  const X = REVX, F = SHORE.fwd, list = X.idx.feuer || [];
+  const X = REVX, F = SHORE.fwd, list = (X.idx.feuer || []).concat(X.feuerExtra || []);
   if (!list.length) return;
   const n = list.length, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), sz = new Float32Array(n);
   const RW = { buoy: 2, beacon: 3, light_minor: 6, light_major: 15, landmark: 10, light_float: 6 };
@@ -1287,6 +1292,478 @@ function revHafenTick(E, N) {
   }
 }
 
+/* ---------- Städte bei Nacht: Fenster, Straßenlicht, angestrahlte Wahrzeichen ---------- */
+var REV_WIN = { value: 0 };          /* 0 = Tag … 1 = Nacht, gemeinsam für alle Hausmaterialien */
+function revNacht() { return typeof NIGHT === 'number' && NIGHT > 0.5 ? 1 : S.licht === 'daemmerung' ? 0.65 : S.licht === 'gold' ? 0.12 : 0; }
+/* Hauswände mit Fenstern: Raster je nach Hausgröße, zufällig erleuchtet, warmes Licht */
+function revHausMat() {
+  const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uWin = REV_WIN;
+    sh.vertexShader = 'varying vec2 vWUv;varying vec2 vWSz;varying vec3 vWN;varying vec2 vWSeed;varying float vWD;\n' + sh.vertexShader
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vWUv = uv; vWN = normal;
+        #ifdef USE_INSTANCING
+          vec3 wsc = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
+          vWSeed = instanceMatrix[3].xz;
+        #else
+          vec3 wsc = vec3(1.0); vWSeed = vec2(0.0);
+        #endif
+        vWSz = abs(normal.x) > 0.5 ? vec2(wsc.z, wsc.y) : vec2(wsc.x, wsc.y);`)
+      .replace('#include <project_vertex>', '#include <project_vertex>\n        vWD = -mvPosition.z;');
+    sh.fragmentShader = 'uniform float uWin;varying vec2 vWUv;varying vec2 vWSz;varying vec3 vWN;varying vec2 vWSeed;varying float vWD;\n' + sh.fragmentShader
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        if (uWin > 0.01 && abs(vWN.y) < 0.5 && vWSz.y > 2.0) {
+          vec2 cl = vWUv * vWSz / vec2(3.4, 2.9);
+          vec2 id = floor(cl), fr = fract(cl);
+          float ins = step(0.28, fr.x) * step(fr.x, 0.74) * step(0.32, fr.y) * step(fr.y, 0.8) * step(0.6, cl.y);
+          float hh = fract(sin(dot(id + floor(vWSeed * 0.31), vec2(12.9898, 78.233))) * 43758.5453);
+          float lit = step(0.55, hh);
+          vec3 wc = mix(vec3(1.0, 0.66, 0.32), vec3(1.0, 0.88, 0.66), fract(hh * 7.31));
+          float far = smoothstep(220.0, 650.0, vWD);
+          totalEmissiveRadiance += uWin * mix(ins * lit * 1.25, 0.28, far) * wc;
+        }`);
+  };
+  m.customProgramCacheKey = () => 'revWin1';
+  return m;
+}
+/* Straßen- und Hafenlaternen als leuchtende Punkte (nur nachts) */
+var REV_LAMP_MAT = null;
+function revLampMat() {
+  if (REV_LAMP_MAT) return REV_LAMP_MAT;
+  REV_LAMP_MAT = new THREE.ShaderMaterial({
+    uniforms: { uN: REV_WIN, uPx: { value: 1 } },
+    vertexShader: 'uniform float uN;uniform float uPx;attribute vec3 col;varying vec3 vC;void main(){vC=col;vec4 mv=modelViewMatrix*vec4(position,1.0);gl_Position=projectionMatrix*mv;gl_PointSize=uN<0.02?0.0:clamp(2600.0/max(1.0,-mv.z),2.5,16.0)*uPx;}',
+    fragmentShader: 'uniform float uN;varying vec3 vC;void main(){vec2 d=gl_PointCoord-0.5;float r=length(d)*2.0;float a=(exp(-r*r*3.0)+0.9*exp(-r*r*30.0))*uN;if(a<0.02)discard;gl_FragColor=vec4(min(vC*a*1.5,vec3(1.0)),a);}',
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  return REV_LAMP_MAT;
+}
+function revLampen(pts) {
+  if (!pts.length) return null;
+  const n = pts.length / 3, col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { const w = (i * 7919) % 10 < 7; col[i * 3] = 1; col[i * 3 + 1] = w ? 0.62 : 0.86; col[i * 3 + 2] = w ? 0.28 : 0.62; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); g.setAttribute('col', new THREE.BufferAttribute(col, 3));
+  const p = new THREE.Points(g, revLampMat()); p.frustumCulled = false; p.renderOrder = 19; return p;
+}
+
+/* ---------- Wahrzeichen ---------- */
+function revWzIdx() {
+  const X = REVX; if (X.wzIdx) return X.wzIdx;
+  X.wzIdx = (X.idx.wahrzeichen || []).map(w => {
+    const P = []; for (let k = 0; k < w.g.length; k += 2) P.push([w.g[k], w.g[k + 1]]);
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const q of P) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); }
+    return { w, P, bb: [x0, y0, x1, y1] };
+  });
+  return X.wzIdx;
+}
+function revInPoly(P, x, y) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; }
+function revInWz(E, N) { for (const z of revWzIdx()) { const b = z.bb; if (E < b[0] - 3 || E > b[2] + 3 || N < b[1] - 3 || N > b[3] + 3) continue; if (revInPoly(z.P, E, N)) return true; } return false; }
+/* Hauptachse (längste Ausdehnung) eines Grundrisses in E/N */
+function revObb(P) {
+  let cx = 0, cy = 0; for (const q of P) { cx += q[0]; cy += q[1]; } cx /= P.length; cy /= P.length;
+  let a = 0, b = 0, c = 0; for (const q of P) { const dx = q[0] - cx, dy = q[1] - cy; a += dx * dx; b += dx * dy; c += dy * dy; }
+  const th = 0.5 * Math.atan2(2 * b, a - c), u = [Math.cos(th), Math.sin(th)], v = [-u[1], u[0]];
+  let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; for (const q of P) { const dx = q[0] - cx, dy = q[1] - cy, s = dx * u[0] + dy * u[1], t = dx * v[0] + dy * v[1]; a0 = Math.min(a0, s); a1 = Math.max(a1, s); b0 = Math.min(b0, t); b1 = Math.max(b1, t); }
+  const sm = (a0 + a1) / 2, tm = (b0 + b1) / 2;
+  return { c: [cx + u[0] * sm + v[0] * tm, cy + u[1] * sm + v[1] * tm], u, v, L: a1 - a0, B: b1 - b0 };
+}
+var REV_WZ_FARBE = { ziegel: '#8a4430', dach: '#5b3a2c', kupfer: '#5f8f7b', putz: '#e4dac6', weiss: '#f0efe9', glas: '#9fbccc', stahl: '#3a3e42' };
+function revWzBuild(z) {
+  const X = REVX, F = SHORE.fwd, w = z.w, P = z.P, grp = new THREE.Group(), mats = [];
+  const M = (c, k) => { const m = new THREE.MeshLambertMaterial({ color: c }); mats.push([m, k == null ? 0.5 : k]); return m; };
+  const G = (E, N) => { const q = F(E, N); return [q[0], -q[1]]; };     /* → Szene x/z */
+  let zmin = 1e9; for (const q of P) zmin = Math.min(zmin, revZ(q[0], q[1])); const wasser = /bark|uboot|schiff/.test(w.art);
+  const base = wasser ? 0 : Math.max(0.2, zmin + 0.35) - 0.6;
+  const ob = revObb(P);
+  /* Grundriss hochziehen */
+  const extr = (h, col, k, y0) => {
+    const sh = new THREE.Shape(); const c0 = G(ob.c[0], ob.c[1]);
+    P.forEach((q, i) => { const p = G(q[0], q[1]); const x = p[0] - c0[0], y = -(p[1] - c0[1]); i ? sh.lineTo(x, y) : sh.moveTo(x, y); });
+    const g = new THREE.ExtrudeGeometry(sh, { depth: h, bevelEnabled: false }); g.rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(g, M(col, k)); m.position.set(c0[0], (y0 == null ? base : y0), c0[1]); grp.add(m); return m;
+  };
+  /* Teil im Achsensystem: s entlang Achse, t quer (m) → Szene */
+  const at = (s, t) => G(ob.c[0] + ob.u[0] * s + ob.v[0] * t, ob.c[1] + ob.u[1] * s + ob.v[1] * t);
+  const ang = (() => { const a = at(0, 0), b = at(10, 0); return Math.atan2(b[0] - a[0], b[1] - a[1]); })();
+  const box = (s, t, l, b, h, y, col, k) => { const m = new THREE.Mesh(new THREE.BoxGeometry(b, h, l), M(col, k)); const p = at(s, t); m.position.set(p[0], y + h / 2, p[1]); m.rotation.y = ang; grp.add(m); return m; };
+  const cyl = (s, t, r0, r1, h, y, seg, col, k) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, h, seg), M(col, k)); const p = at(s, t); m.position.set(p[0], y + h / 2, p[1]); m.rotation.y = ang + (seg === 4 ? Math.PI / 4 : 0); grp.add(m); return m; };
+  const dach = (s0, s1, b, y, h, col) => {         /* Satteldach über Achse */
+    const A = at(s0, -b / 2), B_ = at(s1, -b / 2), C = at(s1, b / 2), D = at(s0, b / 2), R0 = at(s0, 0), R1 = at(s1, 0);
+    const v = [A[0], y, A[1], B_[0], y, B_[1], C[0], y, C[1], D[0], y, D[1], R0[0], y + h, R0[1], R1[0], y + h, R1[1]];
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    g.setIndex([0, 1, 5, 0, 5, 4, 2, 3, 4, 2, 4, 5, 3, 0, 4, 1, 2, 5]); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: col, side: THREE.DoubleSide })); mats.push([m.material, 0.3]); grp.add(m);
+  };
+  const helm = (s, t, ts, y, H, art) => {           /* Turmabschluss */
+    if (art === 'barock') {
+      let yy = y; const r = ts * 0.42;
+      cyl(s, t, r, r, H * 0.2, yy, 8, REV_WZ_FARBE.kupfer, 0.45); yy += H * 0.2;
+      const k1 = new THREE.Mesh(new THREE.SphereGeometry(r * 1.05, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), M(REV_WZ_FARBE.kupfer, 0.45)); const p = at(s, t); k1.position.set(p[0], yy, p[1]); k1.scale.y = 1.3; grp.add(k1); yy += r * 1.25;
+      cyl(s, t, r * 0.35, r * 0.35, H * 0.16, yy, 8, REV_WZ_FARBE.kupfer, 0.45); yy += H * 0.16;
+      const k2 = new THREE.Mesh(new THREE.SphereGeometry(r * 0.45, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), M(REV_WZ_FARBE.kupfer, 0.45)); k2.position.set(p[0], yy, p[1]); grp.add(k2); yy += r * 0.4;
+      const sp = Math.max(2, y + H - yy); cyl(s, t, r * 0.18, 0.05, sp, yy, 8, REV_WZ_FARBE.kupfer, 0.45);
+    } else if (art === 'flach') {
+      cyl(s, t, ts * 0.72, 0.1, Math.max(3, H), y, 4, REV_WZ_FARBE.dach, 0.3);
+      for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) cyl(s + a * ts * 0.4, t + b * ts * 0.4, ts * 0.09, 0.05, ts * 0.5, y, 8, REV_WZ_FARBE.kupfer, 0.45);
+    } else cyl(s, t, ts * 0.7, 0.08, H, y, 8, REV_WZ_FARBE.kupfer, 0.45);
+  };
+  const westEnde = (() => { const a = ob.c[0] + ob.u[0] * ob.L / 2, b = ob.c[0] - ob.u[0] * ob.L / 2; return a < b ? 1 : -1; })();
+  if (w.art === 'kirche') {
+    const L = ob.L, B = Math.max(6, ob.B), hw = w.schiff || Math.min(18, Math.max(7, L * 0.28)), turm = w.turm != null ? w.turm : (L > 22 ? 32 : 20);
+    extr(hw, REV_WZ_FARBE.ziegel, 0.5); dach(-L / 2, L / 2, B, base + hw, Math.min(B * 0.6, 20), REV_WZ_FARBE.dach);
+    if (turm > 0) {
+      const ts = w.westwerk ? B * 0.9 : Math.min(B * 0.62, Math.max(6, turm * 0.13)), sw = westEnde * (L / 2 - ts / 2);
+      const tz = w.tuerme === 2 ? [ts * 0.55, -ts * 0.55] : [0];
+      tz.forEach((tt, i) => {
+        const T = i === 0 ? turm : (w.turm2 || turm), hl = i === 0 ? (w.helm || 'spitz') : 'flach', hm = hl === 'flach' ? T - 3 : T * (hl === 'barock' ? 0.62 : 0.6), tw = w.tuerme === 2 ? ts * 0.8 : ts;
+        box(sw, tt, tw, tw, hm, base, REV_WZ_FARBE.ziegel, 0.6);
+        helm(sw, tt, tw, base + hm, T - hm, hl);
+      });
+    } else cyl(0, 0, 0.9, 0.05, 9, base + hw + Math.min(B * 0.6, 20) - 1, 8, REV_WZ_FARBE.kupfer, 0.45);
+  } else if (w.art === 'tor') {
+    const h = Math.max(w.h, 18); extr(h, REV_WZ_FARBE.ziegel, 0.55); cyl(0, 0, Math.max(ob.L, ob.B) * 0.72, 0.1, 7, base + h, 4, REV_WZ_FARBE.dach, 0.3);
+  } else if (w.art === 'rathaus') {
+    const h = Math.max(w.h, 14); extr(h, REV_WZ_FARBE.ziegel, 0.55); dach(-ob.L / 2, ob.L / 2, ob.B, base + h, ob.B * 0.5, REV_WZ_FARBE.dach);
+  } else if (w.art === 'schloss') {
+    const h = Math.max(w.h, 12); extr(h, REV_WZ_FARBE.putz, 0.5); dach(-ob.L / 2, ob.L / 2, ob.B, base + h, ob.B * 0.35, '#4c4a48');
+    if (w.turm) { cyl(0, 0, 5, 5, w.turm, base, 12, REV_WZ_FARBE.putz, 0.6); for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; box(Math.cos(a) * 4.8, Math.sin(a) * 4.8, 1.2, 1.2, 1.4, base + w.turm, REV_WZ_FARBE.putz, 0.6); } }
+  } else if (w.art === 'turm') {
+    extr(Math.max(w.h, 10), /Wasser/.test(w.n) ? REV_WZ_FARBE.ziegel : '#b9b2a4', 0.5);
+  } else if (w.art === 'backstein') {
+    extr(Math.max(w.h, 12), REV_WZ_FARBE.ziegel, 0.4);
+  } else if (w.art === 'glas') {
+    extr(Math.max(w.h, 9), REV_WZ_FARBE.glas, 0.95);
+  } else if (w.art === 'ozeaneum') {
+    extr(Math.max(w.h, 18), REV_WZ_FARBE.weiss, 0.7);
+  } else {
+    /* Schiffe: Bug ans schmalere Ende */
+    const L = Math.min(Math.max(ob.L, 30), 120), B = Math.min(Math.max(ob.B, 6), 16), bug = (() => { let n0 = 0, n1 = 0; for (const q of P) { const s = (q[0] - ob.c[0]) * ob.u[0] + (q[1] - ob.c[1]) * ob.u[1], t = Math.abs((q[0] - ob.c[0]) * ob.v[0] + (q[1] - ob.c[1]) * ob.v[1]); if (s > ob.L * 0.3) n0 = Math.max(n0, t); if (s < -ob.L * 0.3) n1 = Math.max(n1, t); } return n0 <= n1 ? 1 : -1; })();
+    const huelle = (col, fb, k) => {
+      const sh = new THREE.Shape(), hb = B / 2, Lh = L / 2;
+      sh.moveTo(-Lh, -hb * 0.8); sh.lineTo(Lh * 0.55, -hb); sh.quadraticCurveTo(Lh * 0.95, -hb * 0.6, Lh, 0); sh.quadraticCurveTo(Lh * 0.95, hb * 0.6, Lh * 0.55, hb); sh.lineTo(-Lh, hb * 0.8); sh.closePath();
+      const g = new THREE.ExtrudeGeometry(sh, { depth: fb + 1.5, bevelEnabled: false }); g.rotateX(-Math.PI / 2);
+      const m = new THREE.Mesh(g, M(col, k)); const p = at(0, 0); m.position.set(p[0], -1.5, p[1]); m.rotation.y = ang - Math.PI / 2 + (bug < 0 ? Math.PI : 0); grp.add(m);
+    };
+    if (w.art === 'uboot') {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(B * 0.32, B * 0.32, L * 0.8, 16), M(REV_WZ_FARBE.stahl, 0.15)); m.rotation.z = Math.PI / 2; const hg = new THREE.Group(); hg.add(m);
+      for (const sgn of [1, -1]) { const c = new THREE.Mesh(new THREE.ConeGeometry(B * 0.32, L * 0.1, 16), M(REV_WZ_FARBE.stahl, 0.15)); c.rotation.z = -sgn * Math.PI / 2; c.position.x = sgn * L * 0.45; hg.add(c); }
+      const p = at(0, 0); hg.position.set(p[0], 0.4, p[1]); hg.rotation.y = ang - Math.PI / 2; grp.add(hg);
+      box(bug * L * 0.12, 0, L * 0.12, B * 0.25, 4.5, 0.4 + B * 0.3, REV_WZ_FARBE.stahl, 0.15);
+    } else if (w.art === 'bark') {
+      huelle('#f2f1ec', 4.5, 0.25); box(0, 0, L * 0.85, B * 0.9, 0.3, 4.4, '#a07a52', 0.2);
+      const ms = w.masten || [36, 40, 32], pos = [0.3, 0.02, -0.28];
+      const lp = [], sc = (s, t, y) => { const q = at(s, t); lp.push(q[0], y, q[1]); };
+      ms.forEach((mh, i) => {
+        const s = bug * L * pos[i]; cyl(s, 0, 0.45, 0.2, mh, 4.5, 8, '#d8cfae', 0.3);
+        if (i < 2) for (let r = 0; r < 5; r++) { const y = 4.5 + mh * (0.32 + r * 0.15), yb = B * (2.0 - r * 0.28); box(s, 0, 0.35, yb, 0.35, y, '#3a3a3a', 0.2); }
+        else box(s - bug * 6, 0, 12, 0.3, 0.3, 4.5 + mh * 0.3, '#3a3a3a', 0.2);
+        const top = at(s, 0); sc(s, 0, 4.5 + mh);
+      });
+      const bs = at(bug * (L / 2 + 10), 0), m0 = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.4, 16, 6), M('#d8cfae', 0.3)); const a0 = at(bug * L / 2, 0);
+      m0.position.set((bs[0] + a0[0]) / 2, 6.5, (bs[1] + a0[1]) / 2); m0.lookAt(bs[0], 8, bs[1]); m0.rotateX(Math.PI / 2); grp.add(m0);
+      /* Lichterkette über die Toppen */
+      const kette = [[bug * (L / 2 + 10), 7.5], ...ms.map((mh, i) => [bug * L * pos[i], 4.5 + mh]), [-bug * L / 2, 5]], lpts = [];
+      for (let i = 1; i < kette.length; i++) { const [s0, y0] = kette[i - 1], [s1, y1] = kette[i]; const n = Math.ceil(Math.hypot(s1 - s0, y1 - y0) / 1.6); for (let k = 0; k < n; k++) { const f = k / n, q = at(s0 + (s1 - s0) * f, 0); lpts.push(q[0], y0 + (y1 - y0) * f, q[1]); } }
+      const lk = revLampen(lpts); if (lk) grp.add(lk);
+    } else {
+      huelle('#26313f', 3.5, 0.2); box(-bug * L * 0.05, 0, L * 0.35, B * 0.75, 4.5, 3.5, '#f0efe9', 0.6); box(-bug * L * 0.1, 0, L * 0.18, B * 0.6, 3, 8, '#f0efe9', 0.6); cyl(bug * L * 0.12, 0, 0.3, 0.15, 14, 3.5, 6, '#f0efe9', 0.3);
+    }
+  }
+  grp.traverse(o => { o.userData.sznSkip = 1; if (o.isMesh) o.castShadow = false; });
+  shoreG.add(grp);
+  return { grp, mats };
+}
+function revWzTick(E, N) {
+  const X = REVX; if (!X.wz) X.wz = new Map(); let bud = 4;
+  for (const z of revWzIdx()) {
+    const w = z.w, d = Math.hypot(w.x - E, w.y - N), have = X.wz.get(z);
+    if (!have && d < (w.turm > 50 ? 16000 : 8000) && bud-- > 0) { const r = revWzBuild(z); X.wz.set(z, r); revWzLicht(r, X.wzN || 0); }
+    else if (have && d > (w.turm > 50 ? 19000 : 10500)) { revDispose(have.grp); X.wz.delete(z); }
+  }
+}
+function revWzLicht(r, f) { const warm = new THREE.Color(1, 0.8, 0.55); for (const [m, k] of r.mats) { m.emissive.copy(m.color).multiply(warm).multiplyScalar(k * f * 1.3); } }
+function revNachtTick() {
+  const X = REVX; if (!X) return; const f = revNacht(); REV_WIN.value = f;
+  if (REV_LAMP_MAT) REV_LAMP_MAT.uniforms.uPx.value = renderer.getPixelRatio();
+  if (X.wz && X.wzN !== f) { X.wzN = f; for (const r of X.wz.values()) revWzLicht(r, f); }
+}
+
+/* ---------- Brücken: Rügenbrücke, Rügendamm (Ziegelgrabenbrücke), Peenebrücke Wolgast ----------
+   Rügenbrücke: Pylon 128 m, Hauptfelder 126 m + 198 m, Durchfahrtshöhe 42 m (Wikipedia „Strelasund Crossing“).
+   Ziegelgrabenbrücke: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 je 20 min (BOOTE/YACHT 2025).
+   Peenebrücke Wolgast: Klappe 42 m, 19 m breit (mageba); 5:45, 7:45, 12:45, 17:45, 20:45 je 15 min, Juni–Sept. auch 23:45 (YACHT). */
+function revKlZeit(k) {
+  if (S.bruecke === 'offen') return { auf: 1, immer: true, bis: 999 };
+  const d = new Date(), min = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60, md = (d.getMonth() + 1) * 100 + d.getDate(), dauer = k.dauer || 20, hub = 1.5;
+  let auf = 0, naechste = null;
+  for (const z0 of k.zeiten) {
+    let z = z0;
+    if (typeof z0 === 'object') { const a = z0.von[0] * 100 + z0.von[1], b = z0.bis[0] * 100 + z0.bis[1]; if (md < a || md > b) continue; z = z0.z; }
+    const [h, m] = z.split(':').map(Number), t0 = h * 60 + m, dt = min - t0;
+    if (dt >= 0 && dt <= dauer) auf = Math.max(auf, Math.min(1, dt / hub, (dauer - dt) / hub));
+    const bis = (t0 - min + 1440) % 1440; if (naechste === null || bis < naechste[0]) naechste = [bis, z];
+  }
+  return { auf, naechste: naechste && naechste[1], bis: naechste ? naechste[0] : 999, dauer };
+}
+var REV_CARLIGHT = null;
+function revCarLightMat() {
+  if (REV_CARLIGHT) return REV_CARLIGHT;
+  REV_CARLIGHT = new THREE.ShaderMaterial({
+    uniforms: { uN: { value: 0 }, uPx: { value: 1 } },
+    vertexShader: 'uniform float uN;uniform float uPx;attribute vec3 col;varying vec3 vC;void main(){vC=col;vec4 mv=modelViewMatrix*vec4(position,1.0);gl_Position=projectionMatrix*mv;gl_PointSize=clamp(1500.0/max(1.0,-mv.z),2.0,12.0)*uPx*(0.5+0.5*uN);}',
+    fragmentShader: 'uniform float uN;varying vec3 vC;void main(){vec2 d=gl_PointCoord-0.5;float r=length(d)*2.0;float a=(exp(-r*r*4.0)+0.7*exp(-r*r*40.0))*(0.25+0.75*uN);if(a<0.02)discard;gl_FragColor=vec4(vC*a,a);}',
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  return REV_CARLIGHT;
+}
+function revBrueckenBuild() {
+  const X = REVX, F = SHORE.fwd, list = X.idx.bruecken || [];
+  X.brSolid = new Set(); X.brKlMap = new Map(); X.brMats = []; X.klappen = []; X.strassen = []; X.brBB = null; X.feuerExtra = []; X.verkehr = null;
+  if (!list.length) return;
+  const grp = new THREE.Group(), CS = 4, key = (E, N) => Math.floor(E / CS) + ',' + Math.floor(N / CS);
+  let bb = [1e9, 1e9, -1e9, -1e9];
+  const solid = (E, N, kl) => { const k = key(E, N); if (kl != null) X.brKlMap.set(k, kl); else X.brSolid.add(k); bb = [Math.min(bb[0], E), Math.min(bb[1], N), Math.max(bb[2], E), Math.max(bb[3], N)]; };
+  const M = (c, k) => { const m = new THREE.MeshLambertMaterial({ color: c }); X.brMats.push([m, k == null ? 0.4 : k]); return m; };
+  const sc = (E, N) => { const q = F(E, N); return [q[0], -q[1]]; };
+  const markV = [], markC = [], lampen = [], masten = [];
+  const lampe = (x, y, z, h) => { lampen.push(x, y, z); masten.push([x, y - h, z, h]); };
+  for (const b of list) {
+    const P = []; for (let k = 0; k < b.pts.length; k += 2) P.push([b.pts[k], b.pts[k + 1]]);
+    const n = P.length, s = [0]; for (let i = 1; i < n; i++) s.push(s[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+    const dir = P.map((_, i) => { const a = P[Math.max(0, i - 1)], c = P[Math.min(n - 1, i + 1)], l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1; return [(c[0] - a[0]) / l, (c[1] - a[1]) / l]; });
+    const runs = []; let cur = null; b.nass.forEach((v, i) => { if (v && cur === null) cur = i; if (!v && cur !== null) { runs.push([cur, i - 1]); cur = null; } }); if (cur !== null) runs.push([cur, n - 1]);
+    const at = (sv) => { let i = 0; while (i < n - 2 && s[i + 1] < sv) i++; const f = Math.max(0, Math.min(1, (sv - s[i]) / ((s[i + 1] - s[i]) || 1))); return { E: P[i][0] + (P[i + 1][0] - P[i][0]) * f, N: P[i][1] + (P[i + 1][1] - P[i][1]) * f, d: dir[i], i }; };
+    const iOf = (sv) => { let i = 0; while (i < n - 1 && s[i] < sv) i++; return i; };
+    const grund = (E, N) => revZ(E, N);
+    const band = (i0, i1, hFn, hw, dick, cTop, cSide, cBot, kk, off) => {
+      off = off || 0;
+      if (i1 - i0 < 1) return;
+      const v = [], c = [], ix = []; const cT = new THREE.Color(cTop), cS = new THREE.Color(cSide), cB = new THREE.Color(cBot);
+      const ring = [[-hw, 0, cT], [hw, 0, cT], [hw, 0, cS], [hw, -dick, cS], [hw, -dick, cB], [-hw, -dick, cB], [-hw, -dick, cS], [-hw, 0, cS]];
+      for (let i = i0; i <= i1; i++) { const h = hFn(i), d = dir[i], nx = -d[1], ny = d[0]; for (const [o0, dy, col] of ring) { const o = o0 + off; const p = sc(P[i][0] + nx * o, P[i][1] + ny * o); v.push(p[0], h + dy, p[1]); c.push(col.r, col.g, col.b); } }
+      const R = ring.length; for (let i = 0; i < i1 - i0; i++) for (let f = 0; f < R; f += 2) { const a = i * R + f, b2 = a + 1, a2 = a + R, b3 = b2 + R; ix.push(a, a2, b2, b2, a2, b3); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); g.setIndex(ix); g.computeVertexNormals();
+      const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); X.brMats.push([m, kk == null ? 0.15 : kk]); grp.add(new THREE.Mesh(g, m));
+    };
+    /* Fahrbahnmarkierung: Mittellinie gestrichelt, Randlinien durchgehend */
+    const markierung = (i0, i1, hArr, hw) => {
+      const w = new THREE.Color('#e8e8e2');
+      const quad = (i, o, br) => { const a = P[i], b2 = P[i + 1], d = dir[i], nx = -d[1], ny = d[0], h0 = hArr[i] + 0.05, h1 = hArr[i + 1] + 0.05;
+        const p1 = sc(a[0] + nx * (o - br), a[1] + ny * (o - br)), p2 = sc(a[0] + nx * (o + br), a[1] + ny * (o + br)), p3 = sc(b2[0] + nx * (o - br), b2[1] + ny * (o - br)), p4 = sc(b2[0] + nx * (o + br), b2[1] + ny * (o + br));
+        markV.push(p1[0], h0, p1[1], p3[0], h1, p3[1], p2[0], h0, p2[1], p2[0], h0, p2[1], p3[0], h1, p3[1], p4[0], h1, p4[1]); for (let k = 0; k < 6; k++) markC.push(w.r, w.g, w.b); };
+      for (let i = i0; i < i1; i++) { if (i % 2 === 0) quad(i, 0, 0.08); quad(i, hw - 0.5, 0.08); quad(i, -(hw - 0.5), 0.08); }
+    };
+    const saeulen = [];
+    const hArr = new Float32Array(n), deck = new Uint8Array(n);
+    let vmax = 14, spur = 1.9, hwStr = 4;
+    if (b.art === 'schraegseil') {
+      vmax = 22; spur = 2.4; hwStr = 7;
+      const py = b.pylon || P[runs[0] ? Math.round((runs[0][0] + runs[0][1]) / 2) : 0];
+      let ip = 0, dm = 1e9; P.forEach((q, i) => { const d = Math.hypot(q[0] - py[0], q[1] - py[1]); if (d < dm) { dm = d; ip = i; } });
+      const sp = s[ip], fe = b.felder || [126, 198], H = b.hoehe || 45, st = runs.find(r => s[r[0]] > sp + fe[1]) || runs[runs.length - 1];
+      const sb = Math.max(0, sp - 1150), se = Math.min(s[n - 1], (st ? s[st[1]] : sp + 2000) + 160);
+      const prof = [[sb, 2], [sp - fe[0] - 60, H], [sp + fe[1] + 60, H], [st ? s[st[0]] : sp + 900, 30], [st ? s[st[1]] : sp + 1900, 12], [se, 2]];
+      const pH = (sv) => { for (let k = 1; k < prof.length; k++) if (sv <= prof[k][0]) { const [a, ha] = prof[k - 1], [c, hc] = prof[k]; return ha + (hc - ha) * Math.max(0, Math.min(1, (sv - a) / ((c - a) || 1))); } return 2; };
+      const i0 = iOf(sb), i1 = Math.max(i0 + 2, iOf(se));
+      for (let i = 0; i < n; i++) { const g = grund(P[i][0], P[i][1]); if (i >= i0 && i <= i1) { hArr[i] = Math.max(pH(s[i]), g + 1.2); deck[i] = 1; } else hArr[i] = Math.max(0.3, g + 0.35); }
+      band(i0, i1, i => hArr[i], 7.5, 3.2, '#4b4e53', '#2f6db5', '#d9dcde');
+      for (const o of [-7.35, 7.35]) band(i0, i1, i => hArr[i] + 1.2, 0.18, 1.2, '#2f6db5', '#2f6db5', '#2f6db5', 0.3, o);
+      for (let sv = sb + 60; sv < se - 30; sv += 72) {
+        if (sv > sp - fe[0] - 10 && sv < sp + fe[1] + 10) continue;
+        const q = at(sv), hd = pH(sv), g0 = grund(q.E, q.N); if (hd - g0 < 5) continue;
+        const nx = -q.d[1], ny = q.d[0], wat = g0 < 0, r = wat ? 2.2 : 1.6;
+        for (const o of [-4, 4]) { saeulen.push([q.E + nx * o, q.N + ny * o, r, Math.min(g0, 0) - (wat ? 2 : 0.5), hd - 3.2]); if (wat) for (let a = -r; a <= r; a += 2) for (let c = -r; c <= r; c += 2) solid(q.E + nx * o + a, q.N + ny * o + c); }
+      }
+      const d = dir[ip], nx = -d[1], ny = d[0], PH = b.pylon_h || 128, g0 = grund(py[0], py[1]), leg = 11;
+      for (const o of [-leg, leg]) {
+        const E = py[0] + nx * o, N = py[1] + ny * o, p = sc(E, N);
+        const beton = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.4, 42 - Math.min(0, g0) + 2, 16), M('#e9e8e3', 0.55)); beton.position.set(p[0], (42 + Math.min(0, g0) - 2) / 2, p[1]); grp.add(beton);
+        const stahl = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.9, PH - 42, 14), M('#dfe8f1', 0.7)); stahl.position.set(p[0], 42 + (PH - 42) / 2, p[1]); grp.add(stahl);
+        const kap = new THREE.Mesh(new THREE.SphereGeometry(1.3, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), M('#dfe8f1', 0.7)); kap.position.set(p[0], PH, p[1]); grp.add(kap);
+        X.feuerExtra.push({ x: E, y: N, h: PH + 1.5, typ: 'luftfahrt', name: 'Pylon Rügenbrücke', f: { c: 'Fl', p: 1.5, s: '0.5+(1.0)', k: 'red', r: 8 } });
+      }
+      const pa = sc(py[0] - nx * leg, py[1] - ny * leg), pb = sc(py[0] + nx * leg, py[1] + ny * leg), mid = [(pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2], ang = Math.atan2(pb[1] - pa[1], pb[0] - pa[0]);
+      for (const y of [H - 4, 72, 94, 114]) { const qb = new THREE.Mesh(new THREE.BoxGeometry(leg * 2, y === H - 4 ? 3 : 1.8, 2.2), M(y === H - 4 ? '#e9e8e3' : '#dfe8f1', 0.6)); qb.position.set(mid[0], y, mid[1]); qb.rotation.y = -ang; grp.add(qb); }
+      const sock = new THREE.Mesh(new THREE.BoxGeometry(leg * 2 + 12, 6, 14), M('#d8d6cf', 0.3)); sock.position.set(mid[0], 1, mid[1]); sock.rotation.y = -ang; grp.add(sock);
+      for (let a = -leg - 8; a <= leg + 8; a += 2) for (let c = -8; c <= 8; c += 2) solid(py[0] + nx * a + d[0] * c, py[1] + ny * a + d[1] * c);
+      const lv = [];
+      for (const o of [-leg, leg]) for (const sgn of [-1, 1]) for (let k = 0; k < 8; k++) {
+        const ya = 80 + k * 6.2, dd = sgn < 0 ? 22 + k * 13 : 26 + k * 22, q = at(sp + sgn * dd), oo = Math.sign(o) * 7.2;
+        const A = sc(py[0] + nx * o, py[1] + ny * o), B = sc(q.E - q.d[1] * oo, q.N + q.d[0] * oo); lv.push(A[0], ya, A[1], B[0], pH(sp + sgn * dd) + 1.2, B[1]);
+      }
+      const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lv, 3)); grp.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#f4f6f8' })));
+      for (let i = i0; i <= i1; i++) if (b.nass[i] && hArr[i] - 3.2 < 14) for (let o = -8; o <= 8; o += 2) solid(P[i][0] - dir[i][1] * o, P[i][1] + dir[i][0] * o);
+      for (let sv = sb + 20; sv < se; sv += 36) { const q = at(sv), ii = q.i; for (const o of [-6.8, 6.8]) { const p = sc(q.E - q.d[1] * o, q.N + q.d[0] * o); lampe(p[0], hArr[ii] + 9, p[1], 9); } }
+    } else {
+      /* Niedrige Brücken mit Klappe: Rügendamm (zwei Flügel, Ziegelgraben) und Wolgast (eine Wippe) */
+      const H = b.hoehe || 6, kl = b.klappe, wippe = kl && kl.art === 'wippe', hwD = wippe ? 9.5 : 6.5;
+      hwStr = wippe ? 4.5 : 4; spur = 1.9; vmax = wippe ? 13 : 14;
+      let ks0 = -1, ks1 = -1;
+      if (kl) {
+        if (kl.pos) { let ii = 0, dm = 1e9; P.forEach((q, i) => { const d = Math.hypot(q[0] - kl.pos[0], q[1] - kl.pos[1]); if (d < dm) { dm = d; ii = i; } }); const L = kl.laenge || 42; ks0 = s[ii] - L / 2; ks1 = s[ii] + L / 2; }
+        else if (runs[0]) { const sm = (s[runs[0][0]] + s[runs[0][1]]) / 2, L = kl.breite || 32; ks0 = sm - L / 2; ks1 = sm + L / 2; }
+      }
+      const kIdx = X.klappen.length;
+      for (let i = 0; i < n; i++) hArr[i] = Math.max(0.3, grund(P[i][0], P[i][1]) + 0.35);
+      for (const r of runs) for (let i = Math.max(0, r[0] - 2); i <= Math.min(n - 1, r[1] + 2); i++) { hArr[i] = Math.max(H, hArr[i] + 0.6); deck[i] = 1; }
+      /* Rampen glätten */
+      const h2 = Float32Array.from(hArr); for (let i = 0; i < n; i++) { let a = 0, c = 0; for (let j = Math.max(0, i - 6); j <= Math.min(n - 1, i + 6); j++) { a += hArr[j]; c++; } h2[i] = Math.max(hArr[i] - (deck[i] ? 0 : 0), a / c); if (deck[i] && b.nass[i]) h2[i] = Math.max(h2[i], H); } hArr.set(h2);
+      runs.forEach(r => {
+        const ra = Math.max(0, r[0] - 2), rb = Math.min(n - 1, r[1] + 2), hasK = kl && s[ra] <= ks0 && s[rb] >= ks1;
+        if (hasK) { const ka = iOf(ks0), kb = iOf(ks1); band(ra, ka, i => hArr[i], hwD, 1.8, '#4b4e53', wippe ? '#2f6db5' : '#5d6a74', '#7b8187'); band(kb, rb, i => hArr[i], hwD, 1.8, '#4b4e53', wippe ? '#2f6db5' : '#5d6a74', '#7b8187'); }
+        else band(ra, rb, i => hArr[i], hwD, 1.8, '#4b4e53', wippe ? '#2f6db5' : '#5d6a74', '#7b8187');
+        for (let sv = s[r[0]] + 4; sv <= s[r[1]]; sv += wippe ? 30 : 24) { if (hasK && sv > ks0 - 6 && sv < ks1 + 6) continue; const q = at(sv); saeulen.push([q.E, q.N, 0, -4, hArr[q.i] - 1.8, q.d, hwD * 1.7]); }
+        for (let i = r[0]; i <= r[1]; i++) { const inK = hasK && s[i] >= ks0 && s[i] <= ks1; for (let o = -hwD - 1; o <= hwD + 1; o += 2) for (let a = -3; a <= 3; a += 3) solid(P[i][0] - dir[i][1] * o + dir[i][0] * a, P[i][1] + dir[i][0] * o + dir[i][1] * a, inK ? kIdx : null); }
+      });
+      if (kl && ks0 > 0) {
+        const K = { def: kl, name: kl.name, piv: [], sig: [], auf: -1, s0: ks0, s1: ks1, strasse: X.strassen.length, max: (wippe ? 72 : 80) * DEG };
+        const c = at((ks0 + ks1) / 2); K.E = c.E; K.N = c.N;
+        const hinges = wippe ? [[ks0, ks1]] : [[ks0, (ks0 + ks1) / 2], [ks1, (ks0 + ks1) / 2]];
+        for (const [sa, sz] of hinges) {
+          const q = at(sa), qc = at(sz), A = sc(q.E, q.N), C = sc(qc.E, qc.N), L = Math.hypot(C[0] - A[0], C[1] - A[1]), th = Math.atan2(-(C[1] - A[1]), C[0] - A[0]), hh = hArr[q.i];
+          const hinge = new THREE.Group(); hinge.position.set(A[0], hh, A[1]); hinge.rotation.y = th; const piv = new THREE.Group(); hinge.add(piv);
+          const leaf = new THREE.Mesh(new THREE.BoxGeometry(L, 1.8, hwD * 2), M('#2f6db5', 0.4)); leaf.position.set(L / 2, -0.9, 0); piv.add(leaf);
+          const top = new THREE.Mesh(new THREE.BoxGeometry(L, 0.06, hwD * 2 - 0.6), M('#4b4e53', 0.1)); top.position.set(L / 2, 0.03, 0); piv.add(top);
+          for (const z of [-hwD + 0.2, hwD - 0.2]) { const gl = new THREE.Mesh(new THREE.BoxGeometry(L, 1.1, 0.25), M('#2f6db5', 0.4)); gl.position.set(L / 2, 0.55, z); piv.add(gl); }
+          if (wippe) {
+            /* Wippbrücke: hohe blaue Portaltürme, oben der Waagebalken mit Gegengewicht, der mitschwingt */
+            for (const z of [-hwD - 1.2, hwD + 1.2]) { const t = new THREE.Mesh(new THREE.BoxGeometry(3, 26, 2.4), M('#2f6db5', 0.55)); t.position.set(-3, 13 - 1.8, z); hinge.add(t); }
+            const qb = new THREE.Mesh(new THREE.BoxGeometry(3, 2.2, hwD * 2 + 4.8), M('#2f6db5', 0.55)); qb.position.set(-3, 24, 0); hinge.add(qb);
+            const wp = new THREE.Group(); wp.position.set(-3, 24, 0); hinge.add(wp);
+            for (const z of [-hwD - 1.2, hwD + 1.2]) { const bm = new THREE.Mesh(new THREE.BoxGeometry(34, 1.6, 1.2), M('#2f6db5', 0.55)); bm.position.set(5, 1.2, z); wp.add(bm); }
+            const gg = new THREE.Mesh(new THREE.BoxGeometry(6, 4.5, hwD * 2 + 3.6), M('#3d4a55', 0.2)); gg.position.set(-10, 0.5, 0); wp.add(gg);
+            K.piv.push(wp);
+            const hut = new THREE.Mesh(new THREE.BoxGeometry(5, 3.5, 5), M('#efece4', 0.6)); hut.position.set(-8, 1.75, hwD + 5); hinge.add(hut);
+          } else {
+            const ggw = new THREE.Mesh(new THREE.BoxGeometry(5, 4, hwD * 2 - 1.5), M('#3d4a55', 0.2)); ggw.position.set(-3, -2.5, 0); piv.add(ggw);
+            for (const z of [-hwD - 1, hwD + 1]) { const pf = new THREE.Mesh(new THREE.BoxGeometry(1.2, 13, 1.2), M('#2f6db5', 0.5)); pf.position.set(-2, 6.5 - 1.8, z); hinge.add(pf); }
+            const qbm = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, hwD * 2 + 3), M('#2f6db5', 0.5)); qbm.position.set(-2, 11, 0); hinge.add(qbm);
+            const hut = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 4), M('#efece4', 0.6)); hut.position.set(-5, 1.5, hwD + 3); hinge.add(hut);
+          }
+          const sg = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), new THREE.MeshBasicMaterial({ color: '#ff2a1a' })); sg.position.set(-1, wippe ? 20 : 9, 0); hinge.add(sg); K.sig.push(sg);
+          grp.add(hinge); K.piv.push(piv);
+        }
+        X.klappen.push(K);
+      }
+      for (const r of runs) for (let sv = s[r[0]]; sv < s[r[1]]; sv += 30) { const q = at(sv); const p = sc(q.E - q.d[1] * (hwD - 0.5), q.N + q.d[0] * (hwD - 0.5)); lampe(p[0], hArr[q.i] + 7, p[1], 7); }
+    }
+    /* Straße an Land (auf dem Gelände) mit Laternen */
+    let la = -1;
+    for (let i = 0; i <= n; i++) {
+      const land = i < n && !deck[i];
+      if (land && la < 0) la = i;
+      if ((!land || i === n) && la >= 0) { const lb = Math.min(n - 1, i); band(Math.max(0, la - 1), lb, k => hArr[k], hwStr, 1.5, '#55585c', '#6d6a63', '#6d6a63', 0.05); for (let k = la; k < lb; k += 7) { const p = sc(P[k][0] - dir[k][1] * (hwStr + 1), P[k][1] + dir[k][0] * (hwStr + 1)); lampe(p[0], hArr[k] + 7, p[1], 7); } la = -1; }
+    }
+    markierung(0, n - 1, hArr, hwStr);
+    /* Pfeiler gebündelt */
+    if (saeulen.length) {
+      const cy = new THREE.CylinderGeometry(1, 1, 1, 12); cy.translate(0, 0.5, 0); const bx = new THREE.BoxGeometry(1, 1, 1); bx.translate(0, 0.5, 0);
+      const rund = saeulen.filter(q => q[2] > 0), eckig = saeulen.filter(q => q[2] === 0);
+      const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+      if (rund.length) { const im = new THREE.InstancedMesh(cy, M('#e9e8e3', 0.35), rund.length); rund.forEach((q, i) => { const p = sc(q[0], q[1]); sv.set(q[2], q[4] - q[3], q[2]); pv.set(p[0], q[3], p[1]); qq.identity(); m4.compose(pv, qq, sv); im.setMatrixAt(i, m4); }); im.frustumCulled = false; grp.add(im); }
+      if (eckig.length) { const im = new THREE.InstancedMesh(bx, M('#9a958b', 0.2), eckig.length); eckig.forEach((q, i) => { const p = sc(q[0], q[1]), p2 = sc(q[0] + q[5][0], q[1] + q[5][1]); qq.setFromAxisAngle(up, Math.atan2(p2[0] - p[0], p2[1] - p[1])); sv.set(q[6] || 11, q[4] - q[3], 3); pv.set(p[0], q[3], p[1]); m4.compose(pv, qq, sv); im.setMatrixAt(i, m4); }); im.frustumCulled = false; grp.add(im); }
+    }
+    X.strassen.push({ name: b.n, P, s, dir, h: hArr, L: s[n - 1], vmax, spur, klappen: X.klappen.filter(k => k.strasse === X.strassen.length) });
+  }
+  if (markV.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(markV, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(markC, 3)); g.computeVertexNormals(); const m = new THREE.MeshBasicMaterial({ vertexColors: true }); grp.add(new THREE.Mesh(g, m)); }
+  const lp = revLampen(lampen); if (lp) grp.add(lp);
+  if (masten.length) {
+    const cy = new THREE.CylinderGeometry(0.09, 0.14, 1, 6); cy.translate(0, 0.5, 0); const kb = new THREE.BoxGeometry(0.9, 0.25, 0.45);
+    const im = new THREE.InstancedMesh(cy, M('#8d9196', 0.1), masten.length), ik = new THREE.InstancedMesh(kb, M('#fff1c8', 1.6), masten.length), m4 = new THREE.Matrix4();
+    masten.forEach((q, i) => { m4.makeScale(1, q[3], 1).setPosition(q[0], q[1], q[2]); im.setMatrixAt(i, m4); m4.makeTranslation(q[0], q[1] + q[3] - 0.1, q[2]); ik.setMatrixAt(i, m4); });
+    im.frustumCulled = ik.frustumCulled = false; grp.add(im, ik);
+  }
+  grp.traverse(o => { o.userData.sznSkip = 1; });
+  for (const k of X.brKlMap.keys()) X.brSolid.delete(k);
+  shoreG.add(grp); X.brGrp = grp; X.brBB = [bb[0] - 8, bb[1] - 8, bb[2] + 8, bb[3] + 8]; X.brN = -1;
+  revVerkehrInit();
+}
+/* ---------- Verkehr: Autos in beiden Richtungen, halten vor offener Klappe ---------- */
+function revVerkehrInit() {
+  const X = REVX, cars = [];
+  const FARBEN = ['#e9e9e6', '#1f2226', '#8a8f96', '#b3261e', '#23417a', '#d7d2c4', '#3d5a40', '#5b5e63', '#c7c9cc', '#7a1f1f'];
+  X.strassen.forEach((st, si) => {
+    const nPro = Math.max(3, Math.floor(st.L / (st.vmax > 20 ? 170 : 150)));
+    for (const dirn of [1, -1]) for (let k = 0; k < nPro; k++) cars.push({ si, d: dirn, s: (k + Math.random() * 0.6) * st.L / nPro, v: st.vmax * (0.85 + Math.random() * 0.15), vm: st.vmax * (0.85 + Math.random() * 0.2), lkw: Math.random() < 0.12, c: FARBEN[Math.floor(Math.random() * FARBEN.length)] });
+  });
+  if (!cars.length) return;
+  const box = new THREE.BoxGeometry(1.8, 1.45, 4.4); box.translate(0, 0.72, 0);
+  const im = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: 0xffffff }), cars.length), c = new THREE.Color();
+  cars.forEach((a, i) => { c.set(a.c); im.setColorAt(i, c); }); im.frustumCulled = false; im.userData.sznSkip = 1;
+  const pts = new Float32Array(cars.length * 4 * 3), col = new Float32Array(cars.length * 4 * 3);
+  for (let i = 0; i < cars.length; i++) for (let k = 0; k < 4; k++) { const j = (i * 4 + k) * 3, vorn = k < 2; col[j] = vorn ? 1 : 1; col[j + 1] = vorn ? 0.93 : 0.08; col[j + 2] = vorn ? 0.75 : 0.05; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pts, 3)); g.setAttribute('col', new THREE.BufferAttribute(col, 3));
+  const pp = new THREE.Points(g, revCarLightMat()); pp.frustumCulled = false; pp.renderOrder = 21;
+  shoreG.add(im, pp);
+  X.verkehr = { cars, im, pp, t: performance.now() };
+}
+function revVerkehrTick() {
+  const X = REVX, V = X && X.verkehr; if (!V) return;
+  const now = performance.now(), dt = Math.min(0.1, (now - V.t) / 1000); V.t = now;
+  const F = SHORE.fwd, m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(1, 1, 1), pv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  const pa = V.pp.geometry.attributes.position.array;
+  /* Reihenfolge je Spur, damit niemand auffährt */
+  const spuren = new Map(); V.cars.forEach(a => { const k = a.si * 2 + (a.d > 0 ? 0 : 1); (spuren.get(k) || spuren.set(k, []).get(k)).push(a); });
+  for (const [k, L] of spuren) {
+    const st = X.strassen[L[0].si]; L.sort((a, b) => (a.s - b.s) * a.d);
+    for (let i = 0; i < L.length; i++) {
+      const a = L[i], ld = L[i + 1]; let ziel = a.vm * (a.lkw ? 0.8 : 1);
+      if (ld) { const gap = (ld.s - a.s) * a.d - 6; if (gap < 45) ziel = Math.min(ziel, Math.max(0, ld.v + (gap - 10) * 0.6)); }
+      for (const K of st.klappen) {
+        const z = K.zeit; if (!z || (z.auf <= 0.001 && z.bis > 1.2)) continue;
+        const halt = a.d > 0 ? K.s0 - 14 - a.s : a.s - (K.s1 + 14);
+        if (halt > -0.5 && halt < 90) ziel = Math.min(ziel, Math.max(0, halt * 0.35));
+      }
+      a.v += Math.max(-6 * dt, Math.min(2.5 * dt, ziel - a.v));
+    }
+  }
+  const ac = REV_CARLIGHT; if (ac) { ac.uniforms.uN.value = revNacht(); ac.uniforms.uPx.value = renderer.getPixelRatio(); }
+  V.cars.forEach((a, idx) => {
+    const st = X.strassen[a.si]; a.s += a.d * a.v * dt;
+    if (a.s > st.L) { a.s -= st.L; } else if (a.s < 0) { a.s += st.L; }
+    const P = st.P, S_ = st.s; let i = Math.min(P.length - 2, Math.max(0, Math.floor(a.s / (st.L / (P.length - 1)))));
+    while (i > 0 && S_[i] > a.s) i--; while (i < P.length - 2 && S_[i + 1] < a.s) i++;
+    const f = Math.max(0, Math.min(1, (a.s - S_[i]) / ((S_[i + 1] - S_[i]) || 1))), d = st.dir[i];
+    const off = st.spur * (a.d > 0 ? -1 : 1), E = P[i][0] + (P[i + 1][0] - P[i][0]) * f - d[1] * off, N = P[i][1] + (P[i + 1][1] - P[i][1]) * f + d[0] * off;
+    let h = st.h[i] + (st.h[i + 1] - st.h[i]) * f;
+    for (const K of st.klappen) if (a.s > K.s0 && a.s < K.s1 && K.auf > 0.01) h += 0;   /* niemand steht auf der offenen Klappe */
+    const p0 = F(E, N), p1 = F(E + d[0] * a.d, N + d[1] * a.d), fx = p1[0] - p0[0], fz = -(p1[1] - p0[1]);
+    q.setFromAxisAngle(up, Math.atan2(fx, fz)); sv.set(a.lkw ? 1.3 : 1, a.lkw ? 2.2 : 1, a.lkw ? 2.6 : 1); pv.set(p0[0], h, -p0[1]); m4.compose(pv, q, sv); V.im.setMatrixAt(idx, m4);
+    const lx = -fz * 0.65, lz = fx * 0.65, Lh = (a.lkw ? 5.95 : 2.45), j = idx * 12;
+    pa[j] = p0[0] + fx * Lh + lx; pa[j + 1] = h + 0.7; pa[j + 2] = -p0[1] + fz * Lh + lz;
+    pa[j + 3] = p0[0] + fx * Lh - lx; pa[j + 4] = h + 0.7; pa[j + 5] = -p0[1] + fz * Lh - lz;
+    pa[j + 6] = p0[0] - fx * Lh + lx; pa[j + 7] = h + 0.8; pa[j + 8] = -p0[1] - fz * Lh + lz;
+    pa[j + 9] = p0[0] - fx * Lh - lx; pa[j + 10] = h + 0.8; pa[j + 11] = -p0[1] - fz * Lh - lz;
+  });
+  V.im.instanceMatrix.needsUpdate = true; V.pp.geometry.attributes.position.needsUpdate = true;
+}
+/* Hindernis für die Physik: Pfeiler, Pylon, niedrige Fahrbahnen, geschlossene Klappen */
+function revBrHit(E, N) {
+  const X = REVX, b = X && X.brBB; if (!b || E < b[0] || E > b[2] || N < b[1] || N > b[3]) return false;
+  const k = Math.floor(E / 4) + ',' + Math.floor(N / 4);
+  if (X.brSolid.has(k)) return true;
+  const ki = X.brKlMap.get(k); return ki != null && X.klappen[ki] && X.klappen[ki].auf < 0.95;
+}
+function revBrueckenTick() {
+  const X = REVX; if (!X || !X.brGrp) return;
+  for (const K of X.klappen) {
+    const z = revKlZeit(K.def); K.zeit = z;
+    if (Math.abs(z.auf - K.auf) > 0.002) { K.auf = z.auf; for (const p of K.piv) p.rotation.z = z.auf * K.max; for (const sg of K.sig) sg.material.color.set(z.auf > 0.95 ? '#2bff5a' : '#ff2a1a'); }
+  }
+  const f = revNacht(); if (f !== X.brN) { X.brN = f; const warm = new THREE.Color(1, 0.92, 0.8); for (const [m, k] of X.brMats) m.emissive.copy(m.color).multiply(warm).multiplyScalar(k * f * 1.1); }
+  try { revVerkehrTick(); } catch (e) { console.error('Verkehr', e); X.verkehr = null; }
+  /* Hinweis vor geschlossener Klappe */
+  try {
+    const pl = G && G.boats && G.boats[0]; if (!pl) return;
+    const [E, N] = SHORE.realOf(pl.x, pl.y), now = performance.now();
+    for (const K of X.klappen) {
+      if (K.auf > 0.95 || Math.hypot(K.E - E, K.N - N) > 450) continue;
+      if (!K.msg || now - K.msg > 180000) { K.msg = now; const z = K.zeit || {}; msg(K.name + ' geschlossen – nächste Öffnung ' + z.naechste + ' Uhr für ' + (z.dauer || 20) + ' Minuten (in ' + Math.round(z.bis) + ' min). In den Einstellungen kannst du die Klappbrücken „immer offen“ stellen.', 'warn'); }
+    }
+  } catch (e) {}
+}
+
 /* Echte Fahrwassertonnen (OpenSeaMap) – gebündelt gezeichnet */
 function revSeamarks() {
   const X = REVX, F = SHORE.fwd;
@@ -1399,6 +1876,12 @@ function revMapDraw(x, mp, W, H) {
     for (let k = 0; k < ring.length; k++) { const q = mp(ring[k][0], ring[k][1]); if (q[0] > -400 && q[0] < W + 400 && q[1] > -400 && q[1] < H + 400) any = true; k ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1]); }
     if (any) { x.closePath(); x.fill(); x.stroke(); }
   }
+  /* Brücken: Rügenbrücke blau, Rügendamm grau, Klappe rot/grün */
+  if (REVX && REVX.idx.bruecken) for (const b of REVX.idx.bruecken) {
+    x.strokeStyle = b.art === 'damm' ? 'rgba(90,90,90,.9)' : 'rgba(47,109,181,.95)'; x.lineWidth = b.art === 'damm' ? 1.6 : 2.2; x.beginPath();
+    for (let k = 0; k < b.pts.length; k += 2) { const g = SHORE.fwd(b.pts[k], b.pts[k + 1]), q = mp(g[0], g[1]); k ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1]); } x.stroke();
+  }
+  if (REVX && REVX.klappen) for (const K of REVX.klappen) { const g = SHORE.fwd(K.E, K.N), q = mp(g[0], g[1]); x.fillStyle = K.auf > 0.95 ? '#2bd65a' : '#e0352b'; x.beginPath(); x.arc(q[0], q[1], 3.5, 0, Math.PI * 2); x.fill(); }
   const C = G && G.course;
   if (C && C.rev) { x.setLineDash([4, 4]); x.strokeStyle = 'rgba(255,210,63,.75)'; x.lineWidth = 1.2; x.beginPath(); C.rev.route.forEach((p, k) => { const q = mp(p[0], p[1]); k ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1]); }); x.stroke(); x.setLineDash([]); }
   const a = mp(0, 0), b2 = mp(1000, 0), pxkm = Math.hypot(b2[0] - a[0], b2[1] - a[1]), maxRank = pxkm > 40 ? 3 : pxkm > 12 ? 1 : 0;
@@ -1924,6 +2407,7 @@ const SCHEMA=[
  {group:'Revier & Strömung',items:[
   {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
   {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
+  {k:'bruecke',label:'Klappbrücken (Ziegelgraben, Wolgast)',type:'select',options:[['echt','Öffnen zu den echten Zeiten'],['offen','Immer offen']],hint:'Ziegelgrabenbrücke im Rügendamm: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 Uhr je 20 min. Peenebrücke Wolgast: 5:45, 7:45, 12:45, 17:45, 20:45 Uhr je 15 min, Juni–September auch 23:45 Uhr. Es zählt die Uhrzeit deines Geräts. Unter der Rügenbrücke passt du mit 42 m immer durch – die Klappe daneben musst du abwarten. Autos halten vor der offenen Klappe.'},
   {k:'revEdit',label:'Eigene Strecken (Küstenrevier Rügen)',type:'button',btn:'Strecken-Editor öffnen',act:'revEdit',hint:'Start, Wegpunkte und Ziel auf der Karte antippen und speichern. Gespeicherte Strecken erscheinen oben unter „Kurs im Küstenrevier Rügen“. Start- und Ziellinie richten sich nach dem Wind.'},
   {k:'windFrom',label:'Windrichtung (See-Reviere)',type:'select',num:true,live:v=>v+'° (Live)',options:[[225,'Südwest'],[270,'West'],[315,'Nordwest'],[0,'Nord'],[45,'Nordost'],[90,'Ost'],[135,'Südost'],[180,'Süd']],hint:'Am See zählt, über welches Ufer der Wind kommt: Nordwind über den Auwald ist löchrig, Westwind über die Neue Harth drehig'},
   {k:'rowDist',label:'Ruderstrecke',type:'select',num:true,options:[[250,'250 m'],[500,'500 m'],[1000,'1000 m']],hint:'Für die Ruderregatta (Knopf „Rudern“)'},
@@ -6003,7 +6487,7 @@ const _nv=new THREE.Vector3();
 function navUpdate(){if(!NIGHT||!G)return;for(const b of G.boats){const m=b.m;if(!m||!m.navL||b.gone)continue;_nv.copy(camera.position);m.g.worldToLocal(_nv);
     const th=Math.atan2(_nv.x,-_nv.z)/DEG,a=Math.abs(th);   // 0° voraus, positiv = Steuerbordseite
     for(const l of m.navL){const on=l.k==='port'?(th<=0&&a<=112.5):l.k==='stb'?(th>=0&&a<=112.5):l.k==='stern'?a>=112.5:true;l.sp.visible=on;l.ball.visible=on;}}}
-function render(dt,now){try{revTick();revFeuerTick();}catch(e){console.error('Revier',e);}
+function render(dt,now){try{revTick();revFeuerTick();revNachtTick();revBrueckenTick();}catch(e){console.error('Revier',e);}
   waterMat.uniforms.uT.value=now;sky.material.uniforms.uT.value=now%1800;if(SHORE.anim)for(const fa of SHORE.anim)fa(now);
   const tow=dirv(G.wind.cur+180);waterMat.uniforms.uWind.value.set(tow[0],-tow[1]);
   for(let i=0;i<16;i++){const p=G.wind.puffs[i];if(p)puffU[i].set(p.x,-p.y,p.r,p.str*p.env);else puffU[i].set(0,0,1,0);}
