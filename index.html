@@ -494,7 +494,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
     <p><b>Zweck</b><br>Die Regattakoje ist ein privates, nicht kommerzielles Trainingsspiel. Sie wurde entwickelt für den Leipziger Seesportclub e.V. (Am Stausee 4, 04249 Leipzig, Cospudener See) und dessen Vereinsfreunde. Der Verein ist nicht Betreiber dieses Angebots.</p>
     <p><b>Urheberrecht</b><br>Das Spiel mit Programmcode, Grafiken, 3D-Modellen, Texten und Gestaltung ist urheberrechtlich geschützt und Eigentum von Michael Assmann. Alle Rechte vorbehalten. Vervielfältigung, Verbreitung, Bearbeitung und jede Verwertung außerhalb der privaten Nutzung im Browser sind ohne schriftliche Zustimmung nicht gestattet. Ausgenommen ist das Vereinswappen: Es gehört dem Leipziger Seesportclub e.V.</p>
     <p><b>Kartendaten</b><br>Ufer, Gebäude und Wälder des Reviers Rangsdorfer See: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap-Mitwirkende</a>, Lizenz ODbL 1.0.</p>
-    <p><b>Revier Hiddensee · Kubitzer Bodden · Strelasund</b><br>Küste, Orte, Häuser, Wälder: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap-Mitwirkende</a>, ODbL 1.0 · Seezeichen: OpenSeaMap (aus OpenStreetMap) · Wassertiefe: EMODnet Bathymetry Consortium, EMODnet Digital Bathymetry (DTM), CC BY 4.0 · Gelände: Copernicus DEM GLO-30 © DLR e.V. 2010–2014 und © Airbus Defence and Space GmbH 2014–2018, bereitgestellt im Rahmen von COPERNICUS durch die Europäische Union und ESA. Die Regattabahnen „Blaues Band vom Strelasund“ und „Rund Hiddensee“ sind vereinfacht und folgen tiefem Wasser laut Datensatz – keine Navigationskarte, keine offiziellen Bahnen.</p>
+    <p><b>Küstenrevier Rügen (Hiddensee, Strelasund, Bodden, Peenestrom)</b><br>Küste, Orte, Häuser, Wälder: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap-Mitwirkende</a>, ODbL 1.0 · Seezeichen: OpenSeaMap (aus OpenStreetMap) · Wassertiefe: EMODnet Bathymetry Consortium, EMODnet Digital Bathymetry (DTM), CC BY 4.0 · Gelände: Copernicus DEM GLO-30 © DLR e.V. 2010–2014 und © Airbus Defence and Space GmbH 2014–2018, bereitgestellt im Rahmen von COPERNICUS durch die Europäische Union und ESA. Die Regattabahnen „Blaues Band vom Strelasund“ und „Rund Hiddensee“ sind vereinfacht und folgen tiefem Wasser laut Datensatz – keine Navigationskarte, keine offiziellen Bahnen.</p>
     <p><b>Haftung</b><br>Das Spiel dient der Übung von Taktik und Regeln. Es ersetzt keine Ausbildung auf dem Wasser und keine verbindliche Auslegung der Wettfahrtregeln. Für Inhalte externer Links sind deren Betreiber verantwortlich.</p>
     </section>
     <section id="legDs">
@@ -743,196 +743,292 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
 (function(){
 'use strict';
 /* =====================================================================
-   Regattakoje – Küstenrevier Hiddensee · Kubitzer Bodden · Strelasund
+   Regattakoje – Küstenrevier Rügen (gekachelt)
    ---------------------------------------------------------------------
-   Lädt hiddensee-spiel.json + hiddensee-spiel.bin (erzeugt aus den
-   Seekoje-Revierdaten: OSM/OpenSeaMap, EMODnet-Tiefen, Copernicus-DEM)
-   und baut daraus Gelände, Bäume, Häuser, Fahrwassertonnen sowie die
-   Langstrecken „Blaues Band vom Strelasund“ und „Rund Hiddensee“.
+   Daten kommen aus dem See-Editor (GitHub Action „Revier bauen“):
+     ruegen-spiel.json            Index (Kacheln, Land, Orte, Seezeichen, Kurse)
+     ruegen-spiel-uebersicht.bin  ganzes Revier grob (immer im Speicher)
+     ruegen-spiel-k-II-JJ.bin     16-km-Kacheln fein, nur rund um die Boote
+   Gelände wird in 2,5-km-Stücken mit Detailstufe nach Entfernung gebaut.
    Grundberührung nach Tiefgang der Bootsklasse. KEINE Navigationskarte.
-   Teil des Hauptskripts.
    ===================================================================== */
-var REVH = null, REVH_LOAD = null, REVH_ERR = null;
-/* Tiefgang (m) für die Grundberührung – vereinfachte Spielwerte */
+var REV_BASES = ['../See-Editor/', ''];           /* erst die See-Editor-Seite, dann der eigene Ordner */
+var REVIERE_K = { ruegen: { datei: 'ruegen-spiel.json', name: 'Rügen · Bodden · Peenestrom' } };
+var REVX = null, REVH = null, REVH_LOAD = null, REVH_ERR = null;
 var REV_DRAFT = { jolle: 1.0, opti: 0.75, topcat: 0.7, viking: 1.0, imoca: 4.5, zk10: 1.0, ixylon: 0.9, k6: 0.9, moth: 1.0 };
-var REV_KURSE = { bb: 'Blaues Band vom Strelasund', rund: 'Rund Hiddensee', bahn: 'Regattabahn vor Hiddensee' };
+var REV_ORIG_ALT = { hiddensee: [366520, 6016000] };  /* Strecken aus der ersten Hiddensee-Version umrechnen */
 
 function revDraft() { return REV_DRAFT[CL.key] || 1.0; }
-function revKey() { const ku = S.revKurs || 'bb', cu = ku.indexOf('u:') === 0 ? (revStrecken().find(q => 'u:' + q.id === ku) || {}).t : ''; return ['hid', !!REVH, S.windFrom, ku, cu, S.gfx === 'niedrig' ? 'lo' : 'hi', seasonNow()].join('|'); }
-function revActive() { return S.revier === 'hiddensee' && !!REVH && SHORE && SHORE.kind === 'revier'; }
+function revMigrate() { if (S.revier === 'hiddensee') { S.revier = 'ruegen'; try { saveS(); } catch (e) {} } }
+function revIsBahn() { const k = revK(S.revKurs || 'bb'); return !k || !!k.bahn; }
+function revKursName() { const k = REVX && revK(S.revKurs || 'bb'); return k ? k.name : ''; }
+function revKey() { const ku = S.revKurs || 'bb', cu = ku.indexOf('u:') === 0 ? (revStrecken().find(q => 'u:' + q.id === ku) || {}).t : ''; return ['kue', S.revier, !!REVX, S.windFrom, ku, cu, S.gfx === 'niedrig' ? 'lo' : 'hi', seasonNow()].join('|'); }
+function revFmt(v, d) { return v.toFixed(d).replace('.', ','); }
 
 /* ---------- Laden ---------- */
+async function revInflate(buf) {
+  if (typeof DecompressionStream === 'undefined') throw new Error('Dieser Browser kann die Revierdaten nicht entpacken (bitte aktualisieren)');
+  const st = new Blob([buf]).stream().pipeThrough(new DecompressionStream('deflate'));
+  return await new Response(st).arrayBuffer();
+}
+async function revFetch(base, f, typ) { const r = await fetch(base + f, { cache: 'no-cache' }); if (!r.ok) throw new Error(f + ': HTTP ' + r.status); return typ === 'json' ? r.json() : r.arrayBuffer(); }
 function revLoad() {
-  if (REVH || REVH_LOAD) return REVH_LOAD;
-  try { msg('Küstenrevier Hiddensee wird geladen …', 'info'); } catch (e) {}
-  REVH_LOAD = Promise.all([
-    fetch('hiddensee-spiel.json').then(r => { if (!r.ok) throw new Error('hiddensee-spiel.json: HTTP ' + r.status); return r.json(); }),
-    fetch('hiddensee-spiel.bin').then(r => { if (!r.ok) throw new Error('hiddensee-spiel.bin: HTTP ' + r.status); return r.arrayBuffer(); })
-  ]).then(([j, buf]) => {
-    const g = j.grid, n = g.nx * g.ny;
-    REVH = j; REVH.z = new Int16Array(buf, 0, n); REVH.lu = new Uint8Array(buf, 2 * n, n); REVH.cd = new Uint8Array(buf, 3 * n, n);
-    REVH.W = j.size.w; REVH.H = j.size.h;
-    if (S.revier === 'hiddensee') { buildShore(); if (typeof G !== 'undefined' && G && !G.running) newRace(null); try { applyLight(); } catch (e) {} }
-  }).catch(e => {
-    REVH_ERR = e; REVH_LOAD = null; console.error('Revier Hiddensee', e);
-    try { msg('Revier Hiddensee konnte nicht geladen werden (' + e.message + ').', 'bad'); } catch (_) {}
+  if (REVX || REVH_LOAD) return REVH_LOAD;
+  const def = REVIERE_K[S.revier] || REVIERE_K.ruegen;
+  try { msg('Küstenrevier wird geladen …', 'info'); } catch (e) {}
+  REVH_LOAD = (async () => {
+    let idx = null, base = null, last = null;
+    for (const b of REV_BASES) { try { idx = await revFetch(b, def.datei, 'json'); base = b; break; } catch (e) { last = e; } }
+    if (!idx) throw last || new Error('Revierdaten nicht gefunden');
+    const ob = await revInflate(await revFetch(base, idx.overview.file)); const o = idx.overview, n = o.nx * o.ny;
+    const X = { idx, base, W: idx.size.w, H: idx.size.h, cs: idx.grid.cs, nx: idx.grid.nx, ny: idx.grid.ny, T: idx.grid.tile,
+      ov: { z: new Int16Array(ob, 0, n), lu: new Uint8Array(ob, 2 * n, n), nx: o.nx, ny: o.ny, cs: o.cs },
+      meta: new Map(), tiles: new Map(), chunks: new Map(), scen: new Map(), nLoad: 0, tick: 0 };
+    for (const t of idx.grid.tiles) X.meta.set(t[0] + ',' + t[1], { ti: t[0], tj: t[1], file: t[2], kx: t[3], ky: t[4], nh: t[5] });
+    REVX = REVH = X;
+    if (REVIERE_K[S.revier]) {
+      /* Kacheln rund um den Start vorab laden, dann bauen */
+      const k = revK(S.revKurs || 'bb') || idx.courses.bb, st = k.bahn ? k.center : k.start;
+      await Promise.all(revTilesNear(st[0], st[1], 3000).map(t => revTileLoad(t)));
+      buildShore(); if (typeof G !== 'undefined' && G && !G.running) newRace(null); try { applyLight(); } catch (e) {}
+    }
+    try { buildForm(); } catch (e) {}
+  })().catch(e => {
+    REVH_ERR = e; REVH_LOAD = null; console.error('Küstenrevier', e);
+    try { msg('Küstenrevier konnte nicht geladen werden (' + e.message + '). Die Revierdaten entstehen im See-Editor über die Action „Revier bauen“ (Revier ruegen).', 'bad'); } catch (_) {}
   });
   return REVH_LOAD;
 }
+function revTilesNear(E, N, r) {
+  const X = REVX, ts = X.T * X.cs, out = [];
+  const i1 = Math.floor((E - r) / ts), i2 = Math.floor((E + r) / ts), j1 = Math.floor((X.H - N - r) / ts), j2 = Math.floor((X.H - N + r) / ts);
+  for (let tj = j1; tj <= j2; tj++) for (let ti = i1; ti <= i2; ti++) { const m = X.meta.get(ti + ',' + tj); if (m) out.push(m); }
+  return out;
+}
+function revTileLoad(m) {
+  const X = REVX, key = m.ti + ',' + m.tj; let t = X.tiles.get(key);
+  if (t) return t.p;
+  t = { m, st: 'lade', i1: m.ti * X.T, j1: m.tj * X.T, kx: m.kx, ky: m.ky, used: performance.now() };
+  X.tiles.set(key, t); X.nLoad++;
+  t.p = revFetch(X.base, m.file).then(revInflate).then(buf => {
+    const dv = new DataView(buf), kx = dv.getUint16(4, true), ky = dv.getUint16(6, true), nh = dv.getUint32(8, true), n = kx * ky;
+    t.z = new Int16Array(buf, 12, n); t.lu = new Uint8Array(buf, 12 + 2 * n, n); t.cd = new Uint8Array(buf, 12 + 3 * n, n);
+    t.hs = new Int16Array(buf, 12 + 4 * n, nh * 6); t.kx = kx; t.ky = ky; t.st = 'da'; X.nLoad--;
+    X.dirty = true; for (const [ck, c] of X.chunks) if (c.ti === m.ti && c.tj === m.tj) c.step = -1;  /* Gelände neu bauen */
+  }).catch(e => { t.st = 'fehler'; X.nLoad--; console.warn('Kachel', m.file, e); });
+  return t.p;
+}
 
 /* ---------- Raster ---------- */
+function revCellZ(gi, gj) {
+  const X = REVX; if (gi < 0 || gj < 0 || gi >= X.nx || gj >= X.ny) return -2000;
+  const t = X.tiles.get(((gi / X.T) | 0) + ',' + ((gj / X.T) | 0));
+  if (t && t.z) return t.z[(gj - t.j1) * t.kx + (gi - t.i1)];
+  const o = X.ov; return o.z[Math.min(o.ny - 1, gj >> 1) * o.nx + Math.min(o.nx - 1, gi >> 1)];
+}
+function revCellLu(gi, gj) {
+  const X = REVX; if (gi < 0 || gj < 0 || gi >= X.nx || gj >= X.ny) return 0;
+  const t = X.tiles.get(((gi / X.T) | 0) + ',' + ((gj / X.T) | 0));
+  if (t && t.lu) return t.lu[(gj - t.j1) * t.kx + (gi - t.i1)];
+  const o = X.ov; return o.lu[Math.min(o.ny - 1, gj >> 1) * o.nx + Math.min(o.nx - 1, gi >> 1)];
+}
+function revCellCd(gi, gj) {
+  const X = REVX, t = X.tiles.get(((gi / X.T) | 0) + ',' + ((gj / X.T) | 0));
+  return t && t.cd && gi >= 0 && gj >= 0 ? t.cd[(gj - t.j1) * t.kx + (gi - t.i1)] : 255;
+}
 /* Höhe (m) im Revier-Koordinatensystem E/N (Meter ab Südwest-Ecke). <0 = Wassertiefe */
 function revZ(E, N) {
-  const R = REVH, cs = R.grid.cs, nx = R.grid.nx, ny = R.grid.ny;
-  const fx = E / cs - 0.5, fy = (R.H - N) / cs - 0.5;
+  const X = REVX, cs = X.cs, fx = E / cs - 0.5, fy = (X.H - N) / cs - 0.5;
   const i0 = Math.floor(fx), j0 = Math.floor(fy), tx = fx - i0, ty = fy - j0;
-  const v = (i, j) => (i < 0 || j < 0 || i >= nx || j >= ny) ? -8 * 100 : R.z[j * nx + i];
-  return ((v(i0, j0) * (1 - tx) + v(i0 + 1, j0) * tx) * (1 - ty) + (v(i0, j0 + 1) * (1 - tx) + v(i0 + 1, j0 + 1) * tx) * ty) / 100;
+  return ((revCellZ(i0, j0) * (1 - tx) + revCellZ(i0 + 1, j0) * tx) * (1 - ty) + (revCellZ(i0, j0 + 1) * (1 - tx) + revCellZ(i0 + 1, j0 + 1) * tx) * ty) / 100;
 }
-function revCell(E, N, arr) {
-  const R = REVH, cs = R.grid.cs, i = Math.floor(E / cs), j = Math.floor((R.H - N) / cs);
-  if (i < 0 || j < 0 || i >= R.grid.nx || j >= R.grid.ny) return 0; return arr[j * R.grid.nx + i];
-}
-/* Spielkoordinaten */
 function revH(x, y) { const q = SHORE.realOf(x, y); return revZ(q[0], q[1]); }
 function revDepth(x, y) { return -revH(x, y); }
 
+/* ---------- Kurse ---------- */
+function revK(kurs) {
+  if (!REVX) return null;
+  if (kurs && kurs.indexOf('u:') === 0) return revCustom(kurs.slice(2));
+  return REVX.idx.courses[kurs] || null;
+}
+
 /* ---------- Aufbau ---------- */
 function revBuild() {
-  const R = REVH; let kurs = S.revKurs || 'bb';
-  let KK = kurs === 'bahn' ? null : revK(kurs); if (kurs !== 'bahn' && !KK) { kurs = S.revKurs = 'bb'; KK = R.courses.bb; }
+  const X = REVX; let kurs = S.revKurs || 'bb'; let KK = revK(kurs);
+  if (!KK) { kurs = S.revKurs = 'bb'; KK = revK('bb') || Object.values(X.idx.courses)[0] || { bahn: true, name: 'Freies Wasser', center: [X.W / 2, X.H / 2] }; }
   const wf = (Number(S.windFrom) || 0) * DEG, cs = Math.cos(wf), sn = Math.sin(wf);
-  const st = kurs === 'bahn' ? R.courses.bahn.center : KK.start;
-  try { MZ_MIN = 0.02; } catch (e) {}
+  const st = KK.bahn ? KK.center : KK.start;
   const bo = [st[0] * cs - st[1] * sn, st[0] * sn + st[1] * cs];
   const fwd = (E, N) => [E * cs - N * sn - bo[0], E * sn + N * cs - bo[1]];
-  const realOf = (x, y) => { const X = x + bo[0], Y = y + bo[1]; return [X * cs + Y * sn, -X * sn + Y * cs]; };
+  const realOf = (x, y) => { const XX = x + bo[0], Y = y + bo[1]; return [XX * cs + Y * sn, -XX * sn + Y * cs]; };
   const rotv = (u) => [u[0] * cs - u[1] * sn, u[0] * sn + u[1] * cs];
-  SHORE = { kind: 'revier', key: revKey(), fwd, realOf, rotv, c: [0, 0], R: 30000, fit: 999, P: null };
+  SHORE = { kind: 'revier', key: revKey(), fwd, realOf, rotv, c: [0, 0], R: 60000, fit: 999, P: null };
   TGM = { h: (x, y) => revH(x, y) };
   try { waterMat.uniforms.uShOn.value = 0; } catch (e) {}
-  const lo = S.gfx === 'niedrig';
-  revTerrain(lo); revTrees(lo); revHouses(lo); revLights(); revSeamarks(lo);
-  /* Landflächen für die Karte (Spielkoordinaten) */
-  SHORE.landMap = R.land.map(f => { const p = []; for (let k = 0; k < f.length; k += 2) p.push(fwd(f[k], f[k + 1])); return p; });
-  SHORE.places = R.places.filter(p => p[3] <= 1).map(p => { const q = fwd(p[0], p[1]); return [q[0], q[1], p[2]]; });
+  try { MZ_MIN = 0.01; } catch (e) {}
+  X.chunks = new Map(); X.scen = new Map(); X.lastE = null;
+  X.matT = new THREE.MeshLambertMaterial({ vertexColors: true });
+  revLights(); revSeamarks();
+  SHORE.landMap = X.idx.land.map(f => { const p = []; for (let k = 0; k < f.length; k += 2) p.push(fwd(f[k], f[k + 1])); return p; });
+  SHORE.places = X.idx.places.map(p => { const q = fwd(p[0], p[1]); return [q[0], q[1], p[2], p[3]]; });
+  X.built = false;
   try { seasonApply(shoreG); } catch (e) { console.error('Jahreszeit', e); }
 }
 
+/* Gelände-Stücke (64×64 Zellen = 2,56 km) mit Detailstufe nach Entfernung */
+var REV_CH = 64;
 const REV_LU_COL = { 0: '#7f9a5a', 1: '#3f5a33', 2: '#a59c8c', 3: '#b9b56f', 4: '#d8c99a', 5: '#6f7f55', 6: '#5f7a45', 7: '#86a35e' };
-function revTerrain(lo) {
-  const R = REVH, nx = R.grid.nx, ny = R.grid.ny, cs = R.grid.cs, st = lo ? 2 : 1, F = SHORE.fwd;
-  const cols = {}; for (const k in REV_LU_COL) cols[k] = new THREE.Color(REV_LU_COL[k]);
-  const cSand = new THREE.Color('#cdbd8f'), cWet = new THREE.Color('#9c8f6a'), cBed = new THREE.Color('#8f8a6a'), cRock = new THREE.Color('#9a9488'), tmp = new THREE.Color();
-  const CH = 64; /* Zellen je Kachel und Achse */
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
-  for (let cj = 0; cj < ny - 1; cj += CH * st) for (let ci = 0; ci < nx - 1; ci += CH * st) {
-    const j1 = Math.min(ny - 1, cj + CH * st), i1 = Math.min(nx - 1, ci + CH * st);
-    const js = [], is = []; for (let j = cj; j <= j1; j += st) js.push(j); if (js[js.length - 1] !== j1) js.push(j1);
-    for (let i = ci; i <= i1; i += st) is.push(i); if (is[is.length - 1] !== i1) is.push(i1);
-    let anyLand = false, anyShallow = false;
-    for (const j of js) for (const i of is) { const z = R.z[j * nx + i]; if (z > -50) anyShallow = true; if (z > 0) anyLand = true; }
-    if (!anyShallow) continue; /* reine tiefe See: keine Kachel nötig */
-    const W = is.length, H = js.length, pos = new Float32Array(W * H * 3), col = new Float32Array(W * H * 3), idx = [];
-    let k = 0;
-    for (const j of js) for (const i of is) {
-      const E = (i + 0.5) * cs, N = R.H - (j + 0.5) * cs, z = R.z[j * nx + i] / 100;
-      const [x, y] = F(E, N);
-      const h = z > 0 ? z + 0.35 : z * 1.0 - 0.6;    /* Land minimal anheben, Seegrund absenken: saubere Uferlinie */
-      pos[k * 3] = x; pos[k * 3 + 1] = h; pos[k * 3 + 2] = -y;
-      const lu = R.lu[j * nx + i], cd = R.cd[j * nx + i];
-      if (z <= 0) tmp.copy(cBed); else if (z < 1.2 || (cd <= 1 && lu !== 2 && lu !== 1)) tmp.copy(z < 0.6 ? cWet : cSand);
-      else { tmp.copy(cols[lu] || cols[0]); if (z > 35) tmp.lerp(cRock, Math.min(1, (z - 35) / 40) * 0.35); }
-      const v = 0.92 + 0.16 * Math.sin(i * 12.9898 + j * 78.233) * Math.sin(i * 3.1 + j * 1.7);
-      col[k * 3] = tmp.r * v; col[k * 3 + 1] = tmp.g * v; col[k * 3 + 2] = tmp.b * v; k++;
-    }
-    for (let a = 0; a < H - 1; a++) for (let b = 0; b < W - 1; b++) { const p = a * W + b; idx.push(p, p + W, p + 1, p + 1, p + W, p + W + 1); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere();
-    const m = new THREE.Mesh(g, mat); m.userData.revTerrain = true; shoreG.add(m);
+var REV_COLS = null;
+function revChunkBuild(c, step) {
+  const X = REVX, F = SHORE.fwd, cs = X.cs, CH = REV_CH;
+  if (!REV_COLS) { REV_COLS = {}; for (const k in REV_LU_COL) REV_COLS[k] = new THREE.Color(REV_LU_COL[k]); REV_COLS.sand = new THREE.Color('#cdbd8f'); REV_COLS.wet = new THREE.Color('#9c8f6a'); REV_COLS.bed = new THREE.Color('#8f8a6a'); REV_COLS.rock = new THREE.Color('#9a9488'); }
+  const C = REV_COLS, tmp = new THREE.Color();
+  const n = CH / step + 1, pos = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3); let k = 0, any = false;
+  for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) {
+    const gi = c.gi + b * step, gj = c.gj + a * step, z = revCellZ(gi, gj) / 100;
+    if (z > -0.5) any = true;
+    const E = (gi + 0.5) * cs, N = X.H - (gj + 0.5) * cs, [x, y] = F(E, N), h = z > 0 ? z + 0.35 : z - 0.6;
+    pos[k * 3] = x; pos[k * 3 + 1] = h; pos[k * 3 + 2] = -y;
+    const lu = revCellLu(gi, gj), cd = revCellCd(gi, gj);
+    if (z <= 0) tmp.copy(C.bed); else if (z < 1.2 || (cd <= 1 && lu !== 2 && lu !== 1)) tmp.copy(z < 0.6 ? C.wet : C.sand);
+    else { tmp.copy(C[lu] || C[0]); if (z > 35) tmp.lerp(C.rock, Math.min(1, (z - 35) / 40) * 0.35); }
+    const v = 0.92 + 0.16 * Math.sin(gi * 12.9898 + gj * 78.233) * Math.sin(gi * 3.1 + gj * 1.7);
+    col[k * 3] = tmp.r * v; col[k * 3 + 1] = tmp.g * v; col[k * 3 + 2] = tmp.b * v; k++;
   }
+  if (c.mesh) { shoreG.remove(c.mesh); c.mesh.geometry.dispose(); c.mesh = null; }
+  c.step = step; if (!any) return;
+  const idx = new (n * n > 65535 ? Uint32Array : Uint16Array)((n - 1) * (n - 1) * 6); let q = 0;
+  for (let a = 0; a < n - 1; a++) for (let b = 0; b < n - 1; b++) { const p = a * n + b; idx[q++] = p; idx[q++] = p + n; idx[q++] = p + 1; idx[q++] = p + 1; idx[q++] = p + n; idx[q++] = p + n + 1; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeVertexNormals(); g.computeBoundingSphere();
+  c.mesh = new THREE.Mesh(g, X.matT); shoreG.add(c.mesh);
 }
-function revTrees(lo) {
-  const R = REVH, nx = R.grid.nx, ny = R.grid.ny, cs = R.grid.cs, F = SHORE.fwd;
-  const CAP = lo ? 7000 : 24000, maxCd = lo ? 14 : 24, pts = [];
-  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
-    const k = j * nx + i, lu = R.lu[k]; if (lu !== 1 && lu !== 6) continue; if (R.cd[k] > maxCd || R.z[k] < 80) continue;
-    const n = lu === 1 ? (R.cd[k] < 6 ? 3 : 2) : 1;
-    for (let q = 0; q < n; q++) pts.push([(i + Math.random()) * cs, R.H - (j + Math.random()) * cs, lu]);
+/* Bäume und Häuser einer Kachel (nur in der Nähe) */
+function revScenBuild(t) {
+  const X = REVX, F = SHORE.fwd, cs = X.cs, lo = S.gfx === 'niedrig', grp = new THREE.Group();
+  const cap = lo ? 2200 : 7000, pts = [];
+  for (let j = 0; j < t.ky; j++) for (let i = 0; i < t.kx; i++) {
+    const k = j * t.kx + i, lu = t.lu[k]; if (lu !== 1 && lu !== 6) continue; if (t.cd[k] > (lo ? 14 : 24) || t.z[k] < 80) continue;
+    const nn = lu === 1 ? (t.cd[k] < 6 ? 3 : 2) : 1;
+    for (let q = 0; q < nn; q++) pts.push([(t.i1 + i + Math.random()) * cs, X.H - (t.j1 + j + Math.random()) * cs, lu]);
   }
-  for (let a = pts.length - 1; a > 0; a--) { const b = Math.floor(Math.random() * (a + 1)); const t = pts[a]; pts[a] = pts[b]; pts[b] = t; }
-  const use = pts.slice(0, CAP); if (!use.length) return;
-  const cone = new THREE.ConeGeometry(1, 1, 6); cone.translate(0, 0.5, 0); const blob = new THREE.IcosahedronGeometry(1, 0);
-  const nC = use.filter((p, k) => k % 3 === 0).length, nB = use.length - nC;
-  const imC = new THREE.InstancedMesh(cone, new THREE.MeshLambertMaterial({ color: 0xffffff }), nC);
-  const imB = new THREE.InstancedMesh(blob, new THREE.MeshLambertMaterial({ color: 0xffffff }), nB);
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color();
-  let a = 0, b = 0;
-  use.forEach((t, k) => {
-    const [x, y] = F(t[0], t[1]); const h0 = revZ(t[0], t[1]) + 0.35; if (h0 < 0.8) return;
-    if (k % 3 === 0) { const hh = t[2] === 6 ? rnd(3, 6) : rnd(11, 19); sc.set(hh * 0.28, hh, hh * 0.28); p.set(x, h0 - 0.3, -y); m4.compose(p, q, sc); imC.setMatrixAt(a, m4); c.setHSL(rnd(0.27, 0.33), rnd(0.3, 0.45), rnd(0.16, 0.24)); imC.setColorAt(a++, c); }
-    else { const r = t[2] === 6 ? rnd(1.5, 3) : rnd(3.5, 6.5); sc.set(r, r * rnd(1.1, 1.5), r); p.set(x, h0 + r * 0.9, -y); m4.compose(p, q, sc); imB.setMatrixAt(b, m4); c.setHSL(rnd(0.2, 0.3), rnd(0.32, 0.5), rnd(0.2, 0.3)); imB.setColorAt(b++, c); }
-  });
-  imC.count = a; imB.count = b; imC.frustumCulled = imB.frustumCulled = false; shoreG.add(imC, imB);
-}
-function revHouses(lo) {
-  const R = REVH, F = SHORE.fwd, list = R.houses.slice(0, lo ? 2500 : 6000); if (!list.length) return;
-  const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0);
-  const roof = new THREE.ConeGeometry(0.75, 1, 4, 1); roof.rotateY(Math.PI / 4); roof.translate(0, 0.5, 0);
-  const imW = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: 0xffffff }), list.length);
-  const imR = new THREE.InstancedMesh(roof, new THREE.MeshLambertMaterial({ color: 0xffffff }), list.length);
+  for (let a = pts.length - 1; a > 0; a--) { const b = Math.floor(Math.random() * (a + 1)); const tt = pts[a]; pts[a] = pts[b]; pts[b] = tt; }
+  const use = pts.slice(0, cap);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
-  const wf = (Number(S.windFrom) || 0) * DEG; let n = 0;
-  for (const hs of list) {
-    const [E, N, l, w, ang, hh] = hs; const [x, y] = F(E, N); const h0 = revZ(E, N) + 0.35; if (h0 < 0.5) continue;
-    const H = Math.min(hh, 25); q.setFromAxisAngle(up, ang + wf);
-    sc.set(l, H * 0.72, w); p.set(x, h0 - 0.2, -y); m4.compose(p, q, sc); imW.setMatrixAt(n, m4);
-    c.set(['#e8e1d2', '#d9cdb5', '#f1ece2', '#c9b79a', '#b4553f'][Math.floor(Math.random() * 5)]); imW.setColorAt(n, c);
-    sc.set(l * 1.05, Math.min(H * 0.38, 6), w * 1.05); p.set(x, h0 - 0.2 + H * 0.72, -y); m4.compose(p, q, sc); imR.setMatrixAt(n, m4);
-    c.set(Math.random() < 0.55 ? '#8c3b2a' : Math.random() < 0.5 ? '#5a4a3a' : '#c8b27a'); imR.setColorAt(n, c); n++;
+  if (use.length) {
+    const cone = new THREE.ConeGeometry(1, 1, 6); cone.translate(0, 0.5, 0); const blob = new THREE.IcosahedronGeometry(1, 0);
+    const nC = Math.ceil(use.length / 3), imC = new THREE.InstancedMesh(cone, new THREE.MeshLambertMaterial({ color: 0xffffff }), nC), imB = new THREE.InstancedMesh(blob, new THREE.MeshLambertMaterial({ color: 0xffffff }), use.length - nC + 1);
+    let a = 0, b = 0;
+    use.forEach((tr, k) => {
+      const [x, y] = F(tr[0], tr[1]), h0 = revZ(tr[0], tr[1]) + 0.35; if (h0 < 0.8) return;
+      if (k % 3 === 0) { const hh = tr[2] === 6 ? rnd(3, 6) : rnd(11, 19); sc.set(hh * 0.28, hh, hh * 0.28); p.set(x, h0 - 0.3, -y); m4.compose(p, q, sc); imC.setMatrixAt(a, m4); c.setHSL(rnd(0.27, 0.33), rnd(0.3, 0.45), rnd(0.16, 0.24)); imC.setColorAt(a++, c); }
+      else { const r = tr[2] === 6 ? rnd(1.5, 3) : rnd(3.5, 6.5); sc.set(r, r * rnd(1.1, 1.5), r); p.set(x, h0 + r * 0.9, -y); m4.compose(p, q, sc); imB.setMatrixAt(b, m4); c.setHSL(rnd(0.2, 0.3), rnd(0.32, 0.5), rnd(0.2, 0.3)); imB.setColorAt(b++, c); }
+    });
+    imC.count = a; imB.count = b; grp.add(imC, imB);
   }
-  imW.count = imR.count = n; imW.frustumCulled = imR.frustumCulled = false; shoreG.add(imW, imR);
+  const nh = Math.min(t.hs.length / 6, lo ? 2500 : 9000);
+  if (nh > 0) {
+    const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0); const roof = new THREE.ConeGeometry(0.75, 1, 4, 1); roof.rotateY(Math.PI / 4); roof.translate(0, 0.5, 0);
+    const imW = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: 0xffffff }), nh), imR = new THREE.InstancedMesh(roof, new THREE.MeshLambertMaterial({ color: 0xffffff }), nh);
+    const wf = (Number(S.windFrom) || 0) * DEG, ex0 = t.i1 * cs, ny0 = X.H - (t.j1 + t.ky) * cs; let n2 = 0;
+    for (let k = 0; k < nh; k++) {
+      const h6 = t.hs, E = ex0 + h6[k * 6], N = ny0 + h6[k * 6 + 1], l = h6[k * 6 + 2] / 10, w = h6[k * 6 + 3] / 10, ang = h6[k * 6 + 4] / 1000, hh = h6[k * 6 + 5] / 10;
+      const [x, y] = F(E, N), h0 = revZ(E, N) + 0.35; if (h0 < 0.5) continue;
+      const Hh = Math.min(hh, 25); q.setFromAxisAngle(up, ang + wf);
+      sc.set(l, Hh * 0.72, w); p.set(x, h0 - 0.2, -y); m4.compose(p, q, sc); imW.setMatrixAt(n2, m4);
+      c.set(['#e8e1d2', '#d9cdb5', '#f1ece2', '#c9b79a', '#b4553f'][(k * 7) % 5]); imW.setColorAt(n2, c);
+      sc.set(l * 1.05, Math.min(Hh * 0.38, 6), w * 1.05); p.set(x, h0 - 0.2 + Hh * 0.72, -y); m4.compose(p, q, sc); imR.setMatrixAt(n2, m4);
+      c.set((k * 13) % 9 < 5 ? '#8c3b2a' : (k * 13) % 9 < 7 ? '#5a4a3a' : '#c8b27a'); imR.setColorAt(n2, c); n2++;
+    }
+    imW.count = imR.count = n2; grp.add(imW, imR);
+  }
+  grp.traverse(o => { if (o.isInstancedMesh) o.frustumCulled = false; });
+  shoreG.add(grp); try { seasonApply(grp); } catch (e) {}
+  return grp;
 }
+function revDispose(o) { if (!o) return; shoreG.remove(o); o.traverse(m => { if (m.geometry) m.geometry.dispose(); if (m.material && m.material !== REVX.matT) { (Array.isArray(m.material) ? m.material : [m.material]).forEach(x => x.dispose()); } }); }
+/* Nachladen und Detailstufen – läuft mit der Anzeige mit */
+function revTick(force) {
+  const X = REVX; if (!X || !SHORE || SHORE.kind !== 'revier' || typeof G === 'undefined' || !G || !G.boats) return;
+  const now = performance.now(); if (!force && now - X.tick < 350) return; X.tick = now;
+  const pl = G.boats[0]; if (!pl) return;
+  const [E, N] = SHORE.realOf(pl.x, pl.y), lo = S.gfx === 'niedrig', cs = X.cs, CH = REV_CH, chm = CH * cs;
+  /* Daten: Kacheln um den Spieler (12 km) und um jedes Boot (1,5 km) */
+  const want = new Set();
+  for (const m of revTilesNear(E, N, 12000)) want.add(m);
+  for (const b of G.boats) { if (b === pl) continue; const q = SHORE.realOf(b.x, b.y); for (const m of revTilesNear(q[0], q[1], 1500)) want.add(m); }
+  const wl = [...want].map(m => ({ m, d: revRectDist(E, N, m.ti * X.T * cs, X.H - (m.tj + 1) * X.T * cs, X.T * cs) })).sort((a, b) => a.d - b.d);
+  for (const w of wl) { const t = X.tiles.get(w.m.ti + ',' + w.m.tj); if (t) t.used = now; else if (X.nLoad < 2) revTileLoad(w.m); }
+  if (X.tiles.size > 14) { const old = [...X.tiles.entries()].filter(([k, t]) => t.st !== 'lade' && !wl.some(w => w.m.ti + ',' + w.m.tj === k)).sort((a, b) => a[1].used - b[1].used); while (X.tiles.size > 14 && old.length) { const [k] = old.shift(); const s = X.scen.get(k); if (s) { revDispose(s); X.scen.delete(k); } X.tiles.delete(k); } }
+  /* Gelände-Stücke */
+  const RV = lo ? 7500 : 10500, gi0 = Math.floor((E - RV) / chm), gi1 = Math.floor((E + RV) / chm), gj0 = Math.floor((X.H - N - RV) / chm), gj1 = Math.floor((X.H - N + RV) / chm);
+  let budget = (force || !X.built) ? 400 : 8; X.built = true; const seen = new Set();
+  for (let cj = gj0; cj <= gj1; cj++) for (let ci = gi0; ci <= gi1; ci++) {
+    const gi = ci * CH, gj = cj * CH; if (gi < 0 || gj < 0 || gi >= X.nx || gj >= X.ny) continue;
+    const ti = (gi / X.T) | 0, tj = (gj / X.T) | 0; if (!X.meta.has(ti + ',' + tj)) continue;
+    const d = revRectDist(E, N, gi * cs, X.H - (gj + CH) * cs, chm); if (d > RV) continue;
+    const key = ci + ',' + cj; seen.add(key);
+    const step = lo ? (d < 3000 ? 2 : 4) : (d < 2500 ? 1 : d < 6000 ? 2 : 4);
+    let c = X.chunks.get(key); if (!c) { c = { gi, gj, ti, tj, step: 0, mesh: null }; X.chunks.set(key, c); }
+    if (c.step !== step && budget > 0) { revChunkBuild(c, step); budget--; }
+  }
+  for (const [k, c] of X.chunks) if (!seen.has(k)) { if (c.mesh) { shoreG.remove(c.mesh); c.mesh.geometry.dispose(); } X.chunks.delete(k); }
+  /* Bäume und Häuser */
+  const RS = lo ? 3500 : 5500;
+  for (const [k, t] of X.tiles) {
+    if (t.st !== 'da') continue;
+    const d = revRectDist(E, N, t.i1 * cs, X.H - (t.j1 + t.ky) * cs, t.kx * cs), s = X.scen.get(k);
+    if (d < RS && !s && budget > 0) { X.scen.set(k, revScenBuild(t)); budget -= 3; }
+    else if (d > RS + 2500 && s) { revDispose(s); X.scen.delete(k); }
+  }
+}
+function revRectDist(E, N, x0, y0, size) { const dx = Math.max(x0 - E, 0, E - (x0 + size)), dy = Math.max(y0 - N, 0, N - (y0 + size)); return Math.hypot(dx, dy); }
+
 function revLights() {
-  const R = REVH, F = SHORE.fwd;
+  const X = REVX, F = SHORE.fwd;
   const white = new THREE.MeshLambertMaterial({ color: '#f4f2ec' }), red = new THREE.MeshLambertMaterial({ color: '#b3362c' }), lamp = new THREE.MeshBasicMaterial({ color: '#fff3b0' });
-  for (const L of R.lights) {
-    const [x, y] = F(L[0], L[1]), h0 = Math.max(0.5, revZ(L[0], L[1]) + 0.35), H = Math.max(10, Math.min(L[3] || 20, 30));
-    const g = new THREE.Group();
+  for (const Lh of X.idx.lights) {
+    const [x, y] = F(Lh[0], Lh[1]), h0 = Math.max(0.5, revZ(Lh[0], Lh[1]) + 0.35), H = Math.max(10, Math.min(Lh[3] || 20, 35)), g = new THREE.Group();
     const t = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.07, H * 0.11, H, 12), white); t.position.y = H / 2; g.add(t);
     const bnd = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.085, H * 0.09, H * 0.15, 12), red); bnd.position.y = H * 0.55; g.add(bnd);
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.06, H * 0.06, H * 0.1, 10), lamp); top.position.y = H + H * 0.05; g.add(top);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.06, H * 0.06, H * 0.1, 10), lamp); top.position.y = H * 1.05; g.add(top);
     const cap = new THREE.Mesh(new THREE.ConeGeometry(H * 0.09, H * 0.1, 10), red); cap.position.y = H * 1.15; g.add(cap);
     g.position.set(x, h0, -y); shoreG.add(g);
   }
 }
-/* Echte Fahrwassertonnen (OpenSeaMap): rot = Spiere/Stumpf, grün = Spitz, gelb-schwarz = Kardinal */
-function revSeamarks(lo) {
-  const R = REVH, F = SHORE.fwd;
-  const C = { r: '#c62828', g: '#2e7d32', y: '#f2c230', k: '#1b1b1b', w: '#f4f4f4', o: '#ef7d1a' };
-  const can = new THREE.CylinderGeometry(0.45, 0.45, 1.6, 10); can.translate(0, 0.8, 0);
-  const cone = new THREE.ConeGeometry(0.55, 1.7, 10); cone.translate(0, 0.85, 0);
-  const pil = new THREE.CylinderGeometry(0.25, 0.55, 2.6, 10); pil.translate(0, 1.3, 0);
-  const sph = new THREE.SphereGeometry(0.6, 12, 8); sph.translate(0, 0.6, 0);
-  const mats = {}; const M = c => mats[c] || (mats[c] = new THREE.MeshLambertMaterial({ color: C[c] || '#888' }));
-  SHORE.smFloats = [];
-  for (const s of R.seamarks) {
+/* Echte Fahrwassertonnen (OpenSeaMap) – gebündelt gezeichnet */
+function revSeamarks() {
+  const X = REVX, F = SHORE.fwd;
+  const COL = { r: '#c62828', g: '#2e7d32', y: '#f2c230', k: '#1b1b1b', w: '#f4f4f4', o: '#ef7d1a' };
+  const can = new THREE.CylinderGeometry(0.52, 0.52, 1.85, 10); can.translate(0, 0.92, 0);
+  const cone = new THREE.ConeGeometry(0.63, 1.95, 10); cone.translate(0, 0.98, 0);
+  const pil = new THREE.CylinderGeometry(0.29, 0.63, 3.0, 10); pil.translate(0, 1.5, 0);
+  const sph = new THREE.SphereGeometry(0.69, 12, 8); sph.translate(0, 0.69, 0);
+  const band = new THREE.CylinderGeometry(0.48, 0.58, 0.8, 10); band.translate(0, 1.27, 0);
+  const groups = {};
+  const add = (geo, gk, c, x, y) => { const k = gk + c; (groups[k] || (groups[k] = { geo, c, p: [] })).p.push([x, y]); };
+  for (const s of X.idx.seamarks) {
     const [E, N, k, col, form] = s; if (k === 'F') continue; if (revZ(E, N) > -0.2) continue;
     const [x, y] = F(E, N), c0 = (col || 'y')[0], c1 = col && col[1];
-    let geo = sph; if (k === 'L') geo = /con/.test(form) ? cone : can; else if (k === 'C' || k === 'I') geo = pil; else if (k === 'S') geo = /con/.test(form) ? cone : /can|barrel/.test(form) ? can : sph;
-    const g = new THREE.Group(), m = new THREE.Mesh(geo, M(c0)); g.add(m);
-    if (c1) { const b2 = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.7, 10), M(c1)); b2.position.y = 1.1; g.add(b2); }
-    g.position.set(x, -0.1, -y); g.scale.setScalar(1.15); shoreG.add(g);
+    let geo = sph, gk = 'sph'; if (k === 'L') { if (/con/.test(form)) { geo = cone; gk = 'cone'; } else { geo = can; gk = 'can'; } }
+    else if (k === 'C' || k === 'I') { geo = pil; gk = 'pil'; } else if (k === 'S') { if (/con/.test(form)) { geo = cone; gk = 'cone'; } else if (/can|barrel/.test(form)) { geo = can; gk = 'can'; } }
+    add(geo, gk, c0, x, y); if (c1) add(band, 'band', c1, x, y);
+  }
+  const m4 = new THREE.Matrix4();
+  for (const k in groups) {
+    const gr = groups[k], im = new THREE.InstancedMesh(gr.geo, new THREE.MeshLambertMaterial({ color: COL[gr.c] || '#888' }), gr.p.length);
+    gr.p.forEach((p, i) => { m4.makeTranslation(p[0], -0.1, -p[1]); im.setMatrixAt(i, m4); });
+    im.frustumCulled = false; shoreG.add(im);
   }
 }
 
 /* ---------- Grundberührung ---------- */
 function revKeepIn(b) {
-  if (!REVH) return;
+  if (!REVX) return;
   const dr = b.rib ? 0.5 : revDraft(); let d = revDepth(b.x, b.y);
   if (d >= dr) return;
   const e = 15, gx = revDepth(b.x + e, b.y) - revDepth(b.x - e, b.y), gy = revDepth(b.x, b.y + e) - revDepth(b.x, b.y - e);
-  let l = Math.hypot(gx, gy); let ux = l > 1e-6 ? gx / l : -dirv(b.h)[0], uy = l > 1e-6 ? gy / l : -dirv(b.h)[1];
+  const l = Math.hypot(gx, gy), ux = l > 1e-6 ? gx / l : -dirv(b.h)[0], uy = l > 1e-6 ? gy / l : -dirv(b.h)[1];
   for (let k = 0; k < 12 && d < dr; k++) { b.x += ux * 1.5; b.y += uy * 1.5; d = revDepth(b.x, b.y); }
   /* Bug Richtung tieferes Wasser drehen (KI ganz, Spieler etwas), nie in den Wind */
   const gh = wrap360(Math.atan2(ux, uy) / DEG); let want = gh; const offW = wrap180(want - b.W);
@@ -941,21 +1037,21 @@ function revKeepIn(b) {
   b.h = wrap360(b.h + clamp(turn, -lim, lim));
   b.v = b.isPlayer ? Math.max(b.v * 0.3, 0.3) : Math.max(b.v * 0.4, 0.8);
   if (b.isPlayer && (!b.groundT || G.t - b.groundT > 5)) {
-    b.groundT = G.t; const w = Math.max(0, -revH(b.x, b.y) + 0);
-    msg(revH(b.x, b.y) > 0 ? 'Auf Grund gelaufen – Ufer!' : 'Auf Grund gelaufen – hier sind nur ' + w.toFixed(1).replace('.', ',') + ' m Wasser (Tiefgang ' + dr.toFixed(1).replace('.', ',') + ' m).', 'bad');
+    b.groundT = G.t; const w = Math.max(0, -revH(b.x, b.y));
+    msg(revH(b.x, b.y) > 0 ? 'Auf Grund gelaufen – Ufer!' : 'Auf Grund gelaufen – hier sind nur ' + revFmt(w, 1) + ' m Wasser (Tiefgang ' + revFmt(dr, 1) + ' m).', 'bad');
     beep(150, 0.4, 'square', 0.05);
   }
 }
 /* KI: rechtzeitig vor Flachwasser wenden bzw. abfallen */
 function revAvoid(b, hd) {
-  if (!REVH) return hd;
+  if (!REVX) return hd;
   const dr = revDraft() + 0.35, la = clamp(b.v * 22, 45, 170), ai = b.ai;
   const clear = h => { const u = dirv(h), w = dirv(b.W), lee = Math.abs(wrap180(b.W - h)) < 80 ? 14 : 0;
     const lx = -w[0] * lee, ly = -w[1] * lee;
     for (let t = 12; t <= la; t += 12) { if (revDepth(b.x + u[0] * t, b.y + u[1] * t) < dr) return false; if (lee && revDepth(b.x + u[0] * t + lx, b.y + u[1] * t + ly) < dr) return false; } return true; };
   if (clear(hd)) return hd;
-  const off = wrap180(b.W - hd), up = Math.abs(off) < 70;
-  if (up) { const h2 = wrap360(2 * b.W - hd); if (clear(h2)) { if (ai) { ai.commitSide = -b.side; ai.commitUntil = G.t + 14; ai.lastTack = G.t; } return h2; } }
+  const off = wrap180(b.W - hd), upw = Math.abs(off) < 70;
+  if (upw) { const h2 = wrap360(2 * b.W - hd); if (clear(h2)) { if (ai) { ai.commitSide = -b.side; ai.commitUntil = G.t + 14; ai.lastTack = G.t; } return h2; } }
   for (let dv = 10; dv <= 120; dv += 10) for (const s of [1, -1]) { const h = wrap360(hd + s * dv); if (Math.abs(wrap180(b.W - h)) < 38) continue; if (clear(h)) return h; }
   return wrap360(2 * b.W - hd);
 }
@@ -984,14 +1080,12 @@ function revCourse(C) {
   C.rev = { name: K.name, sm: K.sm, route: K.route.map(p => F(p[0], p[1])) };
   return true;
 }
-/* Ziel für die KI an einem Wegpunkt-Tor: mittig ins Tor, dann ein Stück durch */
 function revWpAim(b, m) {
   const lat = (b.x - m.x) * m.r[0] + (b.y - m.y) * m.r[1], al = (b.x - m.x) * m.u[0] + (b.y - m.y) * m.u[1];
   const lt = clamp(lat, -m.hw * 0.45, m.hw * 0.45), ahead = Math.max(25, L * 3);
-  if (al > L && Math.abs(lat) > m.hw) return { x: m.x + m.r[0] * lt - m.u[0] * 40, y: m.y + m.r[1] * lt - m.u[1] * 40 }; /* am Tor vorbei: zurück */
+  if (al > L && Math.abs(lat) > m.hw) return { x: m.x + m.r[0] * lt - m.u[0] * 40, y: m.y + m.r[1] * lt - m.u[1] * 40 };
   return { x: m.x + m.r[0] * lt + m.u[0] * ahead, y: m.y + m.r[1] * lt + m.u[1] * ahead };
 }
-/* Tor passiert? (Bug kreuzt die Torlinie in Kursrichtung innerhalb der Torbreite) */
 function revWpStuck(b, m) {
   if (b.isPlayer || b.remote || !b.ai) return false; const ai = b.ai, d = Math.hypot(b.x - m.x, b.y - m.y);
   if (ai.wpLeg !== b.leg) { ai.wpLeg = b.leg; ai.wpBest = d; ai.wpT = G.t; return false; }
@@ -1016,15 +1110,16 @@ function revMapDraw(x, mp, W, H) {
   }
   const C = G && G.course;
   if (C && C.rev) { x.setLineDash([4, 4]); x.strokeStyle = 'rgba(255,210,63,.75)'; x.lineWidth = 1.2; x.beginPath(); C.rev.route.forEach((p, k) => { const q = mp(p[0], p[1]); k ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1]); }); x.stroke(); x.setLineDash([]); }
+  const a = mp(0, 0), b2 = mp(1000, 0), pxkm = Math.hypot(b2[0] - a[0], b2[1] - a[1]), maxRank = pxkm > 40 ? 3 : pxkm > 12 ? 1 : 0;
   x.font = '600 10px system-ui,sans-serif'; x.fillStyle = 'rgba(30,30,30,.85)';
-  for (const p of SHORE.places) { const q = mp(p[0], p[1]); if (q[0] > 0 && q[0] < W && q[1] > 0 && q[1] < H) x.fillText(p[2], q[0] + 3, q[1] - 3); }
+  for (const p of SHORE.places) { if (p[3] > maxRank) continue; const q = mp(p[0], p[1]); if (q[0] > 0 && q[0] < W && q[1] > 0 && q[1] < H) x.fillText(p[2], q[0] + 3, q[1] - 3); }
   x.restore();
 }
 
 /* ---------- Tempo-Knopf für Langstrecken ---------- */
 function revSpeedBtn() {
   let el = document.getElementById('revSpeed');
-  const long = S.revier === 'hiddensee' && (S.revKurs || 'bb') !== 'bahn' && G && G.running && !G.over;
+  const long = !!REVIERE_K[S.revier] && REVX && !revIsBahn() && G && G.running && !G.over && !G.free;
   if (!el) {
     el = document.createElement('button'); el.id = 'revSpeed'; el.type = 'button';
     el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:8px;z-index:60;font:600 14px system-ui,sans-serif;color:#fff;background:rgba(12,30,40,.82);border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:6px 12px;cursor:pointer;display:none';
@@ -1035,6 +1130,198 @@ function revSpeedBtn() {
   el.style.display = long ? 'block' : 'none';
   el.textContent = '⏩ Tempo ' + String(S.gameSpeed).replace('.', ',') + '×';
 }
+
+/* ---------- Eigene Strecken ---------- */
+var REV_SK = 'regattakoje.strecken', RVE = null;
+function revStreckenRoh() { try { const a = JSON.parse(localStorage.getItem(REV_SK) || '[]'); return Array.isArray(a) ? a.filter(s => s && s.id) : []; } catch (e) { return []; } }
+function revStreckenSave(a) { try { localStorage.setItem(REV_SK, JSON.stringify(a)); return true; } catch (e) { return false; } }
+/* gespeichert wird in UTM (Meter), damit Strecken jede Reviergröße überleben */
+function revUtm(s) { if (s.ptsU) return s.ptsU; const o = REV_ORIG_ALT[s.rev]; return o && s.pts ? s.pts.map(p => [p[0] + o[0], p[1] + o[1]]) : null; }
+function revStrecken() {
+  if (!REVX) return []; const o = REVX.idx.origin_utm, W = REVX.W, H = REVX.H;
+  return revStreckenRoh().map(s => { const U = revUtm(s); if (!U || U.length < 2) return null; const pts = U.map(p => [p[0] - o.x, p[1] - o.y]); if (pts.some(p => p[0] < 0 || p[1] < 0 || p[0] > W || p[1] > H)) return null; return Object.assign({}, s, { pts }); }).filter(Boolean);
+}
+function revLenSm(p) { let L = 0; for (let k = 1; k < p.length; k++) L += Math.hypot(p[k][0] - p[k - 1][0], p[k][1] - p[k - 1][1]); return L / 1852; }
+function revKursOptions() {
+  if (!REVX) return [['bb', 'Blaues Band vom Strelasund'], ['rund', 'Rund Hiddensee'], ['bahn', 'Regattabahn vor Hiddensee (Westseite)']];
+  const o = [];
+  for (const k in REVX.idx.courses) { const c = REVX.idx.courses[k]; o.push([k, c.bahn ? c.name : c.name + ' (ca. ' + revFmt(c.sm, 0) + ' sm)']); }
+  for (const s of revStrecken()) o.push(['u:' + s.id, 'Eigene: ' + s.name + ' (' + revFmt(revLenSm(s.pts), 1) + ' sm)']);
+  return o;
+}
+function revNearName(p) { if (!REVX) return ''; let best = null; for (const q of REVX.idx.places) { const d = Math.hypot(q[0] - p[0], q[1] - p[1]) + q[3] * 700; if (d < 6000 && (!best || d < best[0])) best = [d, q[2]]; } return best ? best[1] : ''; }
+function revGateHw(E, N, u, cap) { const r = [-u[1], u[0]]; const side = s => { let d = 0; while (d < cap && revZ(E + r[0] * s * (d + 10), N + r[1] * s * (d + 10)) <= -1.3) d += 10; return d; }; return Math.max(25, Math.min(side(1), side(-1), cap)); }
+function revCustom(id) {
+  const s = revStrecken().find(q => q.id === id); if (!s || !REVX) return null; const P = s.pts, gates = [];
+  for (let k = 1; k < P.length - 1; k++) {
+    const a = P[k - 1], b = P[k], c = P[k + 1]; const u1 = [b[0] - a[0], b[1] - a[1]], u2 = [c[0] - b[0], c[1] - b[1]]; const l1 = Math.hypot(u1[0], u1[1]) || 1, l2 = Math.hypot(u2[0], u2[1]) || 1;
+    let u = [u1[0] / l1 + u2[0] / l2, u1[1] / l1 + u2[1] / l2], lu = Math.hypot(u[0], u[1]); if (lu < 1e-6) { u = [u1[0] / l1, u1[1] / l1]; lu = 1; } u = [u[0] / lu, u[1] / lu];
+    const nn = revNearName(b); gates.push({ x: b[0], y: b[1], u, hw: revGateHw(b[0], b[1], u, 150), name: 'Tor ' + k + (nn ? ' · ' + nn : '') });
+  }
+  const f = P[P.length - 1], nf = revNearName(f);
+  return { name: s.name, sm: +revLenSm(P).toFixed(1), start: P[0], gates, finish: { x: f[0], y: f[1], windLine: true, name: 'Ziel' + (nf ? ' · ' + nf : '') }, route: P, custom: true, t: s.t };
+}
+
+/* Editor: Karte mit Tiefen, Tippen = Punkt, Ziehen = verschieben / Karte schieben */
+function revEditOpen() {
+  if (!REVX) { const pr = revLoad(); msg('Revierdaten werden geladen – der Editor öffnet gleich.', 'info'); if (pr) pr.then(() => { if (REVX) revEditOpen(); }); return; }
+  if (!RVE) revEditBuild();
+  RVE.ov.hidden = false; RVE.pts = []; RVE.editId = null; RVE.name = ''; RVE.warn = '';
+  requestAnimationFrame(() => { revEditFit(); revEditList(); revEditDraw(); });
+}
+function revEditClose() {
+  RVE.ov.hidden = true;
+  try { buildForm(); } catch (e) {}
+  if (REVIERE_K[S.revier] && String(S.revKurs || '').indexOf('u:') === 0) { try { onSetting('revKurs'); } catch (e) {} }
+}
+function revEditBuild() {
+  const ov = document.createElement('div'); ov.id = 'revEdit'; ov.hidden = true;
+  ov.style.cssText = 'position:fixed;inset:0;z-index:300;background:#0c1820;color:#e8f0f2;font:14px system-ui,-apple-system,sans-serif;display:flex;flex-direction:column';
+  ov.innerHTML = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 8px 6px">'
+    + '<b style="font-size:16px;margin-right:auto">Eigene Strecke · Rügen</b>'
+    + '<button type="button" data-a="undo">↶ Punkt zurück</button><button type="button" data-a="new">＋ Neu</button><button type="button" data-a="save">💾 Speichern</button><button type="button" data-a="close">✕ Fertig</button></div>'
+    + '<div style="position:relative;flex:1;min-height:0"><canvas style="position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair"></canvas>'
+    + '<div data-r="info" style="position:absolute;left:8px;right:8px;bottom:8px;background:rgba(12,24,32,.9);border:1px solid #2a4553;border-radius:10px;padding:7px 10px;font-size:13px;line-height:1.4"></div></div>'
+    + '<div data-r="list" style="max-height:30vh;overflow:auto;padding:6px 8px 10px;border-top:1px solid #2a4553"></div>';
+  ov.querySelectorAll('button').forEach(b => b.style.cssText = 'font:600 14px system-ui,sans-serif;color:#fff;background:#183342;border:1px solid #2f5a6e;border-radius:9px;padding:7px 10px;cursor:pointer');
+  document.body.appendChild(ov);
+  const cv = ov.querySelector('canvas'), o = REVX.ov, nx = o.nx, ny = o.ny;
+  const img = document.createElement('canvas'); img.width = nx; img.height = ny; const c2 = img.getContext('2d'), id = c2.createImageData(nx, ny);
+  const T = [[1, [96, 150, 205]], [2, [128, 176, 222]], [3, [160, 198, 234]], [5, [188, 215, 240]], [10, [213, 230, 246]], [1e9, [236, 244, 251]]];
+  const LC = { 0: [222, 212, 176], 1: [176, 198, 146], 2: [208, 196, 184], 3: [232, 224, 186], 4: [240, 226, 176], 5: [196, 208, 176], 6: [196, 210, 160], 7: [212, 222, 178] };
+  for (let k = 0; k < nx * ny; k++) {
+    const z = o.z[k] / 100; let c;
+    if (z < 0) { c = T[T.length - 1][1]; for (const [g, cc] of T) if (-z < g) { c = cc; break; } } else c = LC[o.lu[k]] || LC[0];
+    id.data[k * 4] = c[0]; id.data[k * 4 + 1] = c[1]; id.data[k * 4 + 2] = c[2]; id.data[k * 4 + 3] = 255;
+  }
+  c2.putImageData(id, 0, 0);
+  RVE = { ov, cv, img, pts: [], view: { s: 0.02, cE: REVX.W / 2, cN: REVX.H / 2 }, editId: null, name: '', warn: '', info: ov.querySelector('[data-r=info]'), list: ov.querySelector('[data-r=list]') };
+  ov.querySelector('[data-a=undo]').onclick = () => { RVE.pts.pop(); revEditDraw(); };
+  ov.querySelector('[data-a=new]').onclick = () => { RVE.pts = []; RVE.editId = null; RVE.name = ''; revEditDraw(); };
+  ov.querySelector('[data-a=save]').onclick = revEditSave;
+  ov.querySelector('[data-a=close]').onclick = revEditClose;
+  const toW = (sx, sy) => { const v = RVE.view, W = cv.clientWidth, H = cv.clientHeight; return [v.cE + (sx - W / 2) / v.s, v.cN - (sy - H / 2) / v.s]; };
+  const toS = (E, N) => { const v = RVE.view, W = cv.clientWidth, H = cv.clientHeight; return [W / 2 + (E - v.cE) * v.s, H / 2 - (N - v.cN) * v.s]; };
+  RVE.toS = toS; RVE.toW = toW;
+  const ptr = new Map(); let moved = 0, dragPt = -1, pin = null;
+  const rel = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const zoomAt = (f, sx, sy) => { const v = RVE.view, [E, N] = toW(sx, sy); v.s = clamp(v.s * f, 0.003, 1.2); const [E2, N2] = toW(sx, sy); v.cE += E - E2; v.cN += N - N2; revEditDraw(); };
+  cv.addEventListener('pointerdown', e => {
+    e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (_) {} const [sx, sy] = rel(e); ptr.set(e.pointerId, { x: sx, y: sy }); moved = 0; dragPt = -1;
+    if (ptr.size === 1) { let bd = 18; RVE.pts.forEach((p, i) => { const q = toS(p[0], p[1]), d = Math.hypot(q[0] - sx, q[1] - sy); if (d < bd) { bd = d; dragPt = i; } }); }
+    if (ptr.size === 2) { const [a, b] = [...ptr.values()]; pin = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1 }; dragPt = -1; }
+  });
+  cv.addEventListener('pointermove', e => {
+    const p = ptr.get(e.pointerId); if (!p) return; const [sx, sy] = rel(e); const dx = sx - p.x, dy = sy - p.y; p.x = sx; p.y = sy; moved += Math.abs(dx) + Math.abs(dy);
+    if (ptr.size >= 2 && pin) { const [a, b] = [...ptr.values()], d = Math.hypot(a.x - b.x, a.y - b.y) || 1; zoomAt(d / pin.d, (a.x + b.x) / 2, (a.y + b.y) / 2); pin.d = d; return; }
+    if (dragPt >= 0 && moved > 3) { RVE.pts[dragPt] = toW(sx, sy); revEditDraw(); return; }
+    if (moved > 3) { RVE.view.cE -= dx / RVE.view.s; RVE.view.cN += dy / RVE.view.s; revEditDraw(); }
+  });
+  const up = e => {
+    if (!ptr.has(e.pointerId)) return; const was = ptr.size; const p = ptr.get(e.pointerId); ptr.delete(e.pointerId); if (ptr.size < 2) pin = null;
+    if (was === 1 && moved < 6 && dragPt < 0 && e.type === 'pointerup') {
+      const [E, N] = toW(p.x, p.y);
+      if (revZ(E, N) > -0.3) { RVE.warn = 'Dieser Punkt liegt an Land – bitte ins Wasser tippen.'; revEditDraw(); return; }
+      RVE.warn = ''; RVE.pts.push([E, N]); revEditDraw();
+    }
+    dragPt = -1;
+  };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('wheel', e => { e.preventDefault(); const [sx, sy] = rel(e); zoomAt(e.deltaY < 0 ? 1.25 : 0.8, sx, sy); }, { passive: false });
+  addEventListener('resize', () => { if (RVE && !RVE.ov.hidden) revEditDraw(); });
+}
+function revEditFit() { const cv = RVE.cv, W = cv.clientWidth || 360, H = cv.clientHeight || 500; const v = RVE.view; v.s = Math.min(W / REVX.W, H / REVX.H) * 0.95; v.cE = REVX.W / 2; v.cN = REVX.H / 2; }
+function revEditCheck(P) {
+  const dr = revDraft(), legs = []; let minAll = 99;
+  for (let k = 1; k < P.length; k++) {
+    const a = P[k - 1], b = P[k], L2 = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(2, Math.ceil(L2 / 25)); let mn = 99;
+    for (let i = 0; i <= n; i++) { const t = i / n; mn = Math.min(mn, -revZ(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)); }
+    legs.push({ L: L2, mn, bad: mn < dr + 0.2 }); minAll = Math.min(minAll, mn);
+  }
+  let startOk = true; if (P.length) { const s = P[0]; for (let a = 0; a < 16; a++) { const w = a * Math.PI / 8; if (-revZ(s[0] + Math.cos(w) * 160, s[1] + Math.sin(w) * 160) < dr + 0.3) { startOk = false; break; } } }
+  return { legs, minAll, startOk, dr };
+}
+function revEditDraw() {
+  const cv = RVE.cv, dpr = Math.min(2, devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.fillStyle = '#e9e2cc'; x.fillRect(0, 0, W, H);
+  const X = REVX, o = X.ov, toS = RVE.toS, v = RVE.view, [ox, oy] = toS(0, X.H);
+  x.imageSmoothingEnabled = v.s * o.cs < 3; x.drawImage(RVE.img, ox, oy, o.nx * o.cs * v.s, o.ny * o.cs * v.s);
+  x.font = '600 11px system-ui,sans-serif'; x.textAlign = 'center';
+  const maxR = v.s > 0.08 ? 3 : v.s > 0.03 ? 2 : v.s > 0.012 ? 1 : 0;
+  for (const p of X.idx.places) { if (p[3] > maxR) continue; const q = toS(p[0], p[1]); if (q[0] < -50 || q[0] > W + 50 || q[1] < -20 || q[1] > H + 20) continue; x.lineWidth = 3; x.strokeStyle = 'rgba(255,255,255,.8)'; x.strokeText(p[2], q[0], q[1]); x.fillStyle = '#333'; x.fillText(p[2], q[0], q[1]); }
+  if (v.s > 0.06) for (const s of X.idx.seamarks) { if (s[2] !== 'L' && s[2] !== 'C') continue; const q = toS(s[0], s[1]); x.fillStyle = { r: '#c62828', g: '#2e7d32' }[s[3][0]] || '#d4a017'; x.beginPath(); x.arc(q[0], q[1], 2.6, 0, 7); x.fill(); }
+  const P = RVE.pts, ck = revEditCheck(P), wf = (Number(S.windFrom) || 0) * DEG, w = [Math.sin(wf), Math.cos(wf)], perp = [w[1], -w[0]];
+  for (let k = 1; k < P.length; k++) { const a = toS(P[k - 1][0], P[k - 1][1]), b = toS(P[k][0], P[k][1]); x.strokeStyle = ck.legs[k - 1].bad ? '#e53935' : '#f5b400'; x.lineWidth = 3; x.setLineDash(ck.legs[k - 1].bad ? [6, 4] : []); x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke(); }
+  x.setLineDash([]);
+  const line = (p, d, len, col) => { const hl = Math.max(len * v.s, 16), q = toS(p[0], p[1]); x.strokeStyle = col; x.lineWidth = 3; x.beginPath(); x.moveTo(q[0] - d[0] * hl, q[1] + d[1] * hl); x.lineTo(q[0] + d[0] * hl, q[1] - d[1] * hl); x.stroke(); };
+  if (P.length) line(P[0], perp, 120, '#2e7d32');
+  if (P.length >= 2) { const a = P[P.length - 2], b = P[P.length - 1], L2 = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, d = [(b[0] - a[0]) / L2, (b[1] - a[1]) / L2]; const along = Math.abs(d[0] * w[0] + d[1] * w[1]) >= 0.5; line(b, along ? perp : [d[1], -d[0]], 80, '#1565c0'); }
+  P.forEach((p, i) => {
+    const q = toS(p[0], p[1]), last = i === P.length - 1 && i > 0, first = i === 0;
+    x.beginPath(); x.arc(q[0], q[1], 9, 0, 7); x.fillStyle = first ? '#2e7d32' : last ? '#1565c0' : '#f5b400'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#fff'; x.stroke();
+    x.fillStyle = '#fff'; x.font = '700 10px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(first ? 'S' : last ? 'Z' : String(i), q[0], q[1] + 0.5); x.textBaseline = 'alphabetic';
+  });
+  { const cx = W - 42, cy = 40; x.fillStyle = 'rgba(12,24,32,.75)'; x.beginPath(); x.arc(cx, cy, 24, 0, 7); x.fill(); x.save(); x.translate(cx, cy); x.rotate(wf + Math.PI); x.strokeStyle = '#7fd3ff'; x.fillStyle = '#7fd3ff'; x.lineWidth = 3; x.beginPath(); x.moveTo(0, -14); x.lineTo(0, 10); x.stroke(); x.beginPath(); x.moveTo(0, 15); x.lineTo(-6, 6); x.lineTo(6, 6); x.closePath(); x.fill(); x.restore(); x.fillStyle = '#cfe6ee'; x.font = '600 10px system-ui'; x.textAlign = 'center'; x.fillText('Wind', cx, cy + 36); x.fillText('N ↑', 22, 18); }
+  let t;
+  if (!P.length) t = '<b>Tippe den Startpunkt ins Wasser.</b> Danach die Wegpunkte (werden zu Toren), der letzte Punkt ist das Ziel. Punkte lassen sich verschieben, Karte mit einem Finger schieben, mit zwei Fingern zoomen.';
+  else if (P.length === 1) t = '<b>Start gesetzt.</b> Jetzt Wegpunkte tippen – der zuletzt getippte Punkt wird das Ziel.' + (ck.startOk ? '' : '<br>⚠ Am Start ist es eng oder flach – für die Startlinie besser auf freies Wasser legen.');
+  else {
+    const bad = ck.legs.map((l, i) => l.bad ? i + 1 : 0).filter(Boolean);
+    t = '<b>' + (P.length - 2) + ' Tore · ' + revFmt(revLenSm(P), 1) + ' sm</b> · flachste Stelle auf der Linie ' + revFmt(Math.max(0, ck.minAll), 1) + ' m (Tiefgang ' + CL.name + ': ' + revFmt(ck.dr, 1) + ' m)'
+      + (bad.length ? '<br>⚠ Schenkel ' + bad.join(', ') + ' führt durch zu flaches Wasser (rot gestrichelt) – Wegpunkt dazwischen setzen oder verschieben.' : '')
+      + (ck.startOk ? '' : '<br>⚠ Am Start ist es eng oder flach.')
+      + '<br><span style="color:#9fc0cc">Start- und Ziellinie richten sich beim Rennen nach dem Wind (grün = Start, blau = Ziel, Vorschau für die eingestellte Windrichtung). Tiefen in dieser Übersicht sind grob (80 m).</span>';
+  }
+  if (RVE.warn) t = '⚠ ' + RVE.warn + '<br>' + t;
+  if (RVE.editId) t = '✎ Bearbeite „' + revEsc(RVE.name) + '“ · ' + t;
+  RVE.info.innerHTML = t;
+}
+function revEsc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function revEditSave() {
+  const P = RVE.pts; if (P.length < 2) { RVE.warn = 'Mindestens Start und Ziel setzen.'; revEditDraw(); return; }
+  const all = revStreckenRoh(); let name = RVE.name || ('Strecke ' + (all.length + 1));
+  const nn = prompt('Name der Strecke:', name); if (nn === null) return; name = (nn.trim() || name).slice(0, 40);
+  const o = REVX.idx.origin_utm, ptsU = P.map(p => [Math.round(p[0] + o.x), Math.round(p[1] + o.y)]);
+  if (RVE.editId) { const s = all.find(q => q.id === RVE.editId); if (s) { s.name = name; s.ptsU = ptsU; delete s.pts; s.rev = 'kueste'; s.t = Date.now(); } }
+  else { RVE.editId = Date.now().toString(36); all.push({ id: RVE.editId, name, rev: 'kueste', ptsU, t: Date.now() }); }
+  RVE.name = name;
+  if (!revStreckenSave(all)) { RVE.warn = 'Speichern ging nicht – der Browser-Speicher ist voll oder gesperrt.'; revEditDraw(); return; }
+  RVE.warn = ''; revEditList(); revEditDraw(); msg('Strecke „' + name + '“ gespeichert.', 'good');
+}
+function revEditList() {
+  const all = revStrecken(), Lst = RVE.list;
+  if (!all.length) { Lst.innerHTML = '<div style="color:#9fc0cc;font-size:13px">Noch keine eigenen Strecken gespeichert.</div>'; return; }
+  Lst.innerHTML = '<div style="color:#9fc0cc;font-size:12px;margin-bottom:4px">Gespeicherte Strecken (nur auf diesem Gerät)</div>';
+  for (const s of all) {
+    const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid #1d3542;flex-wrap:wrap';
+    const sel = S.revKurs === 'u:' + s.id;
+    row.innerHTML = '<span style="flex:1;min-width:140px">' + (sel ? '✅ ' : '') + '<b>' + revEsc(s.name) + '</b> · ' + revFmt(revLenSm(s.pts), 1) + ' sm · ' + Math.max(0, s.pts.length - 2) + ' Tore</span>';
+    const mk = (txt, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; b.style.cssText = 'font:600 13px system-ui;color:#fff;background:#183342;border:1px solid #2f5a6e;border-radius:8px;padding:5px 9px;cursor:pointer'; b.onclick = fn; row.appendChild(b); };
+    mk('▶ Segeln', () => { S.revier = 'ruegen'; S.revKurs = 'u:' + s.id; saveS(); revEditClose(); onSetting('revKurs'); msg('Kurs „' + s.name + '“ gewählt – Regatta starten.', 'good'); });
+    mk('✎ Bearbeiten', () => { RVE.pts = s.pts.map(p => p.slice()); RVE.editId = s.id; RVE.name = s.name; revEditDraw(); });
+    mk('🗑', () => { if (!confirm('Strecke „' + s.name + '“ löschen?')) return; revStreckenSave(revStreckenRoh().filter(q => q.id !== s.id)); if (S.revKurs === 'u:' + s.id) { S.revKurs = 'bb'; saveS(); } if (RVE.editId === s.id) RVE.editId = null; revEditList(); revEditDraw(); });
+    Lst.appendChild(row);
+  }
+}
+
+/* ---------- Freies Segeln: auf der Minikarte hinbeamen ---------- */
+var MAPAFF = null, BEAMON = false;
+function mapAff(mp) { const o = mp(0, 0), a = mp(1, 0), b = mp(0, 1); const m = [a[0] - o[0], b[0] - o[0], a[1] - o[1], b[1] - o[1]]; const det = m[0] * m[3] - m[1] * m[2]; if (Math.abs(det) > 1e-12) MAPAFF = { o, m, det }; }
+function mapToWorld(sx, sy) { if (!MAPAFF) return null; const { o, m, det } = MAPAFF, dx = sx - o[0], dy = sy - o[1]; return [(m[3] * dx - m[1] * dy) / det, (-m[2] * dx + m[0] * dy) / det]; }
+function beamToggle() { BEAMON = !BEAMON; const bt = document.getElementById('mapBeam'); if (bt) bt.classList.toggle('on', BEAMON); if (BEAMON) msg('Hinbeamen: Tippe in der Karte auf einen Punkt im Wasser. Mit „−“ zoomst du weiter heraus.', 'info'); }
+function beamTo(sx, sy) {
+  BEAMON = false; const bt = document.getElementById('mapBeam'); if (bt) bt.classList.remove('on');
+  const w = mapToWorld(sx, sy); if (!w || !G || !G.free) return; const pl = P(), x = w[0], y = w[1];
+  let ok = onWater(x, y); if (SHORE.kind === 'revier' && REVX) ok = revDepth(x, y) >= (pl.rib ? 0.6 : revDraft()) + 0.3;
+  if (!ok) { msg('Dort ist kein ausreichend tiefes Wasser – such dir einen anderen Punkt.', 'warn'); return; }
+  const d = Math.hypot(x - pl.x, y - pl.y);
+  for (const b of G.boats) if (b !== pl && b.cpuTrainer) { b.x = x + 10; b.y = y - 9; b.v = 0; }
+  pl.x = x; pl.y = y; pl.v = Math.min(pl.v, 1); snapCam = true;
+  if (SHORE.kind === 'revier' && REVX) revTick(true);
+  msg('Hingebeamt (' + (d >= 1000 ? revFmt(d / 1000, 1) + ' km' : Math.round(d) + ' m') + ').', 'good');
+}
+
 
 /* ================= Grundlagen ================= */
 const DEG=Math.PI/180, KN=0.514444;
@@ -1344,9 +1631,9 @@ const SCHEMA=[
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
-  {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont'],['hiddensee','Hiddensee · Bodden · Strelasund (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
-  {k:'revKurs',label:'Kurs im Revier Hiddensee',type:'select',get options(){return revKursOptions();},hint:'Nur im Revier Hiddensee. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
-  {k:'revEdit',label:'Eigene Strecken (Revier Hiddensee)',type:'button',btn:'Strecken-Editor öffnen',act:'revEdit',hint:'Start, Wegpunkte und Ziel auf der Karte antippen und speichern. Gespeicherte Strecken erscheinen oben unter „Kurs im Revier Hiddensee“. Start- und Ziellinie richten sich nach dem Wind.'},
+  {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
+  {k:'revEdit',label:'Eigene Strecken (Küstenrevier Rügen)',type:'button',btn:'Strecken-Editor öffnen',act:'revEdit',hint:'Start, Wegpunkte und Ziel auf der Karte antippen und speichern. Gespeicherte Strecken erscheinen oben unter „Kurs im Küstenrevier Rügen“. Start- und Ziellinie richten sich nach dem Wind.'},
   {k:'windFrom',label:'Windrichtung (See-Reviere)',type:'select',num:true,live:v=>v+'° (Live)',options:[[225,'Südwest'],[270,'West'],[315,'Nordwest'],[0,'Nord'],[45,'Nordost'],[90,'Ost'],[135,'Südost'],[180,'Süd']],hint:'Am See zählt, über welches Ufer der Wind kommt: Nordwind über den Auwald ist löchrig, Westwind über die Neue Harth drehig'},
   {k:'rowDist',label:'Ruderstrecke',type:'select',num:true,options:[[250,'250 m'],[500,'500 m'],[1000,'1000 m']],hint:'Für die Ruderregatta (Knopf „Rudern“)'},
   {k:'rowBoat',label:'Ruderboot',type:'select',options:[['zk10','Kutter ZK 10 (10 Riemen)'],['viking','Wikingerschiff (8 Riemen, Wikinger-Crew)']]},
@@ -1431,10 +1718,10 @@ const WX_TXT={none:'kein Niederschlag',r1:'leichter Regen',r2:'mäßiger Regen',
 const WX_COMP=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 const LIGHT_TXT={mittag:'Mittag',nachmittag:'Nachmittag',gold:'Goldene Stunde',daemmerung:'Dämmerung',nacht:'Nacht'};
 let wxBusy=false;
-function wxSite(){if(S.revier==='hiddensee')return {lat:54.47,lon:13.09,name:'Hiddensee'};return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
+function wxSite(){revMigrate();if(REVIERE_K[S.revier])return {lat:54.42,lon:13.35,name:'Rügen'};return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
 async function loadLiveWx(){if(wxBusy)return;wxBusy=true;const say=t=>{S.wxInfo=t;const st=document.getElementById('wxStatus');if(st)st.textContent=t;saveS();};
   try{say('Lade Live-Daten …');const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),9000);
-    if(S.revier!=='rangs'&&S.revier!=='cospu'&&S.revier!=='hiddensee'&&!(G&&G.running&&!G.over))S.revier='cospu';const site=wxSite();const r=await fetch(WX_URL.replace('latitude='+WX_LAT,'latitude='+site.lat).replace('longitude='+WX_LON,'longitude='+site.lon),{signal:ctl.signal,cache:'no-store'});clearTimeout(to);if(!r.ok)throw new Error('HTTP '+r.status);
+    if(S.revier!=='rangs'&&S.revier!=='cospu'&&!REVIERE_K[S.revier]&&!(G&&G.running&&!G.over))S.revier='cospu';const site=wxSite();const r=await fetch(WX_URL.replace('latitude='+WX_LAT,'latitude='+site.lat).replace('longitude='+WX_LON,'longitude='+site.lon),{signal:ctl.signal,cache:'no-store'});clearTimeout(to);if(!r.ok)throw new Error('HTTP '+r.status);
     const j=await r.json(),c=j&&j.current;if(!c||typeof c.wind_speed_10m!=='number')throw new Error('keine Daten');
     const running=!!(G&&G.running&&!G.over);const parts=[];const t=Number(c.time)||Math.floor(Date.now()/1000);
     const hhmm=new Date(t*1000).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Berlin'});
@@ -2214,8 +2501,8 @@ function objSync(){if(!shoreG)return;const st=objState();for(const e of [...OBJ_
 function buildShore(){try{waterMat.uniforms.uShOn.value=0;}catch(e){}
   if(shoreG){scene.remove(shoreG);shoreG.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material)(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>m&&m.dispose&&m.dispose());});}
   shoreG=new THREE.Group();scene.add(shoreG);
-  try{if(S.revier!=='hiddensee'){MZ_MIN=0.25;if(mz.z<MZ_MIN)mapZset(MZ_MIN);}}catch(e){}
-  if(S.revier==='hiddensee'){TGM=null;if(REVH){try{revBuild();}catch(e){console.error('Revier Hiddensee',e);}return;}revLoad();}
+  revMigrate();try{if(!REVIERE_K[S.revier]){MZ_MIN=0.25;if(mz.z<MZ_MIN)mapZset(MZ_MIN);}}catch(e){}
+  if(REVIERE_K[S.revier]){TGM=null;if(REVX){try{revBuild();}catch(e){console.error('Küstenrevier',e);}return;}revLoad();}
   if(S.revier==='cospu'||isGL()){objStart();try{buildCospu();}finally{objFinish();}try{seasonApply(shoreG);}catch(e){console.error('Jahreszeit',e);}try{shoreFoamBuild();}catch(e){console.error('Uferschaum',e);}try{shoreDampBuild();}catch(e){console.error('Uferwellen',e);}return;}
   const rev=S.revier||'open';let R0=1660,a0=0,a1=Math.PI*2;
   if(rev==='small')R0=Math.max(560,S.legLength*0.62+380);
@@ -3612,7 +3899,7 @@ function applyLight(){const L=LIGHTS[S.licht]||LIGHTS.mittag;const {cl,pr}=wxSta
   sun.color.set(L.sun);sun.intensity=L.si*(1-0.82*ov)*(seasonNow()==='winter'?0.85:1);if(night)sun.intensity*=mdir?(0.3+0.9*ASTRO.moonK):0.3;try{astroUpdate(true);ASTRO.last=-1e9;}catch(e){}HEMI.color.set(L.hs);HEMI.groundColor.set(L.hg);HEMI.intensity=L.hi*(1+(night?0:0.3*ov));
   const fg=new THREE.Color(L.fog),g1=_lum(fg);const grey=new THREE.Color().setRGB(g1,g1,g1*1.02).multiplyScalar((1-0.28*dk)*(pr===4?1.06:1));
   FOG.copy(fg).lerp(grey,ov*0.85);{const sz=seasonNow();if(sz==='winter')FOG.lerp(new THREE.Color('#dde5ec'),0.3);else if(sz==='herbst')FOG.lerp(new THREE.Color('#ddd6c4'),0.15);}const tp=new THREE.Color(L.top);SKY_TOP.copy(tp).lerp(grey.clone().multiplyScalar(0.88),ov*0.8);if(scene.fog)scene.fog.color.copy(FOG);
-  const vis=pr===0?0:pr===4?0.55:[0,0.25,0.5,0.8][pr];const fk=S.revier==='hiddensee'?2.8:1,fn=450*fk*(1-0.55*vis),ff=3000*fk*(1-0.7*vis);if(scene.fog){scene.fog.near=fn;scene.fog.far=ff;}waterMat.uniforms.uFogN.value=fn;waterMat.uniforms.uFogF.value=ff;
+  const vis=pr===0?0:pr===4?0.55:[0,0.25,0.5,0.8][pr];const fk=REVIERE_K[S.revier]?2.8:1,fn=450*fk*(1-0.55*vis),ff=3000*fk*(1-0.7*vis);if(scene.fog){scene.fog.near=fn;scene.fog.far=ff;}waterMat.uniforms.uFogN.value=fn;waterMat.uniforms.uFogF.value=ff;
   const su=sky.material.uniforms;su.uCl.value=cl2;su.uDk.value=dk;waterMat.uniforms.uCl.value=cl2;
   if(typeof envDone!=='undefined')envDone=false;
   NIGHT=L.night?1:0;su.uN.value=NIGHT;waterMat.uniforms.uN.value=NIGHT;scene.background.set(L.bg||'#9ec6e0');glare.material.opacity=(NIGHT?0.12:1)*(1-0.9*cl2);updateHaze();
@@ -4078,7 +4365,7 @@ function isClassGeo(g){for(const k in CGEO){const o=CGEO[k];for(const v of Objec
 function newRace(lesson,opts){
   clearRoot();
   CL=CLASSES[S.boatClass]||CLASSES.jolle;L=CL.len;BEAM=CL.key==='topcat'?2.3:CL.beam*0.95;
-  {const lake=S.revier==='cospu'||isGL();if(S.revier==='hiddensee'){if(SHORE.key!==revKey())buildShore();}else if(lake&&SHORE.key!==cospuKey())buildShore();else if(!lake&&(SHORE.kind==='poly'||SHORE.kind==='revier'))buildShore();}
+  {const lake=S.revier==='cospu'||isGL();if(REVIERE_K[S.revier]){if(SHORE.key!==revKey())buildShore();}else if(lake&&SHORE.key!==cospuKey())buildShore();else if(!lake&&(SHORE.kind==='poly'||SHORE.kind==='revier'))buildShore();}
   const W0=0,U=dirv(W0),R=[U[1],-U[0]];
   const n=lesson?2:(opts&&opts.mp?opts.mp.total:S.cpuCount+1);const lineLen=lesson?Math.max(60,(n+1)*Math.max(L,3.5)*1.9):lineLenFor(n,Math.max(L,3.5));
   const C={W0,U,R,lineLen,lesson:!!lesson};
@@ -4099,7 +4386,7 @@ function newRace(lesson,opts){
   const ptOf=e=>e==='finish'?(C.finishUp?C.fin.c:{x:0,y:0}):isMark(e)?e:null;
   for(let i=0;i<C.seq.length;i++){const m=C.seq[i];if(!isMark(m)||m.d)continue;const pv=i>0?ptOf(C.seq[i-1]):{x:0,y:0},nx=ptOf(C.seq[i+1]);if(!pv||!nx){m.d=[-U[0],-U[1]];continue;}
     const ax=m.x-pv.x,ay=m.y-pv.y,an=Math.hypot(ax,ay)||1,dx=nx.x-m.x,dy=nx.y-m.y,dn=Math.hypot(dx,dy)||1;const vx=ax/an-dx/dn,vy=ay/an-dy/dn,vn=Math.hypot(vx,vy)||1;m.d=[vx/vn,vy/vn];}
-  if(!lesson&&!(opts&&(opts.row||opts.free))&&S.revier==='hiddensee'&&(S.revKurs||'bb')!=='bahn'&&SHORE.kind==='revier')revCourse(C);
+  if(!lesson&&!(opts&&(opts.row||opts.free))&&REVIERE_K[S.revier]&&REVX&&!revIsBahn()&&SHORE.kind==='revier')revCourse(C);
   for(const m of [C.wm,C.lm,C.om,C.wing])if(m){if(!m.d)m.d=[-U[0],-U[1]];m.n=[-m.d[1],m.d[0]];}
   C.marks=C.wps||[C.wm,C.lm,C.om,C.wing].filter(Boolean);
   C.buoys=[];for(const m of C.marks){if(m.kind==='gate'||m.kind==='wp')C.buoys.push({x:m.a.x,y:m.a.y,m},{x:m.b.x,y:m.b.y,m});else C.buoys.push({x:m.x,y:m.y,m});}
@@ -4922,7 +5209,7 @@ function updateChips(){{const j=!!RIG().jib&&!(G&&G.row);$('tFurlIn').hidden=!j;
 function togglePause(){if(!G||!G.running||G.over)return;if(G.mp){pauseEl.hidden=!pauseEl.hidden;$('restartBtn').hidden=true;for(const k in keys)keys[k]=false;return;}$('restartBtn').hidden=false;G.paused=!G.paused;pauseEl.hidden=!G.paused;for(const k in keys)keys[k]=false;}
 function startRace(keepSeries){audioInit();restoreS();if(keepSeries!==true)SERIES=null;newRace(null);G.running=true;hideAllOv();hudEl.hidden=false;$('touch').hidden=!isTouch;$('tPen').hidden=false;updateTouch();if(S.ghost){const gh=loadGhost();if(gh&&gh.cls===CL.key)createGhost(gh);}
   cam.mode='chase';cam.yaw=0;cam.h=P().h;cam.dist=clamp(L*3.6,12,60);camera.up.set(0,1,0);snapCam=true;
-  if(G.course.rev){msg(G.course.rev.name+' · '+String(G.course.rev.sm).replace('.',',')+' sm · '+G.course.wps.length+' Tore entlang der Fahrrinne, dann ins Ziel. Startverfahren läuft.','info');msg('Tipp: Mit ⏩ oben in der Mitte stellst du das Tempo hoch (bis 20×). Tiefgang '+String(revDraft()).replace('.',',')+' m – außerhalb der Rinne wird es flach.','info');}else msg(CL.name+' · Startverfahren läuft. Tonnen an Backbord runden.','info');if(S.revier==='hiddensee'&&revDraft()>2.5)msg('Achtung: '+CL.name+' hat zu viel Tiefgang für die Bodden – nimm die Regattabahn vor Hiddensee oder ein flacheres Boot.','warn');if(SHORE.kind==='poly'&&SHORE.fit<25)msg('Achtung: Die Bahn passt nicht ganz in den See – Kreuzlänge im Menü kürzen.','warn');if(S.courseFan)setTimeout(()=>{if(G&&G.running)msg('Farbfächer am Bug: grün = Kurs bringt dich am schnellsten zum Ziel, rot = verschenkt Weg. Abschaltbar im Menü.','coach');},2500);}
+  if(G.course.rev){msg(G.course.rev.name+' · '+String(G.course.rev.sm).replace('.',',')+' sm · '+G.course.wps.length+' Tore entlang der Fahrrinne, dann ins Ziel. Startverfahren läuft.','info');msg('Tipp: Mit ⏩ oben in der Mitte stellst du das Tempo hoch (bis 20×). Tiefgang '+String(revDraft()).replace('.',',')+' m – außerhalb der Rinne wird es flach.','info');}else msg(CL.name+' · Startverfahren läuft. Tonnen an Backbord runden.','info');if(REVIERE_K[S.revier]&&revDraft()>2.5)msg('Achtung: '+CL.name+' hat zu viel Tiefgang für die Bodden – nimm eine Regattabahn auf freiem Wasser (Westseite Hiddensee, Prorer Wiek) oder ein flacheres Boot.','warn');if(SHORE.kind==='poly'&&SHORE.fit<25)msg('Achtung: Die Bahn passt nicht ganz in den See – Kreuzlänge im Menü kürzen.','warn');if(S.courseFan)setTimeout(()=>{if(G&&G.running)msg('Farbfächer am Bug: grün = Kurs bringt dich am schnellsten zum Ziel, rot = verschenkt Weg. Abschaltbar im Menü.','coach');},2500);}
 function startDrill(){audioInit();restoreS();newRace(null,{drill:true});G.running=true;hideAllOv();hudEl.hidden=false;$('touch').hidden=!isTouch;$('tPen').hidden=false;updateTouch();
   cam.mode='chase';cam.yaw=0;cam.h=P().h;cam.dist=clamp(L*3.6,12,60);camera.up.set(0,1,0);snapCam=true;msg('Startübung: 60 s bis zum Schuss. Sei pünktlich, schnell und am bevorteilten Ende.','info');}
 function toMenu(){const wasLesson=!!S_main;restoreS();if(G){G.running=false;G.paused=false;}hideAllOv();hudEl.hidden=true;buildForm();renderBest();menuEl.hidden=false;if(wasLesson||CL.key!==S.boatClass)newRace(null);else setupWaves();}
@@ -5274,11 +5561,11 @@ function drawMap(){
   const x=mctx;x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,W,H);
   const C=G.course;const pl=P();let sc,mp;
   if(C.lesson){const cx=pl.x*C.R[0]+pl.y*C.R[1],ca=pl.x*C.U[0]+pl.y*C.U[1];sc=Math.min(W,H)/140;mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+(lat-cx)*sc,H/2-(al-ca)*sc];};}
-  else if(C.wps){const RR=1500;sc=Math.min(W,H)/(2*RR);const cx=pl.x*C.R[0]+pl.y*C.R[1],ca=pl.x*C.U[0]+pl.y*C.U[1];mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+(lat-cx)*sc,H/2-(al-ca)*sc];};}
+  else if(C.wps||SHORE.kind==='revier'){const RR=1500,s0=Math.min(W,H)/(2*RR);sc=s0;const cx=pl.x*C.R[0]+pl.y*C.R[1],ca=pl.x*C.U[0]+pl.y*C.U[1];mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+(lat-cx)*s0,H/2-(al-ca)*s0];};}
   else{const LW=Math.max(C.lineLen*1.1,S.legLength*0.5,C.wing||C.om?S.legLength*0.5+60:0);const aMin=-110,aMax=S.legLength+50;const pad=8;sc=Math.min((W-2*pad)/(2*LW),(H-2*pad)/(aMax-aMin));
     mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+lat*sc,H-pad-(al-aMin)*sc];};}
   {const Z=mz.z;let fx,fy;
-    if(mz.free){const [ox,oy]=mp(0,0),lim=2600*sc;mz.fx=clamp(mz.fx,ox-lim,ox+lim);mz.fy=clamp(mz.fy,oy-lim,oy+lim);fx=mz.fx;fy=mz.fy;}
+    if(mz.free){const rv=SHORE.kind==='revier',[ox,oy]=rv?[W/2,H/2]:mp(0,0),lim=(rv?80000:2600)*sc;mz.fx=clamp(mz.fx,ox-lim,ox+lim);mz.fy=clamp(mz.fy,oy-lim,oy+lim);fx=mz.fx;fy=mz.fy;}
     else if(Z>1){const [bx,by]=mp(pl.x,pl.y);fx=bx-mz.px/Z;fy=by-mz.py/Z;}else{fx=W/2;fy=H/2;}
     mz._fx=fx;mz._fy=fy;
     if(Z!==1||fx!==W/2||fy!==H/2){const mp0=mp;mp=(wx,wy)=>{const [a,b]=mp0(wx,wy);return [W/2+(a-fx)*Z,H/2+(b-fy)*Z];};sc*=Z;}}
@@ -5425,7 +5712,7 @@ const _nv=new THREE.Vector3();
 function navUpdate(){if(!NIGHT||!G)return;for(const b of G.boats){const m=b.m;if(!m||!m.navL||b.gone)continue;_nv.copy(camera.position);m.g.worldToLocal(_nv);
     const th=Math.atan2(_nv.x,-_nv.z)/DEG,a=Math.abs(th);   // 0° voraus, positiv = Steuerbordseite
     for(const l of m.navL){const on=l.k==='port'?(th<=0&&a<=112.5):l.k==='stb'?(th>=0&&a<=112.5):l.k==='stern'?a>=112.5:true;l.sp.visible=on;l.ball.visible=on;}}}
-function render(dt,now){
+function render(dt,now){try{revTick();}catch(e){console.error('Revier',e);}
   waterMat.uniforms.uT.value=now;sky.material.uniforms.uT.value=now%1800;if(SHORE.anim)for(const fa of SHORE.anim)fa(now);
   const tow=dirv(G.wind.cur+180);waterMat.uniforms.uWind.value.set(tow[0],-tow[1]);
   for(let i=0;i<16;i++){const p=G.wind.puffs[i];if(p)puffU[i].set(p.x,-p.y,p.r,p.str*p.env);else puffU[i].set(0,0,1,0);}
@@ -6186,7 +6473,7 @@ function renderRanking(list){const box=$('rankBox');if(!box)return;box.innerHTML
 async function exportCSV(){if(!G)return;const list=G.boats.filter(b=>!b.rib).sort((a,b)=>progress(b)-progress(a));const d=new Date();const ds=d.toLocaleDateString('de-DE');
   const q=v=>'"'+String(v).replace(/"/g,'""')+'"';const rows=[['Platz','Boot','Klasse','Zeit','Zeit (s)','Strafen','Status','Start-Platz','Plätze gewonnen','Wind (kn)','Revier','Datum'].map(q).join(';')];
   list.forEach((b,i)=>{const st=b.dsq?'DSQ':b.finished?'Ziel':(!b.started?(b.ocs?'OCS':'DNS'):'DNF');const pl=b.finished&&!b.dsq?i+1:'';const sr=G.cp&&G.cp.r[G.boats.indexOf(b)]?G.cp.r[G.boats.indexOf(b)].S:'';
-    rows.push([pl,b.name,CL.name,b.finished?fmtT(b.finishT):'',b.finished?b.finishT.toFixed(1).replace('.',','):'',b.penCount||0,st,sr||'',sr&&pl?sr-pl:'',S.tws,({cospu:'Cospudener See',rangs:'Rangsdorfer See',gpx:(GPXLAKE&&GPXLAKE.name)||'eigener See',open:'Binnensee',small:'kleiner See',coast:'Küste',hiddensee:'Hiddensee · '+(REV_KURSE[S.revKurs||'bb']||'')})[S.revier]||'',ds].map(q).join(';'));});
+    rows.push([pl,b.name,CL.name,b.finished?fmtT(b.finishT):'',b.finished?b.finishT.toFixed(1).replace('.',','):'',b.penCount||0,st,sr||'',sr&&pl?sr-pl:'',S.tws,({cospu:'Cospudener See',rangs:'Rangsdorfer See',gpx:(GPXLAKE&&GPXLAKE.name)||'eigener See',open:'Binnensee',small:'kleiner See',coast:'Küste',ruegen:'Rügen · '+revKursName()})[S.revier]||'',ds].map(q).join(';'));});
   const data='﻿'+rows.join('\r\n');const fn='regattakoje-ergebnis-'+d.toISOString().slice(0,10)+'.csv';
   try{const dl=window.claude&&window.claude.use?await window.claude.use('downloads'):null;if(dl){await dl.save({filename:fn,data});return;}}catch(e){if(e&&e.code==='declined')return;}
   try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'text/csv;charset=utf-8'}));a.download=fn;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}catch(e){msg('Export nicht möglich','bad');}}
@@ -7096,195 +7383,6 @@ function ixyUpd(b,m){const K=m.ixy;if(!K)return;const S=K.S;
   if(S.grp.rud&&m.rud[0])S.grp.rud.rotation.y=m.rud[0].rotation.y;
   // Kimmschwerter: Hochklappen nach achtern in den Schwertkasten (85° = ganz oben)
   if(m.ixyB)for(const B of m.ixyB){const G2=S.grp[B.sd>0?'bS':'bB'];if(G2)G2.rotation.x=-B.up*1.48;}}
-/* ---------- Eigene Strecken (Revier Hiddensee) ---------- */
-var REV_SK = 'regattakoje.strecken', RVE = null;
-function revStrecken() { try { const a = JSON.parse(localStorage.getItem(REV_SK) || '[]'); return Array.isArray(a) ? a.filter(s => s && s.rev === 'hiddensee' && Array.isArray(s.pts) && s.pts.length >= 2) : []; } catch (e) { return []; } }
-function revStreckenSave(a) { try { localStorage.setItem(REV_SK, JSON.stringify(a)); return true; } catch (e) { return false; } }
-function revLenSm(p) { let L = 0; for (let k = 1; k < p.length; k++) L += Math.hypot(p[k][0] - p[k - 1][0], p[k][1] - p[k - 1][1]); return L / 1852; }
-function revFmt(v, d) { return v.toFixed(d).replace('.', ','); }
-function revKursOptions() {
-  const o = [['bb', 'Blaues Band vom Strelasund (ca. 12 sm)'], ['rund', 'Rund Hiddensee (ca. 31 sm)'], ['bahn', 'Regattabahn vor Hiddensee (Westseite)']];
-  for (const s of revStrecken()) o.push(['u:' + s.id, 'Eigene: ' + s.name + ' (' + revFmt(revLenSm(s.pts), 1) + ' sm)']);
-  return o;
-}
-function revNearName(p) { if (!REVH) return ''; let best = null; for (const q of REVH.places) { const d = Math.hypot(q[0] - p[0], q[1] - p[1]) + q[3] * 700; if (d < 6000 && (!best || d < best[0])) best = [d, q[2]]; } return best ? best[1] : ''; }
-function revGateHw(E, N, u, cap) { const r = [-u[1], u[0]]; const side = s => { let d = 0; while (d < cap && revZ(E + r[0] * s * (d + 10), N + r[1] * s * (d + 10)) <= -1.3) d += 10; return d; }; return Math.max(25, Math.min(side(1), side(-1), cap)); }
-function revCustom(id) {
-  const s = revStrecken().find(q => q.id === id); if (!s || !REVH) return null; const P = s.pts, gates = [];
-  for (let k = 1; k < P.length - 1; k++) {
-    const a = P[k - 1], b = P[k], c = P[k + 1]; const u1 = [b[0] - a[0], b[1] - a[1]], u2 = [c[0] - b[0], c[1] - b[1]]; const l1 = Math.hypot(u1[0], u1[1]) || 1, l2 = Math.hypot(u2[0], u2[1]) || 1;
-    let u = [u1[0] / l1 + u2[0] / l2, u1[1] / l1 + u2[1] / l2], lu = Math.hypot(u[0], u[1]); if (lu < 1e-6) { u = [u1[0] / l1, u1[1] / l1]; lu = 1; } u = [u[0] / lu, u[1] / lu];
-    const nn = revNearName(b); gates.push({ x: b[0], y: b[1], u, hw: revGateHw(b[0], b[1], u, 150), name: 'Tor ' + k + (nn ? ' · ' + nn : '') });
-  }
-  const f = P[P.length - 1], nf = revNearName(f);
-  return { name: s.name, sm: +revLenSm(P).toFixed(1), start: P[0], gates, finish: { x: f[0], y: f[1], windLine: true, name: 'Ziel' + (nf ? ' · ' + nf : '') }, route: P, custom: true, t: s.t };
-}
-function revK(kurs) { if (kurs && kurs.indexOf('u:') === 0) return revCustom(kurs.slice(2)); return REVH.courses[kurs]; }
-
-/* Editor: Karte mit Tiefen, Tippen = Punkt, Ziehen = verschieben / Karte schieben */
-function revEditOpen() {
-  if (!REVH) { const pr = revLoad(); msg('Revierdaten werden geladen – der Editor öffnet gleich.', 'info'); if (pr) pr.then(() => { if (REVH) revEditOpen(); }); return; }
-  if (!RVE) revEditBuild();
-  RVE.ov.hidden = false; RVE.pts = []; RVE.editId = null; RVE.name = '';
-  requestAnimationFrame(() => { revEditFit(); revEditList(); revEditDraw(); });
-}
-function revEditClose() {
-  RVE.ov.hidden = true;
-  try { buildForm(); } catch (e) {}
-  if (S.revier === 'hiddensee' && String(S.revKurs || '').indexOf('u:') === 0) { try { onSetting('revKurs'); } catch (e) {} }
-}
-function revEditBuild() {
-  const ov = document.createElement('div'); ov.id = 'revEdit'; ov.hidden = true;
-  ov.style.cssText = 'position:fixed;inset:0;z-index:300;background:#0c1820;color:#e8f0f2;font:14px system-ui,-apple-system,sans-serif;display:flex;flex-direction:column';
-  ov.innerHTML = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 8px 6px">'
-    + '<b style="font-size:16px;margin-right:auto">Eigene Strecke · Hiddensee</b>'
-    + '<button type="button" data-a="undo">↶ Punkt zurück</button><button type="button" data-a="new">＋ Neu</button><button type="button" data-a="save">💾 Speichern</button><button type="button" data-a="close">✕ Fertig</button></div>'
-    + '<div style="position:relative;flex:1;min-height:0"><canvas style="position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair"></canvas>'
-    + '<div data-r="info" style="position:absolute;left:8px;right:8px;bottom:8px;background:rgba(12,24,32,.9);border:1px solid #2a4553;border-radius:10px;padding:7px 10px;font-size:13px;line-height:1.4"></div></div>'
-    + '<div data-r="list" style="max-height:30vh;overflow:auto;padding:6px 8px 10px;border-top:1px solid #2a4553"></div>';
-  ov.querySelectorAll('button').forEach(b => b.style.cssText = 'font:600 14px system-ui,sans-serif;color:#fff;background:#183342;border:1px solid #2f5a6e;border-radius:9px;padding:7px 10px;cursor:pointer');
-  document.body.appendChild(ov);
-  const cv = ov.querySelector('canvas'), R = REVH, nx = R.grid.nx, ny = R.grid.ny;
-  const img = document.createElement('canvas'); img.width = nx; img.height = ny; const c2 = img.getContext('2d'), id = c2.createImageData(nx, ny);
-  const T = [[1, [96, 150, 205]], [2, [128, 176, 222]], [3, [160, 198, 234]], [5, [188, 215, 240]], [10, [213, 230, 246]], [1e9, [236, 244, 251]]];
-  const LC = { 0: [222, 212, 176], 1: [176, 198, 146], 2: [208, 196, 184], 3: [232, 224, 186], 4: [240, 226, 176], 5: [196, 208, 176], 6: [196, 210, 160], 7: [212, 222, 178] };
-  for (let k = 0; k < nx * ny; k++) {
-    const z = R.z[k] / 100; let c;
-    if (z < 0) { c = T[T.length - 1][1]; for (const [g, cc] of T) if (-z < g) { c = cc; break; } } else c = LC[R.lu[k]] || LC[0];
-    id.data[k * 4] = c[0]; id.data[k * 4 + 1] = c[1]; id.data[k * 4 + 2] = c[2]; id.data[k * 4 + 3] = 255;
-  }
-  c2.putImageData(id, 0, 0);
-  RVE = { ov, cv, img, pts: [], view: { s: 0.02, cE: R.W / 2, cN: R.H / 2 }, editId: null, name: '', info: ov.querySelector('[data-r=info]'), list: ov.querySelector('[data-r=list]') };
-  ov.querySelector('[data-a=undo]').onclick = () => { RVE.pts.pop(); revEditDraw(); };
-  ov.querySelector('[data-a=new]').onclick = () => { RVE.pts = []; RVE.editId = null; RVE.name = ''; revEditDraw(); };
-  ov.querySelector('[data-a=save]').onclick = revEditSave;
-  ov.querySelector('[data-a=close]').onclick = revEditClose;
-  const toW = (sx, sy) => { const v = RVE.view, W = cv.clientWidth, H = cv.clientHeight; return [v.cE + (sx - W / 2) / v.s, v.cN - (sy - H / 2) / v.s]; };
-  const toS = (E, N) => { const v = RVE.view, W = cv.clientWidth, H = cv.clientHeight; return [W / 2 + (E - v.cE) * v.s, H / 2 - (N - v.cN) * v.s]; };
-  RVE.toS = toS; RVE.toW = toW;
-  const ptr = new Map(); let moved = 0, dragPt = -1, pin = null;
-  const rel = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
-  const zoomAt = (f, sx, sy) => { const v = RVE.view, [E, N] = toW(sx, sy); v.s = clamp(v.s * f, 0.004, 1.2); const [E2, N2] = toW(sx, sy); v.cE += E - E2; v.cN += N - N2; revEditDraw(); };
-  cv.addEventListener('pointerdown', e => {
-    e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (_) {} const [sx, sy] = rel(e); ptr.set(e.pointerId, { x: sx, y: sy }); moved = 0; dragPt = -1;
-    if (ptr.size === 1) { let bd = 18; RVE.pts.forEach((p, i) => { const q = toS(p[0], p[1]), d = Math.hypot(q[0] - sx, q[1] - sy); if (d < bd) { bd = d; dragPt = i; } }); }
-    if (ptr.size === 2) { const [a, b] = [...ptr.values()]; pin = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1 }; dragPt = -1; }
-  });
-  cv.addEventListener('pointermove', e => {
-    const p = ptr.get(e.pointerId); if (!p) return; const [sx, sy] = rel(e); const dx = sx - p.x, dy = sy - p.y; p.x = sx; p.y = sy; moved += Math.abs(dx) + Math.abs(dy);
-    if (ptr.size >= 2 && pin) { const [a, b] = [...ptr.values()], d = Math.hypot(a.x - b.x, a.y - b.y) || 1; zoomAt(d / pin.d, (a.x + b.x) / 2, (a.y + b.y) / 2); pin.d = d; return; }
-    if (dragPt >= 0 && moved > 3) { RVE.pts[dragPt] = toW(sx, sy); revEditDraw(); return; }
-    if (moved > 3) { RVE.view.cE -= dx / RVE.view.s; RVE.view.cN += dy / RVE.view.s; revEditDraw(); }
-  });
-  const up = e => {
-    if (!ptr.has(e.pointerId)) return; const was = ptr.size; const p = ptr.get(e.pointerId); ptr.delete(e.pointerId); if (ptr.size < 2) pin = null;
-    if (was === 1 && moved < 6 && dragPt < 0 && e.type === 'pointerup') {
-      const [E, N] = toW(p.x, p.y);
-      if (revZ(E, N) > -0.3) { RVE.warn = 'Dieser Punkt liegt an Land – bitte ins Wasser tippen.'; revEditDraw(); return; }
-      RVE.warn = ''; RVE.pts.push([E, N]); revEditDraw();
-    }
-    dragPt = -1;
-  };
-  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-  cv.addEventListener('wheel', e => { e.preventDefault(); const [sx, sy] = rel(e); zoomAt(e.deltaY < 0 ? 1.25 : 0.8, sx, sy); }, { passive: false });
-  addEventListener('resize', () => { if (RVE && !RVE.ov.hidden) revEditDraw(); });
-}
-function revEditFit() { const cv = RVE.cv, W = cv.clientWidth || 360, H = cv.clientHeight || 500; const v = RVE.view; v.s = Math.min(W / REVH.W, H / REVH.H) * 0.95; v.cE = REVH.W / 2; v.cN = REVH.H / 2; }
-/* Prüfung einer Strecke: flachste Stelle je Schenkel, Platz am Start */
-function revEditCheck(P) {
-  const dr = revDraft(), legs = []; let minAll = 99;
-  for (let k = 1; k < P.length; k++) {
-    const a = P[k - 1], b = P[k], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(2, Math.ceil(L / 20)); let mn = 99;
-    for (let i = 0; i <= n; i++) { const t = i / n; mn = Math.min(mn, -revZ(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)); }
-    legs.push({ L, mn, bad: mn < dr + 0.2 }); minAll = Math.min(minAll, mn);
-  }
-  let startOk = true; if (P.length) { const s = P[0]; for (let a = 0; a < 16; a++) { const w = a * Math.PI / 8; if (-revZ(s[0] + Math.cos(w) * 160, s[1] + Math.sin(w) * 160) < dr + 0.3) { startOk = false; break; } } }
-  return { legs, minAll, startOk, dr };
-}
-function revEditDraw() {
-  const cv = RVE.cv, dpr = Math.min(2, devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
-  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
-  const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.fillStyle = '#e9e2cc'; x.fillRect(0, 0, W, H);
-  const R = REVH, cs = R.grid.cs, toS = RVE.toS, v = RVE.view, [ox, oy] = toS(0, R.H);
-  x.imageSmoothingEnabled = v.s * cs < 3; x.drawImage(RVE.img, ox, oy, R.grid.nx * cs * v.s, R.grid.ny * cs * v.s);
-  /* Orte */
-  x.font = '600 11px system-ui,sans-serif'; x.textAlign = 'center';
-  for (const p of R.places) { if (p[3] > (v.s > 0.08 ? 3 : v.s > 0.03 ? 2 : 1)) continue; const q = toS(p[0], p[1]); if (q[0] < -50 || q[0] > W + 50 || q[1] < -20 || q[1] > H + 20) continue; x.lineWidth = 3; x.strokeStyle = 'rgba(255,255,255,.8)'; x.strokeText(p[2], q[0], q[1]); x.fillStyle = '#333'; x.fillText(p[2], q[0], q[1]); }
-  /* Fahrwassertonnen ab mittlerer Nähe */
-  if (v.s > 0.06) for (const s of R.seamarks) { if (s[2] !== 'L' && s[2] !== 'C') continue; const q = toS(s[0], s[1]); x.fillStyle = { r: '#c62828', g: '#2e7d32' }[s[3][0]] || '#d4a017'; x.beginPath(); x.arc(q[0], q[1], 2.6, 0, 7); x.fill(); }
-  const P = RVE.pts, ck = revEditCheck(P), wf = (Number(S.windFrom) || 0) * DEG, w = [Math.sin(wf), Math.cos(wf)], perp = [w[1], -w[0]];
-  /* Schenkel */
-  for (let k = 1; k < P.length; k++) { const a = toS(P[k - 1][0], P[k - 1][1]), b = toS(P[k][0], P[k][1]); x.strokeStyle = ck.legs[k - 1].bad ? '#e53935' : '#f5b400'; x.lineWidth = 3; x.setLineDash(ck.legs[k - 1].bad ? [6, 4] : []); x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke(); }
-  x.setLineDash([]);
-  const line = (p, d, len, col) => { const hl = Math.max(len * v.s, 16), q = toS(p[0], p[1]); x.strokeStyle = col; x.lineWidth = 3; x.beginPath(); x.moveTo(q[0] - d[0] * hl, q[1] + d[1] * hl); x.lineTo(q[0] + d[0] * hl, q[1] - d[1] * hl); x.stroke(); };
-  if (P.length) line(P[0], perp, 120, '#2e7d32');
-  if (P.length >= 2) { const a = P[P.length - 2], b = P[P.length - 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, d = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; const along = Math.abs(d[0] * w[0] + d[1] * w[1]) >= 0.5; line(b, along ? perp : [d[1], -d[0]], 80, '#1565c0'); }
-  P.forEach((p, i) => {
-    const q = toS(p[0], p[1]), last = i === P.length - 1 && i > 0, first = i === 0;
-    x.beginPath(); x.arc(q[0], q[1], 9, 0, 7); x.fillStyle = first ? '#2e7d32' : last ? '#1565c0' : '#f5b400'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#fff'; x.stroke();
-    x.fillStyle = '#fff'; x.font = '700 10px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(first ? 'S' : last ? 'Z' : String(i), q[0], q[1] + 0.5); x.textBaseline = 'alphabetic';
-  });
-  /* Windpfeil */
-  { const cx = W - 42, cy = 40; x.fillStyle = 'rgba(12,24,32,.75)'; x.beginPath(); x.arc(cx, cy, 24, 0, 7); x.fill(); x.save(); x.translate(cx, cy); x.rotate(wf + Math.PI); x.strokeStyle = '#7fd3ff'; x.fillStyle = '#7fd3ff'; x.lineWidth = 3; x.beginPath(); x.moveTo(0, -14); x.lineTo(0, 10); x.stroke(); x.beginPath(); x.moveTo(0, 15); x.lineTo(-6, 6); x.lineTo(6, 6); x.closePath(); x.fill(); x.restore(); x.fillStyle = '#cfe6ee'; x.font = '600 10px system-ui'; x.textAlign = 'center'; x.fillText('Wind', cx, cy + 36); x.fillText('N ↑', 22, 18); }
-  /* Infozeile */
-  let t;
-  if (!P.length) t = '<b>Tippe den Startpunkt ins Wasser.</b> Danach die Wegpunkte (werden zu Toren), der letzte Punkt ist das Ziel. Punkte lassen sich verschieben, Karte mit einem Finger schieben, mit zwei Fingern zoomen.';
-  else if (P.length === 1) t = '<b>Start gesetzt.</b> Jetzt Wegpunkte tippen – der zuletzt getippte Punkt wird das Ziel.' + (ck.startOk ? '' : '<br>⚠ Am Start ist es eng oder flach – für die Startlinie besser auf freies Wasser legen.');
-  else {
-    const bad = ck.legs.map((l, i) => l.bad ? i + 1 : 0).filter(Boolean);
-    t = '<b>' + (P.length - 2) + ' Tore · ' + revFmt(revLenSm(P), 1) + ' sm</b> · flachste Stelle auf der Linie ' + revFmt(Math.max(0, ck.minAll), 1) + ' m (Tiefgang ' + CL.name + ': ' + revFmt(ck.dr, 1) + ' m)'
-      + (bad.length ? '<br>⚠ Schenkel ' + bad.join(', ') + ' führt durch zu flaches Wasser (rot gestrichelt) – Wegpunkt dazwischen setzen oder verschieben.' : '')
-      + (ck.startOk ? '' : '<br>⚠ Am Start ist es eng oder flach.')
-      + '<br><span style="color:#9fc0cc">Start- und Ziellinie richten sich beim Rennen nach dem Wind (grün = Start, blau = Ziel, Vorschau für die eingestellte Windrichtung).</span>';
-  }
-  if (RVE.warn) t = '⚠ ' + RVE.warn + '<br>' + t;
-  if (RVE.editId) t = '✎ Bearbeite „' + revEsc(RVE.name) + '“ · ' + t;
-  RVE.info.innerHTML = t;
-}
-function revEsc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-function revEditSave() {
-  const P = RVE.pts; if (P.length < 2) { RVE.warn = 'Mindestens Start und Ziel setzen.'; revEditDraw(); return; }
-  const all = revStrecken(); let name = RVE.name || ('Strecke ' + (all.length + 1));
-  const nn = prompt('Name der Strecke:', name); if (nn === null) return; name = (nn.trim() || name).slice(0, 40);
-  const pts = P.map(p => [Math.round(p[0]), Math.round(p[1])]);
-  if (RVE.editId) { const s = all.find(q => q.id === RVE.editId); if (s) { s.name = name; s.pts = pts; s.t = Date.now(); } }
-  else { RVE.editId = Date.now().toString(36); all.push({ id: RVE.editId, name, rev: 'hiddensee', pts, t: Date.now() }); }
-  RVE.name = name;
-  if (!revStreckenSave(all)) { RVE.warn = 'Speichern ging nicht – der Browser-Speicher ist voll oder gesperrt.'; revEditDraw(); return; }
-  RVE.warn = ''; revEditList(); revEditDraw(); msg('Strecke „' + name + '“ gespeichert.', 'good');
-}
-function revEditList() {
-  const all = revStrecken(), L = RVE.list;
-  if (!all.length) { L.innerHTML = '<div style="color:#9fc0cc;font-size:13px">Noch keine eigenen Strecken gespeichert.</div>'; return; }
-  L.innerHTML = '<div style="color:#9fc0cc;font-size:12px;margin-bottom:4px">Gespeicherte Strecken (nur auf diesem Gerät)</div>';
-  for (const s of all) {
-    const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid #1d3542;flex-wrap:wrap';
-    const sel = S.revKurs === 'u:' + s.id;
-    row.innerHTML = '<span style="flex:1;min-width:140px">' + (sel ? '✅ ' : '') + '<b>' + revEsc(s.name) + '</b> · ' + revFmt(revLenSm(s.pts), 1) + ' sm · ' + Math.max(0, s.pts.length - 2) + ' Tore</span>';
-    const mk = (txt, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; b.style.cssText = 'font:600 13px system-ui;color:#fff;background:#183342;border:1px solid #2f5a6e;border-radius:8px;padding:5px 9px;cursor:pointer'; b.onclick = fn; row.appendChild(b); };
-    mk('▶ Segeln', () => { S.revier = 'hiddensee'; S.revKurs = 'u:' + s.id; saveS(); revEditClose(); onSetting('revKurs'); msg('Kurs „' + s.name + '“ gewählt – Regatta starten.', 'good'); });
-    mk('✎ Bearbeiten', () => { RVE.pts = s.pts.map(p => p.slice()); RVE.editId = s.id; RVE.name = s.name; revEditDraw(); });
-    mk('🗑', () => { if (!confirm('Strecke „' + s.name + '“ löschen?')) return; revStreckenSave(revStrecken().filter(q => q.id !== s.id)); if (S.revKurs === 'u:' + s.id) { S.revKurs = 'bb'; saveS(); } if (RVE.editId === s.id) { RVE.editId = null; } revEditList(); revEditDraw(); });
-    L.appendChild(row);
-  }
-}
-
-/* ---------- Freies Segeln: auf der Minikarte hinbeamen ---------- */
-var MAPAFF = null, BEAMON = false;
-function mapAff(mp) { const o = mp(0, 0), a = mp(1, 0), b = mp(0, 1); const m = [a[0] - o[0], b[0] - o[0], a[1] - o[1], b[1] - o[1]]; const det = m[0] * m[3] - m[1] * m[2]; if (Math.abs(det) > 1e-12) MAPAFF = { o, m, det }; }
-function mapToWorld(sx, sy) { if (!MAPAFF) return null; const { o, m, det } = MAPAFF, dx = sx - o[0], dy = sy - o[1]; return [(m[3] * dx - m[1] * dy) / det, (-m[2] * dx + m[0] * dy) / det]; }
-function beamToggle() { BEAMON = !BEAMON; const bt = document.getElementById('mapBeam'); if (bt) bt.classList.toggle('on', BEAMON); if (BEAMON) msg('Hinbeamen: Tippe in der Karte auf einen Punkt im Wasser. Mit „−“ zoomst du weiter heraus.', 'info'); }
-function beamTo(sx, sy) {
-  BEAMON = false; const bt = document.getElementById('mapBeam'); if (bt) bt.classList.remove('on');
-  const w = mapToWorld(sx, sy); if (!w || !G || !G.free) return; const pl = P(), x = w[0], y = w[1];
-  let ok = onWater(x, y); if (SHORE.kind === 'revier' && REVH) ok = revDepth(x, y) >= (pl.rib ? 0.6 : revDraft()) + 0.3;
-  if (!ok) { msg('Dort ist kein ausreichend tiefes Wasser – such dir einen anderen Punkt.', 'warn'); return; }
-  const d = Math.hypot(x - pl.x, y - pl.y);
-  for (const b of G.boats) if (b !== pl && b.cpuTrainer) { b.x = x + 10; b.y = y - 9; b.v = 0; }
-  pl.x = x; pl.y = y; pl.v = Math.min(pl.v, 1); snapCam = true;
-  msg('Hingebeamt (' + (d >= 1000 ? revFmt(d / 1000, 1) + ' km' : Math.round(d) + ' m') + ').', 'good');
-}
-
 function ixyBoardsBuild(g){const sh=HSHAPE.ixylon;const zOf=u=>-sh.len/2+u*sh.len;const geo=new THREE.BoxGeometry(0.028,0.95,0.36);geo.translate(0,-0.475,0.12);const out=[];
   for(const sd of [1,-1]){const tilt=new THREE.Group();tilt.position.set(sd*0.47,sh.dims(0.47)[1]-0.06,zOf(0.44));tilt.rotation.z=sd*0.14;g.add(tilt);const lift=new THREE.Group();tilt.add(lift);
     const m=new THREE.Mesh(geo,IXY_BOARD);m.castShadow=true;lift.add(m);out.push({sd,lift,up:0});}return out;}
