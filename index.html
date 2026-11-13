@@ -813,7 +813,7 @@ function revTileLoad(m) {
   t.p = revFetch(X.base, m.file).then(revInflate).then(buf => {
     const dv = new DataView(buf), kx = dv.getUint16(4, true), ky = dv.getUint16(6, true), nh = dv.getUint32(8, true), n = kx * ky;
     t.z = new Int16Array(buf, 12, n); t.lu = new Uint8Array(buf, 12 + 2 * n, n); t.cd = new Uint8Array(buf, 12 + 3 * n, n);
-    t.hs = new Int16Array(buf, 12 + 4 * n, nh * 6); t.kx = kx; t.ky = ky; t.st = 'da'; X.nLoad--;
+    t.hs = new Int16Array(buf, 12 + 4 * n, nh * 6); t.kx = kx; t.ky = ky; t.st = 'da'; X.nLoad--; X.tileVer = (X.tileVer || 0) + 1;
     X.dirty = true; for (const [ck, c] of X.chunks) if (c.ti === m.ti && c.tj === m.tj) c.step = -1;  /* Gelände neu bauen */
   }).catch(e => { t.st = 'fehler'; X.nLoad--; console.warn('Kachel', m.file, e); });
   return t.p;
@@ -870,7 +870,7 @@ function revBuild() {
   try { MZ_MIN = 0.01; } catch (e) {}
   X.chunks = new Map(); X.scen = new Map(); X.lastE = null;
   X.matT = new THREE.MeshLambertMaterial({ vertexColors: true });
-  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null;
+  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null; X.brGrp = null; X.verkehr = null;
   X.haefen = (X.idx.haefen || []).map(h => Object.assign({}, h, { st: null, z: null, m: null, teile: null, grp: null }));
   try { revTuerme(); } catch (e) { console.error('Leuchttürme', e); }
   try { revBrueckenBuild(); } catch (e) { console.error('Brücken', e); }
@@ -905,7 +905,7 @@ function revChunkBuild(c, step) {
   if (c.mesh) { shoreG.remove(c.mesh); c.mesh.geometry.dispose(); c.mesh = null; }
   c.step = step; if (!any) return;
   const idx = new (n * n > 65535 ? Uint32Array : Uint16Array)((n - 1) * (n - 1) * 6); let q = 0;
-  const HR = (X.haefen || []).filter(h => h.z).map(h => [h.x0 + 2 * h.cs, h.y0 + 2 * h.cs, h.x0 + (h.n - 2) * h.cs, h.y0 + (h.n - 2) * h.cs]);
+  const HR = (X.haefen || []).filter(h => h.z).map(h => [h.x0 + 2 * h.cs, h.y0 + 2 * h.cs, h.x0 + revHW(h) - 2 * h.cs, h.y0 + revHH(h) - 2 * h.cs]);
   const drin = (a, b) => { if (!HR.length) return false; const E0 = (c.gi + b * step + 0.5) * cs, N0 = X.H - (c.gj + a * step + 0.5) * cs, E1 = E0 + step * cs, N1 = N0 - step * cs; return HR.some(r => E0 >= r[0] && E1 <= r[2] && N1 >= r[1] && N0 <= r[3]); };
   for (let a = 0; a < n - 1; a++) for (let b = 0; b < n - 1; b++) { if (drin(a, b)) continue; const p = a * n + b; idx[q++] = p; idx[q++] = p + n; idx[q++] = p + 1; idx[q++] = p + 1; idx[q++] = p + n; idx[q++] = p + n + 1; }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -930,6 +930,7 @@ function revScenBuild(t) {
     let a = 0, b = 0;
     use.forEach((tr, k) => {
       const [x, y] = F(tr[0], tr[1]), h0 = revZ(tr[0], tr[1]) + 0.35; if (h0 < 0.8) return;
+      const hm = revHafenMaske(tr[0], tr[1]); if (hm >= 2) return;
       if (k % 3 === 0) { const hh = tr[2] === 6 ? rnd(3, 6) : rnd(11, 19); sc.set(hh * 0.28, hh, hh * 0.28); p.set(x, h0 - 0.3, -y); m4.compose(p, q, sc); imC.setMatrixAt(a, m4); c.setHSL(rnd(0.27, 0.33), rnd(0.3, 0.45), rnd(0.16, 0.24)); imC.setColorAt(a++, c); }
       else { const r = tr[2] === 6 ? rnd(1.5, 3) : rnd(3.5, 6.5); sc.set(r, r * rnd(1.1, 1.5), r); p.set(x, h0 + r * 0.9, -y); m4.compose(p, q, sc); imB.setMatrixAt(b, m4); c.setHSL(rnd(0.2, 0.3), rnd(0.32, 0.5), rnd(0.2, 0.3)); imB.setColorAt(b++, c); }
     });
@@ -938,7 +939,7 @@ function revScenBuild(t) {
   const nh = Math.min(t.hs.length / 6, lo ? 2500 : 9000);
   if (nh > 0) {
     const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0); const roof = new THREE.ConeGeometry(0.75, 1, 4, 1); roof.rotateY(Math.PI / 4); roof.translate(0, 0.5, 0);
-    const imW = new THREE.InstancedMesh(box, revHausMat(), nh), imR = new THREE.InstancedMesh(roof, new THREE.MeshLambertMaterial({ color: 0xffffff }), nh);
+    const imW = new THREE.InstancedMesh(box, revHausMat(), nh), imV = new THREE.InstancedMesh(box, revFassMat(0xffffff, { villa: true }), nh), imR = new THREE.InstancedMesh(roof, new THREE.MeshLambertMaterial({ color: 0xffffff }), nh); let nv = 0, nw = 0;
     const wf = (Number(S.windFrom) || 0) * DEG, ex0 = t.i1 * cs, ny0 = X.H - (t.j1 + t.ky) * cs, lamps = []; let n2 = 0;
     for (let k = 0; k < nh; k++) {
       const h6 = t.hs, E = ex0 + h6[k * 6], N = ny0 + h6[k * 6 + 1], l = h6[k * 6 + 2] / 10, w = h6[k * 6 + 3] / 10, ang = h6[k * 6 + 4] / 1000, hh = h6[k * 6 + 5] / 10;
@@ -946,13 +947,15 @@ function revScenBuild(t) {
       if (X.lampen && X.lampen.some(L => Math.abs(L[0] - E) < 14 && Math.abs(L[1] - N) < 14)) continue;
       if (revInWz(E, N)) continue;
       if (k % 4 === 0) { const la = ang + 1.3, lr = Math.max(l, w) * 0.5 + 3; const [lx, ly] = F(E + Math.cos(la) * lr, N + Math.sin(la) * lr); lamps.push(lx, h0 + 4.5, -ly); }
-      const Hh = Math.min(hh, 25); q.setFromAxisAngle(up, ang + wf);
-      sc.set(l, Hh * 0.72, w); p.set(x, h0 - 0.2, -y); m4.compose(p, q, sc); imW.setMatrixAt(n2, m4);
-      c.set(['#e8e1d2', '#d9cdb5', '#f1ece2', '#c9b79a', '#b4553f'][(k * 7) % 5]); imW.setColorAt(n2, c);
+      const bad = revBad(E, N), hanse = !bad && revHanse(E, N);
+      const Hh = Math.min(bad ? Math.max(hh, 12) : hanse ? Math.max(hh, 13) : hh, 25); q.setFromAxisAngle(up, ang + wf);
+      sc.set(l, Hh * 0.72, w); p.set(x, h0 - 0.2, -y); m4.compose(p, q, sc);
+      c.set(bad ? ['#f6f5f0', '#f1efe8', '#ebe8df', '#f6f5f0', '#e3ddcd'][(k * 7) % 5] : hanse ? ['#a5543c', '#c9a46a', '#b5623f', '#e6dccb', '#8f3f2e', '#d8c39a', '#9c4a36'][(k * 7) % 7] : ['#e8e1d2', '#d9cdb5', '#f1ece2', '#c9b79a', '#b4553f'][(k * 7) % 5]);
+      if (bad) { imV.setMatrixAt(nv, m4); imV.setColorAt(nv++, c); } else { imW.setMatrixAt(nw, m4); imW.setColorAt(nw++, c); }
       sc.set(l * 1.05, Math.min(Hh * 0.38, 6), w * 1.05); p.set(x, h0 - 0.2 + Hh * 0.72, -y); m4.compose(p, q, sc); imR.setMatrixAt(n2, m4);
-      c.set((k * 13) % 9 < 5 ? '#8c3b2a' : (k * 13) % 9 < 7 ? '#5a4a3a' : '#c8b27a'); imR.setColorAt(n2, c); n2++;
+      c.set(bad ? ((k * 13) % 9 < 6 ? '#5e6368' : (k * 13) % 9 < 8 ? '#6f6b66' : '#8c3b2a') : hanse ? ((k * 13) % 9 < 7 ? '#a8452e' : '#6e3a2c') : (k * 13) % 9 < 5 ? '#8c3b2a' : (k * 13) % 9 < 7 ? '#5a4a3a' : '#c8b27a'); imR.setColorAt(n2, c); n2++;
     }
-    imW.count = imR.count = n2; grp.add(imW, imR);
+    imW.count = nw; imV.count = nv; imR.count = n2; grp.add(imW, imV, imR);
     const lp = revLampen(lamps); if (lp) grp.add(lp);
   }
   grp.traverse(o => { if (o.isInstancedMesh) o.frustumCulled = false; });
@@ -1012,7 +1015,7 @@ var REV_LT = [
   { re: /Peilturm/i, s: { form: 4, h: 23, r0: 3.0, r1: 2.6, col: '#9c5038', galerie: 1, gcol: '#555', lat: '#777', dach: '#555', kuppel: true } },
   { re: /Dornbusch/i, s: { form: 12, h: 28, r0: 3.0, r1: 2.3, col: '#f2f0ea', galerie: 1, gcol: '#e8e4da', lat: '#f2f0ea', dach: '#b3362c' } },
   { re: /Oie/i, s: { form: 8, h: 39, r0: 3.8, r1: 2.8, col: '#a0523a', sockel: { form: 4, h: 6, r: 5.6, col: '#9a5640' }, galerie: 2, gcol: '#1f1f1f', lat: '#1f1f1f', dach: '#1f1f1f' } },
-  { re: /Sassnitz Ost/i, s: { form: 8, h: 12, r0: 1.4, r1: 0.9, col: '#2e7d4f', bands: [[0.45, 0.6, '#f2f0ea']], galerie: 1, gcol: '#2e7d4f', lat: '#2e7d4f', dach: '#2e7d4f' } },
+  { re: /Sassnitz Ost/i, s: { form: 8, h: 13, r0: 1.7, r1: 1.05, col: '#1f8a4c', bands: [[0.36, 0.74, '#f4f3ee']], galerie: 1, gcol: '#1f8a4c', lat: '#1f8a4c', dach: '#1f8a4c', fahne: true, plattform: { r: 9, h: 3.2, col: '#8b6a52' } } },
   { re: /Westmole/i, s: { typ: 'beine', h: 7, col: '#c62828' } },
   { re: /Mukran/i, s: { form: 8, h: 14, r0: 1.6, r1: 1.1, col: '#2e7d4f', bands: [[0.5, 0.62, '#f2f0ea']], galerie: 1, gcol: '#2e7d4f', lat: '#2e7d4f', dach: '#2e7d4f' } },
   { re: /^Peenemünde$/i, s: { form: 16, h: 11, r0: 1.8, r1: 1.5, col: '#c0392b', bands: [[0, 0.18, '#f2f0ea']], galerie: 1, gcol: '#c0392b', lat: '#f2f0ea', dach: '#f2f0ea', caisson: true } },
@@ -1080,6 +1083,7 @@ function revTurm(st, face) {
   } else {
     const seg = st.form || 12, rot = seg === 4 ? Math.PI / 4 : 0; let y0 = 0;
     if (st.caisson) { cyl(4.2, 4.6, 3.2, 20, '#8f8c86', -1.2); y0 = 2.0; }
+    if (st.plattform) { const pf = st.plattform; cyl(pf.r, pf.r * 1.04, pf.h + 3, 28, pf.col, -3); const rr = new THREE.Mesh(new THREE.TorusGeometry(pf.r - 0.3, 0.35, 4, 28), revM(pf.col)); rr.rotation.x = Math.PI / 2; rr.position.y = pf.h + 0.5; g.add(rr); y0 = pf.h; }
     if (st.sockel) { const so = st.sockel; cyl(so.r * (so.form === 4 ? 1.414 : 1), so.r * (so.form === 4 ? 1.414 : 1) * 1.05, so.h, so.form || 8, so.col, y0, so.form === 4 ? Math.PI / 4 : 0); y0 += so.h; }
     const sh = H - y0 - Math.max(1.1, H * 0.085) * 1.6, fs = seg === 4 ? 1.414 : 1;
     if (st.stufen) { for (let k = 0; k < st.stufen; k++) { const t0 = k / st.stufen, hh = sh / st.stufen, rb = (st.r0 + (st.r1 - st.r0) * t0) * fs, rt = (st.r0 + (st.r1 - st.r0) * (t0 + 1 / st.stufen)) * fs * 0.92; cyl(rt, rb, hh, 4, st.col, y0 + k * hh, rot); cyl(rt * 1.06, rt * 1.06, 0.4, 4, st.col, y0 + (k + 1) * hh - 0.4, rot); } }
@@ -1092,6 +1096,7 @@ function revTurm(st, face) {
     if (st.kuppel) { const k = new THREE.Mesh(new THREE.SphereGeometry(st.r1 * 0.9, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), revM('#666')); k.position.y = top + 0.25; g.add(k); lampY = top + 1; }
     else lampY = laterne(top + 0.25, Math.max(0.7, st.r1 * 0.75), st.lat || '#f4f2ec', st.dach || '#c62828');
   }
+  if (st.fahne) { const st1 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.6, 4), revM('#1f8a4c')); st1.position.y = lampY + 2.4; g.add(st1); const pf = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.25, 0.04), revM('#1f8a4c')); pf.position.set(0.3, lampY + 2.9, 0); g.add(pf); }
   g.userData.lampY = lampY;
   return g;
 }
@@ -1204,44 +1209,65 @@ function revFeuerTick() {
   X.feuerPts.geometry.attributes.col.needsUpdate = true; X.feuerPts.geometry.attributes.sz.needsUpdate = true;
 }
 
-/* ---------- Häfen fein (4 m): Kais, Molen, Stege ---------- */
+/* ---------- Feine Ausschnitte: Häfen (4 m) und Kreideküste (6 m) ---------- */
+function revHW(h) { return (h.nx || h.n) * h.cs; }
+function revHH(h) { return (h.ny || h.n) * h.cs; }
+function revRectDist2(E, N, x0, y0, w, hh) { const dx = Math.max(x0 - E, 0, E - (x0 + w)), dy = Math.max(y0 - N, 0, N - (y0 + hh)); return Math.hypot(dx, dy); }
 function revHafenAt(E, N) {
   const X = REVX; if (!X || !X.haefen) return null;
-  for (const h of X.haefen) if (h.z && E >= h.x0 && N >= h.y0 && E < h.x0 + h.n * h.cs && N < h.y0 + h.n * h.cs) return h;
+  for (const h of X.haefen) if (h.z && E >= h.x0 && N >= h.y0 && E < h.x0 + revHW(h) && N < h.y0 + revHH(h)) return h;
   return null;
 }
 function revHafenZ(h, E, N) {
-  const fx = (E - h.x0) / h.cs - 0.5, fy = (h.y0 + h.n * h.cs - N) / h.cs - 0.5, n = h.n;
-  const i0 = Math.max(0, Math.min(n - 2, Math.floor(fx))), j0 = Math.max(0, Math.min(n - 2, Math.floor(fy))), tx = Math.max(0, Math.min(1, fx - i0)), ty = Math.max(0, Math.min(1, fy - j0)), z = h.z;
-  return ((z[j0 * n + i0] * (1 - tx) + z[j0 * n + i0 + 1] * tx) * (1 - ty) + (z[(j0 + 1) * n + i0] * (1 - tx) + z[(j0 + 1) * n + i0 + 1] * tx) * ty) / 100;
+  const nx = h.nx || h.n, ny = h.ny || h.n, fx = (E - h.x0) / h.cs - 0.5, fy = (h.y0 + ny * h.cs - N) / h.cs - 0.5;
+  const i0 = Math.max(0, Math.min(nx - 2, Math.floor(fx))), j0 = Math.max(0, Math.min(ny - 2, Math.floor(fy))), tx = Math.max(0, Math.min(1, fx - i0)), ty = Math.max(0, Math.min(1, fy - j0)), z = h.z;
+  return ((z[j0 * nx + i0] * (1 - tx) + z[j0 * nx + i0 + 1] * tx) * (1 - ty) + (z[(j0 + 1) * nx + i0] * (1 - tx) + z[(j0 + 1) * nx + i0 + 1] * tx) * ty) / 100;
+}
+function revHafenMaske(E, N) {
+  const h = revHafenAt(E, N); if (!h) return -1; const nx = h.nx || h.n, ny = h.ny || h.n;
+  const i = Math.floor((E - h.x0) / h.cs), j = Math.floor((h.y0 + ny * h.cs - N) / h.cs); return i < 0 || j < 0 || i >= nx || j >= ny ? -1 : h.m[j * nx + i];
 }
 function revSchmal(h, i, j) {
-  const n = h.n, w = (a, b) => a < 0 || b < 0 || a >= n || b >= n ? false : h.m[b * n + a] === 0;
+  if (h.art === 'kreide') return false;
+  const nx = h.nx || h.n, ny = h.ny || h.n, w = (a, b) => a < 0 || b < 0 || a >= nx || b >= ny ? false : h.m[b * nx + a] === 0;
   for (let d = 1; d <= 6; d++) { if ((w(i - d, j) || w(i - d - 1, j)) && (w(i + d, j) || w(i + d + 1, j)) && d <= 5) return true; if ((w(i, j - d) || w(i, j - d - 1)) && (w(i, j + d) || w(i, j + d + 1)) && d <= 5) return true; }
   return false;
 }
 function revHafenLoad(h) {
   if (h.st) return; h.st = 'lade'; const X = REVX;
   revFetch(X.base, h.file).then(revInflate).then(buf => {
-    const dv = new DataView(buf), n = dv.getUint16(14, true);
-    h.z = new Int16Array(buf, 16, n * n); h.m = new Uint8Array(buf, 16 + 2 * n * n, n * n); h.n = n; h.st = 'da';
-    for (const [k, c] of X.chunks) { const x0 = c.gi * X.cs, x1 = (c.gi + REV_CH) * X.cs, y1 = X.H - c.gj * X.cs, y0 = X.H - (c.gj + REV_CH) * X.cs; if (x1 > h.x0 && x0 < h.x0 + h.n * h.cs && y1 > h.y0 && y0 < h.y0 + h.n * h.cs) c.step = -1; }
-    h.teile = new Map(); revStege(h);
+    const dv = new DataView(buf), v2 = dv.getUint8(3) === 50;   /* 'RKH2' = rechteckig */
+    const nx = dv.getUint16(14, true), ny = v2 ? dv.getUint16(16, true) : nx, o = v2 ? 18 : 16, n = nx * ny;
+    h.z = new Int16Array(buf.slice(o, o + 2 * n)); h.m = new Uint8Array(buf, o + 2 * n, n); h.nx = nx; h.ny = ny; h.n = Math.max(nx, ny); h.st = 'da';
+    const W = revHW(h), HH = revHH(h);
+    for (const [k, c] of X.chunks) { const x0 = c.gi * X.cs, x1 = (c.gi + REV_CH) * X.cs, y1 = X.H - c.gj * X.cs, y0 = X.H - (c.gj + REV_CH) * X.cs; if (x1 > h.x0 && x0 < h.x0 + W && y1 > h.y0 && y0 < h.y0 + HH) c.step = -1; }
+    /* Bäume/Häuser der betroffenen Kacheln neu setzen (keine Bäume an der Kreidewand) */
+    for (const [k, t] of X.tiles) { if (!X.scen.has(k)) continue; const tx0 = t.i1 * X.cs, ty1 = X.H - t.j1 * X.cs, tx1 = tx0 + t.kx * X.cs, ty0 = ty1 - t.ky * X.cs; if (tx1 > h.x0 && tx0 < h.x0 + W && ty1 > h.y0 && ty0 < h.y0 + HH) { revDispose(X.scen.get(k)); X.scen.delete(k); } }
+    h.teile = new Map(); revStege(h); X.tileVer = (X.tileVer || 0) + 1;
   }).catch(e => { h.st = 'fehler'; console.warn('Hafen', h.name, e); });
 }
+var REV_KREIDE = null;
 function revHafenTeil(h, ci, cj, step) {
-  const F = SHORE.fwd, CH = 50, n = h.n, cs = h.cs, key = ci + ',' + cj; let t = h.teile.get(key);
+  const F = SHORE.fwd, CH = 50, nx = h.nx || h.n, ny = h.ny || h.n, cs = h.cs, key = ci + ',' + cj; let t = h.teile.get(key);
   if (t && t.step === step) return; if (t && t.mesh) { shoreG.remove(t.mesh); t.mesh.geometry.dispose(); }
-  const i0 = ci * CH, j0 = cj * CH, m = Math.floor(Math.min(CH, n - 1 - i0) / step) + 1, k2 = Math.floor(Math.min(CH, n - 1 - j0) / step) + 1;
-  const pos = new Float32Array(m * k2 * 3), col = new Float32Array(m * k2 * 3), C = REV_COLS, tmp = new THREE.Color(), kai = new THREE.Color('#7d7b76'), steg = new THREE.Color('#8d8a84'); let q = 0;
+  if (!REV_KREIDE) REV_KREIDE = { kr: new THREE.Color('#f0ede4'), kg: new THREE.Color('#cfcab8'), kies: new THREE.Color('#a8a69f'), kies2: new THREE.Color('#8f8d87') };
+  const i0 = ci * CH, j0 = cj * CH, m = Math.floor(Math.min(CH, nx - 1 - i0) / step) + 1, k2 = Math.floor(Math.min(CH, ny - 1 - j0) / step) + 1;
+  if (m < 2 || k2 < 2) { h.teile.set(key, { step, mesh: null }); return; }
+  const pos = new Float32Array(m * k2 * 3), col = new Float32Array(m * k2 * 3), C = REV_COLS, K = REV_KREIDE, tmp = new THREE.Color(), kai = new THREE.Color('#7d7b76'); let q = 0, any = false;
   for (let a = 0; a < k2; a++) for (let b = 0; b < m; b++) {
-    const i = Math.min(n - 1, i0 + b * step), j = Math.min(n - 1, j0 + a * step), z = h.z[j * n + i] / 100, mk = h.m[j * n + i];
-    const E = h.x0 + (i + 0.5) * cs, N = h.y0 + n * cs - (j + 0.5) * cs, [x, y] = F(E, N), hh = mk === 2 ? -2.2 : z > 0 ? z + 0.35 : z - 0.6;
+    const i = Math.min(nx - 1, i0 + b * step), j = Math.min(ny - 1, j0 + a * step), z = h.z[j * nx + i] / 100, mk = h.m[j * nx + i];
+    if (z > -0.5) any = true;
+    const E = h.x0 + (i + 0.5) * cs, N = h.y0 + ny * cs - (j + 0.5) * cs, [x, y] = F(E, N), hh = mk === 2 ? -2.2 : z > 0 ? z + 0.35 : z - 0.6;
     pos[q * 3] = x; pos[q * 3 + 1] = hh; pos[q * 3 + 2] = -y;
-    if (z <= 0 || mk === 2) tmp.copy(C.bed); else if (mk === 3 || revSchmal(h, i, j)) tmp.copy(kai); else if (mk === 2) tmp.copy(steg);
+    let v = 0.94 + 0.12 * Math.sin(i * 7.31 + j * 3.17);
+    if (z <= 0 || mk === 2) tmp.copy(C.bed);
+    else if (mk === 5) { tmp.copy(K.kr); if (z < 10) tmp.lerp(K.kg, (10 - z) / 14); v = 1.45 + 0.12 * Math.sin(i * 1.9 + j * 0.37) + 0.06 * Math.sin(i * 5.3); }
+    else if (mk === 4) { tmp.copy((i * 7 + j * 13) % 5 < 2 ? K.kies2 : K.kies); }
+    else if (mk === 3 || revSchmal(h, i, j)) tmp.copy(kai);
     else { const lu = revCellLu(Math.floor(E / REVX.cs), Math.floor((REVX.H - N) / REVX.cs)); tmp.copy(z < 1.2 ? C.sand : (C[lu] || C[0])); }
-    const v = 0.94 + 0.12 * Math.sin(i * 7.31 + j * 3.17); col[q * 3] = tmp.r * v; col[q * 3 + 1] = tmp.g * v; col[q * 3 + 2] = tmp.b * v; q++;
+    col[q * 3] = tmp.r * v; col[q * 3 + 1] = tmp.g * v; col[q * 3 + 2] = tmp.b * v; q++;
   }
+  if (!any) { h.teile.set(key, { step, mesh: null }); return; }
   const idx = new Uint32Array((m - 1) * (k2 - 1) * 6); let w = 0;
   for (let a = 0; a < k2 - 1; a++) for (let b = 0; b < m - 1; b++) { const p = a * m + b; idx[w++] = p; idx[w++] = p + m; idx[w++] = p + 1; idx[w++] = p + 1; idx[w++] = p + m; idx[w++] = p + m + 1; }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeVertexNormals(); g.computeBoundingSphere();
@@ -1279,13 +1305,13 @@ function revStege(h) {
 function revHafenTick(E, N) {
   const X = REVX; if (!X.haefen) return;
   for (const h of X.haefen) {
-    const d = revRectDist(E, N, h.x0, h.y0, h.n * h.cs);
+    const d = revRectDist2(E, N, h.x0, h.y0, revHW(h), revHH(h));
     if (!h.st && d < 9000) revHafenLoad(h);
     if (h.st !== 'da') continue;
     if (!h.teile) h.teile = new Map();
-    const CH = 50, nc = Math.ceil((h.n - 1) / CH); let bud = 6;
-    for (let cj = 0; cj < nc; cj++) for (let ci = 0; ci < nc; ci++) {
-      const dd = revRectDist(E, N, h.x0 + ci * CH * h.cs, h.y0 + h.n * h.cs - (cj + 1) * CH * h.cs, CH * h.cs);
+    const CH = 50, nci = Math.ceil(((h.nx || h.n) - 1) / CH), ncj = Math.ceil(((h.ny || h.n) - 1) / CH), HH = revHH(h); let bud = 6;
+    for (let cj = 0; cj < ncj; cj++) for (let ci = 0; ci < nci; ci++) {
+      const dd = revRectDist(E, N, h.x0 + ci * CH * h.cs, h.y0 + HH - (cj + 1) * CH * h.cs, CH * h.cs);
       const step = dd < 1200 ? 1 : dd < 3000 ? 2 : dd < 6000 ? 5 : 10, t = h.teile.get(ci + ',' + cj);
       if ((!t || t.step !== step) && (bud-- > 0 || !t)) revHafenTeil(h, ci, cj, step);
     }
@@ -1296,37 +1322,66 @@ function revHafenTick(E, N) {
 var REV_WIN = { value: 0 };          /* 0 = Tag … 1 = Nacht, gemeinsam für alle Hausmaterialien */
 function revNacht() { return typeof NIGHT === 'number' && NIGHT > 0.5 ? 1 : S.licht === 'daemmerung' ? 0.65 : S.licht === 'gold' ? 0.12 : 0; }
 /* Hauswände mit Fenstern: Raster je nach Hausgröße, zufällig erleuchtet, warmes Licht */
-function revHausMat() {
-  const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
+/* Hansestadt-Altstadt (Stralsund, Greifswald, Wolgast): Backstein, Ocker, rote Dächer */
+function revHanse(E, N) {
+  const X = REVX; if (!X.hanseOrte) X.hanseOrte = (X.idx.places || []).filter(p => /^(Stralsund|Greifswald|Wolgast)$/.test(p[2])).map(p => [p[0], p[1], p[2] === 'Stralsund' ? 1500 : 1000]);
+  for (const b of X.hanseOrte) if (Math.hypot(b[0] - E, b[1] - N) < b[2]) return true;
+  return false;
+}
+/* Seebäder mit weißer Bäderarchitektur */
+function revBad(E, N) {
+  const X = REVX; if (!X.badOrte) X.badOrte = (X.idx.places || []).filter(p => /Sassnitz|Binz|Sellin|Göhren|Baabe|Zinnowitz|Lohme|Glowe|Breege|Juliusruh|Thiessow|Lubmin|Zempin|Koserow|Trassenheide|Karlshagen|Vitte|Kloster|Neuendorf/.test(p[2])).map(p => [p[0], p[1], /Sassnitz|Binz/.test(p[2]) ? 2200 : 1300]);
+  for (const b of X.badOrte) if (Math.abs(b[0] - E) < b[2] && Math.abs(b[1] - N) < b[2] && Math.hypot(b[0] - E, b[1] - N) < b[2]) return true;
+  return false;
+}
+/* Fassaden mit Fenstern: am Tag dunkles Glas, nachts zufällig warm erleuchtet.
+   Arbeitet mit Weltkoordinaten, passt also auf Häuser (instanziert) und auf Wahrzeichen.
+   villa: Bäderarchitektur mit weißen Balkonbändern und großen, weiß gerahmten Fenstern. */
+function revFassMat(col, opt) {
+  opt = opt || {};
+  const m = new THREE.MeshLambertMaterial({ color: col == null ? 0xffffff : col });
+  const villa = !!opt.villa, cx = opt.cx || (villa ? 3.0 : 3.4), cy = opt.cy || 3.0;
+  m.userData.uH = { value: opt.h || 10 };
   m.onBeforeCompile = sh => {
-    sh.uniforms.uWin = REV_WIN;
-    sh.vertexShader = 'varying vec2 vWUv;varying vec2 vWSz;varying vec3 vWN;varying vec2 vWSeed;varying float vWD;\n' + sh.vertexShader
+    sh.uniforms.uWin = REV_WIN; sh.uniforms.uH = m.userData.uH;
+    sh.vertexShader = 'varying vec3 vFW;varying vec3 vFN;varying float vFB;varying float vFT;varying float vFD;varying vec2 vFS;uniform float uH;\n' + sh.vertexShader
       .replace('#include <begin_vertex>', `#include <begin_vertex>
-        vWUv = uv; vWN = normal;
         #ifdef USE_INSTANCING
-          vec3 wsc = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
-          vWSeed = instanceMatrix[3].xz;
+          mat4 fM = modelMatrix * instanceMatrix;
+          vFB = fM[3].y; vFT = vFB + length(instanceMatrix[1].xyz); vFS = instanceMatrix[3].xz;
         #else
-          vec3 wsc = vec3(1.0); vWSeed = vec2(0.0);
+          mat4 fM = modelMatrix;
+          vFB = fM[3].y; vFT = vFB + uH; vFS = vec2(0.0);
         #endif
-        vWSz = abs(normal.x) > 0.5 ? vec2(wsc.z, wsc.y) : vec2(wsc.x, wsc.y);`)
-      .replace('#include <project_vertex>', '#include <project_vertex>\n        vWD = -mvPosition.z;');
-    sh.fragmentShader = 'uniform float uWin;varying vec2 vWUv;varying vec2 vWSz;varying vec3 vWN;varying vec2 vWSeed;varying float vWD;\n' + sh.fragmentShader
+        vFW = (fM * vec4(transformed, 1.0)).xyz; vFN = normalize(mat3(fM) * normal);`)
+      .replace('#include <project_vertex>', '#include <project_vertex>\n        vFD = -mvPosition.z;');
+    sh.fragmentShader = 'uniform float uWin;varying vec3 vFW;varying vec3 vFN;varying float vFB;varying float vFT;varying float vFD;varying vec2 vFS;\n' + sh.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        vec3 fn = normalize(vFN); float side = 1.0 - step(0.45, abs(fn.y));
+        vec2 ft = normalize(vec2(-fn.z, fn.x) + 1e-5); float fu = dot(vFW.xz, ft), fv = vFW.y - vFB;
+        vec2 fcl = vec2(fu / ${cx.toFixed(2)}, fv / ${cy.toFixed(2)}); vec2 fid = floor(fcl), ffr = fract(fcl);
+        float inH = step(0.9, fv) * step(fv, vFT - vFB - 0.5);
+        ${villa
+          ? `float fwin = side * inH * step(0.16, ffr.x) * step(ffr.x, 0.84) * step(0.22, ffr.y) * step(ffr.y, 0.86);
+             float frame = side * inH * (1.0 - step(0.06, abs(ffr.x - 0.5))) * step(0.22, ffr.y);
+             float band = side * inH * step(ffr.y, 0.13); float shade = side * inH * step(0.13, ffr.y) * step(ffr.y, 0.2);`
+          : `float fwin = side * inH * step(0.28, ffr.x) * step(ffr.x, 0.72) * step(0.3, ffr.y) * step(ffr.y, 0.8);
+             float frame = 0.0, band = 0.0, shade = 0.0;`}
+        float ffar = smoothstep(260.0, 900.0, vFD);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.2, 0.25), fwin * (1.0 - frame) * (0.85 - 0.6 * ffar));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.97), (band + frame) * (1.0 - ffar));
+        diffuseColor.rgb *= 1.0 - 0.35 * shade * (1.0 - ffar);
+        float fh = fract(sin(dot(fid + floor(vFS * 0.37), vec2(12.9898, 78.233))) * 43758.5453);`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        if (uWin > 0.01 && abs(vWN.y) < 0.5 && vWSz.y > 2.0) {
-          vec2 cl = vWUv * vWSz / vec2(3.4, 2.9);
-          vec2 id = floor(cl), fr = fract(cl);
-          float ins = step(0.28, fr.x) * step(fr.x, 0.74) * step(0.32, fr.y) * step(fr.y, 0.8) * step(0.6, cl.y);
-          float hh = fract(sin(dot(id + floor(vWSeed * 0.31), vec2(12.9898, 78.233))) * 43758.5453);
-          float lit = step(0.55, hh);
-          vec3 wc = mix(vec3(1.0, 0.66, 0.32), vec3(1.0, 0.88, 0.66), fract(hh * 7.31));
-          float far = smoothstep(220.0, 650.0, vWD);
-          totalEmissiveRadiance += uWin * mix(ins * lit * 1.25, 0.28, far) * wc;
+        if (uWin > 0.01) {
+          float lit = step(0.52, fh); vec3 wc = mix(vec3(1.0, 0.66, 0.32), vec3(1.0, 0.88, 0.66), fract(fh * 7.31));
+          totalEmissiveRadiance += uWin * mix(fwin * (1.0 - frame) * lit * 1.25, 0.26 * side * inH, ffar) * wc;
         }`);
   };
-  m.customProgramCacheKey = () => 'revWin1';
+  m.customProgramCacheKey = () => 'revFass' + (villa ? 'V' : 'N') + cx + '_' + cy;
   return m;
 }
+function revHausMat() { return revFassMat(0xffffff, {}); }
 /* Straßen- und Hafenlaternen als leuchtende Punkte (nur nachts) */
 var REV_LAMP_MAT = null;
 function revLampMat() {
@@ -1377,11 +1432,12 @@ function revWzBuild(z) {
   const base = wasser ? 0 : Math.max(0.2, zmin + 0.35) - 0.6;
   const ob = revObb(P);
   /* Grundriss hochziehen */
-  const extr = (h, col, k, y0) => {
+  const MF = (c, k, h, opt) => { const m = revFassMat(c, Object.assign({ h }, opt || {})); mats.push([m, k == null ? 0.5 : k]); return m; };
+  const extr = (h, col, k, y0, fass) => {
     const sh = new THREE.Shape(); const c0 = G(ob.c[0], ob.c[1]);
     P.forEach((q, i) => { const p = G(q[0], q[1]); const x = p[0] - c0[0], y = -(p[1] - c0[1]); i ? sh.lineTo(x, y) : sh.moveTo(x, y); });
     const g = new THREE.ExtrudeGeometry(sh, { depth: h, bevelEnabled: false }); g.rotateX(-Math.PI / 2);
-    const m = new THREE.Mesh(g, M(col, k)); m.position.set(c0[0], (y0 == null ? base : y0), c0[1]); grp.add(m); return m;
+    const m = new THREE.Mesh(g, fass ? MF(col, k, h, fass) : M(col, k)); m.position.set(c0[0], (y0 == null ? base : y0), c0[1]); grp.add(m); return m;
   };
   /* Teil im Achsensystem: s entlang Achse, t quer (m) → Szene */
   const at = (s, t) => G(ob.c[0] + ob.u[0] * s + ob.v[0] * t, ob.c[1] + ob.u[1] * s + ob.v[1] * t);
@@ -1403,6 +1459,8 @@ function revWzBuild(z) {
       cyl(s, t, r * 0.35, r * 0.35, H * 0.16, yy, 8, REV_WZ_FARBE.kupfer, 0.45); yy += H * 0.16;
       const k2 = new THREE.Mesh(new THREE.SphereGeometry(r * 0.45, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), M(REV_WZ_FARBE.kupfer, 0.45)); k2.position.set(p[0], yy, p[1]); grp.add(k2); yy += r * 0.4;
       const sp = Math.max(2, y + H - yy); cyl(s, t, r * 0.18, 0.05, sp, yy, 8, REV_WZ_FARBE.kupfer, 0.45);
+    } else if (art === 'pyramide') {
+      cyl(s, t, ts * 0.72, 0.1, Math.max(4, ts * 0.55), y, 4, REV_WZ_FARBE.kupfer, 0.45);
     } else if (art === 'flach') {
       cyl(s, t, ts * 0.72, 0.1, Math.max(3, H), y, 4, REV_WZ_FARBE.dach, 0.3);
       for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) cyl(s + a * ts * 0.4, t + b * ts * 0.4, ts * 0.09, 0.05, ts * 0.5, y, 8, REV_WZ_FARBE.kupfer, 0.45);
@@ -1416,7 +1474,7 @@ function revWzBuild(z) {
       const ts = w.westwerk ? B * 0.9 : Math.min(B * 0.62, Math.max(6, turm * 0.13)), sw = westEnde * (L / 2 - ts / 2);
       const tz = w.tuerme === 2 ? [ts * 0.55, -ts * 0.55] : [0];
       tz.forEach((tt, i) => {
-        const T = i === 0 ? turm : (w.turm2 || turm), hl = i === 0 ? (w.helm || 'spitz') : 'flach', hm = hl === 'flach' ? T - 3 : T * (hl === 'barock' ? 0.62 : 0.6), tw = w.tuerme === 2 ? ts * 0.8 : ts;
+        const T = i === 0 ? turm : (w.turm2 || turm), hl = i === 0 ? (w.helm || 'spitz') : (w.helm2 || 'flach'), hm = hl === 'flach' ? T - 3 : hl === 'pyramide' ? T - Math.max(4, ts * 0.45) : T * (hl === 'barock' ? 0.62 : 0.6), tw = w.tuerme === 2 ? ts * 0.8 : ts;
         box(sw, tt, tw, tw, hm, base, REV_WZ_FARBE.ziegel, 0.6);
         helm(sw, tt, tw, base + hm, T - hm, hl);
       });
@@ -1424,18 +1482,72 @@ function revWzBuild(z) {
   } else if (w.art === 'tor') {
     const h = Math.max(w.h, 18); extr(h, REV_WZ_FARBE.ziegel, 0.55); cyl(0, 0, Math.max(ob.L, ob.B) * 0.72, 0.1, 7, base + h, 4, REV_WZ_FARBE.dach, 0.3);
   } else if (w.art === 'rathaus') {
-    const h = Math.max(w.h, 14); extr(h, REV_WZ_FARBE.ziegel, 0.55); dach(-ob.L / 2, ob.L / 2, ob.B, base + h, ob.B * 0.5, REV_WZ_FARBE.dach);
+    const h = Math.max(w.h, 14); extr(h, REV_WZ_FARBE.ziegel, 0.55, null, {}); dach(-ob.L / 2, ob.L / 2, ob.B, base + h, ob.B * 0.5, REV_WZ_FARBE.dach);
+    if (/Altes Rathaus/.test(w.n)) {
+      /* Schaufassade (Stralsund): hohe Backsteinwand mit sechs Türmchen und Rundfenstern, zum Alten Markt (Norden) */
+      const nord = (ob.c[1] + ob.u[1] * ob.L / 2) > (ob.c[1] - ob.u[1] * ob.L / 2) ? 1 : -1, sF = nord * (ob.L / 2 + 0.6), HF = h + 12;
+      box(sF, 0, 1.2, ob.B, HF, base, '#7d3a2a', 0.65);
+      for (let k = 0; k < 6; k++) { const t = -ob.B / 2 + ob.B * (k + 0.5) / 6; box(sF, t, 1.6, 1.6, 5, base + HF, '#6f3325', 0.65); cyl(sF, t, 1.1, 0.05, 4, base + HF + 5, 4, '#2e2a28', 0.4); }
+      for (let k = 0; k < 6; k++) { const t = -ob.B / 2 + ob.B * (k + 0.5) / 6; const rf = new THREE.Mesh(new THREE.CircleGeometry(1.3, 16), new THREE.MeshBasicMaterial({ color: '#1d1f22' })); const pp = at(sF + nord * 0.65, t); rf.position.set(pp[0], base + HF - 3.5, pp[1]); rf.rotation.y = ang + (nord > 0 ? 0 : Math.PI); grp.add(rf); }
+    }
+  } else if (w.art === 'speicher') {
+    /* Backsteinspeicher: hohe Wände mit Fensterreihen, steiles rotes Dach, Treppengiebel an den Enden */
+    const h = Math.max(w.h, 18), B = Math.max(8, ob.B), L = ob.L, rh = Math.min(B * 0.85, 16);
+    extr(h, '#8e4a36', 0.45, null, { cx: 3.2, cy: 3.1 }); dach(-L / 2, L / 2, B + 0.6, base + h, rh, '#b04a30');
+    for (const sg of [-1, 1]) for (let k = 0; k < 4; k++) { const wk = B * (1 - k / 4.2), hk = rh / 4; box(sg * (L / 2 - 0.4), 0, 0.9, wk, hk, base + h + k * hk, '#8e4a36', 0.45); }
+    for (let k = 0; k < Math.floor(L / 6); k++) { const sv = -L / 2 + 3 + k * 6; for (const sg of [-1, 1]) box(sv, sg * B * 0.28, 1.6, 1.4, 1.6, base + h + rh * 0.35, '#b04a30', 0.3); }
   } else if (w.art === 'schloss') {
-    const h = Math.max(w.h, 12); extr(h, REV_WZ_FARBE.putz, 0.5); dach(-ob.L / 2, ob.L / 2, ob.B, base + h, ob.B * 0.35, '#4c4a48');
+    const h = Math.max(w.h, 12); extr(h, REV_WZ_FARBE.putz, 0.5, null, {}); dach(-ob.L / 2, ob.L / 2, ob.B, base + h, ob.B * 0.35, '#4c4a48');
     if (w.turm) { cyl(0, 0, 5, 5, w.turm, base, 12, REV_WZ_FARBE.putz, 0.6); for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; box(Math.cos(a) * 4.8, Math.sin(a) * 4.8, 1.2, 1.2, 1.4, base + w.turm, REV_WZ_FARBE.putz, 0.6); } }
   } else if (w.art === 'turm') {
     extr(Math.max(w.h, 10), /Wasser/.test(w.n) ? REV_WZ_FARBE.ziegel : '#b9b2a4', 0.5);
   } else if (w.art === 'backstein') {
-    extr(Math.max(w.h, 12), REV_WZ_FARBE.ziegel, 0.4);
+    extr(Math.max(w.h, 12), REV_WZ_FARBE.ziegel, 0.4, null, {});
   } else if (w.art === 'glas') {
     extr(Math.max(w.h, 9), REV_WZ_FARBE.glas, 0.95);
   } else if (w.art === 'ozeaneum') {
     extr(Math.max(w.h, 18), REV_WZ_FARBE.weiss, 0.7);
+  } else if (w.art === 'haengebruecke') {
+    /* Hängebrücke Sassnitz: gekrümmter Steg (243 m) um einen schlanken Mast, vom Hang hinunter zum Stadthafen */
+    const MH = w.mast || 38, CH_ = 190, R = 102; let th = 0, bz = -1e9;
+    for (let k = 0; k < 48; k++) { const t = k / 48 * Math.PI * 2, z = revZ(w.x + Math.cos(t) * CH_, w.y + Math.sin(t) * CH_); if (z > bz) { bz = z; th = t; } }
+    const Bx = w.x + Math.cos(th) * CH_, By = w.y + Math.sin(th) * CH_, mx = (w.x + Bx) / 2, my = (w.y + By) / 2, dd = Math.sqrt(R * R - (CH_ / 2) ** 2);
+    const cx = mx - Math.sin(th) * dd, cy = my + Math.cos(th) * dd, aA = Math.atan2(w.y - cy, w.x - cx); let aB = Math.atan2(By - cy, Bx - cx), dA = aB - aA;
+    while (dA > Math.PI) dA -= Math.PI * 2; while (dA < -Math.PI) dA += Math.PI * 2;
+    const NS = 64, pk = [], zs = Math.max(1, revZ(w.x, w.y)) + 1.2, ze = Math.max(1, bz) + 0.8;
+    for (let k = 0; k <= NS; k++) { const t = k / NS, a = aA + dA * t, E = cx + R * Math.cos(a), N = cy + R * Math.sin(a); let h = zs + (ze - zs) * t; if (k > 2 && k < NS - 2) h = Math.max(h, revZ(E, N) + 2); pk.push([E, N, h, a]); }
+    const box = new THREE.BoxGeometry(1, 1, 1), imD = new THREE.InstancedMesh(box, M('#e8ebee', 0.5), NS * 3), m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), eu = new THREE.Euler();
+    let ii = 0;
+    for (let k = 0; k < NS; k++) {
+      const A = pk[k], B = pk[k + 1];
+      for (const [o, hh, br, dk] of [[0, 0, 3.2, 0.7], [1.55, 0.9, 0.08, 1.1], [-1.55, 0.9, 0.08, 1.1]]) {
+        const am = (A[3] + B[3]) / 2, ox = Math.cos(am) * o, oy = Math.sin(am) * o, pa = G(A[0] + ox, A[1] + oy), pb = G(B[0] + ox, B[1] + oy), len = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) + 0.2;
+        const yaw = Math.atan2(pb[0] - pa[0], pb[1] - pa[1]), pitch = Math.atan2(B[2] - A[2], len);
+        eu.set(-pitch, yaw, 0, 'YXZ'); qq.setFromEuler(eu); sv.set(br, dk, len); pv.set((pa[0] + pb[0]) / 2, (A[2] + B[2]) / 2 + hh, (pa[1] + pb[1]) / 2); m4.compose(pv, qq, sv); imD.setMatrixAt(ii++, m4);
+      }
+    }
+    imD.frustumCulled = false; grp.add(imD);
+    const am = aA + dA * 0.45, mxE = cx + (R - 32) * Math.cos(am), mxN = cy + (R - 32) * Math.sin(am), gm = Math.max(0.5, revZ(mxE, mxN) + 0.35), pm = G(mxE, mxN);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.9, MH, 10), M('#f2f3f4', 0.8)); mast.position.set(pm[0], gm + MH / 2, pm[1]); grp.add(mast);
+    const lv = []; for (let k = 2; k < NS - 1; k += 3) { const q = pk[k], pi = G(q[0] - Math.cos(q[3]) * 1.5, q[1] - Math.sin(q[3]) * 1.5); lv.push(pm[0], gm + MH, pm[1], pi[0], q[2] + 0.9, pi[1]); }
+    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lv, 3)); grp.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#f4f6f8' })));
+    const lp = []; for (let k = 1; k < NS; k += 4) { const q = pk[k], pp = G(q[0], q[1]); lp.push(pp[0], q[2] + 1.6, pp[1]); } const lpp = revLampen(lp); if (lpp) grp.add(lpp);
+  } else if (w.art === 'skywalk') {
+    /* Skywalk Königsstuhl: schwebender Ring über der Kreidekante, gehalten von einem schrägen Mast */
+    let zt = -1e9; for (const q of P) zt = Math.max(zt, revZ(q[0], q[1])); zt += 1.2; const ring = P.concat([P[0]]);
+    const box = new THREE.BoxGeometry(1, 1, 1), im = new THREE.InstancedMesh(box, M('#d9dcdf', 0.5), (ring.length - 1) * 3), m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0); let ii = 0;
+    let cx = 0, cy = 0; for (const q of P) { cx += q[0]; cy += q[1]; } cx /= P.length; cy /= P.length;
+    for (let k = 0; k < ring.length - 1; k++) for (const [o, hh, br, dk] of [[0, 0, 3, 0.5], [1.4, 0.8, 0.1, 1.1], [-1.4, 0.8, 0.1, 1.1]]) {
+      const A = ring[k], B = ring[k + 1], mx = (A[0] + B[0]) / 2 - cx, my = (A[1] + B[1]) / 2 - cy, ml = Math.hypot(mx, my) || 1, pa = G(A[0] + mx / ml * o, A[1] + my / ml * o), pb = G(B[0] + mx / ml * o, B[1] + my / ml * o);
+      qq.setFromAxisAngle(up, Math.atan2(pb[0] - pa[0], pb[1] - pa[1])); sv.set(br, dk, Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) + 0.5); pv.set((pa[0] + pb[0]) / 2, zt + hh, (pa[1] + pb[1]) / 2); m4.compose(pv, qq, sv); im.setMatrixAt(ii++, m4);
+    }
+    im.frustumCulled = false; grp.add(im);
+    let fx = 0, fy = 0, fz = -1e9; for (const q of P) { const z = revZ(q[0], q[1]); if (z > fz) { fz = z; fx = q[0]; fy = q[1]; } }
+    const mf = G(fx + (fx - cx) * 0.6, fy + (fy - cy) * 0.6), mt = G(cx, cy), mh = 28, mb = revZ(fx + (fx - cx) * 0.6, fy + (fy - cy) * 0.6);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.7, 1, 8), M('#e9ebee', 0.6)); const top = new THREE.Vector3(mt[0], zt + mh, mt[1]), bot = new THREE.Vector3(mf[0], mb, mf[1]), dv = new THREE.Vector3().subVectors(top, bot);
+    mast.scale.y = dv.length(); mast.position.copy(bot).addScaledVector(dv, 0.5); mast.quaternion.setFromUnitVectors(up, dv.clone().normalize()); grp.add(mast);
+    const lv = []; for (const q of P) { const p = G(q[0], q[1]); lv.push(top.x, top.y, top.z, p[0], zt + 1, p[1]); }
+    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lv, 3)); grp.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#f4f6f8' })));
   } else {
     /* Schiffe: Bug ans schmalere Ende */
     const L = Math.min(Math.max(ob.L, 30), 120), B = Math.min(Math.max(ob.B, 6), 16), bug = (() => { let n0 = 0, n1 = 0; for (const q of P) { const s = (q[0] - ob.c[0]) * ob.u[0] + (q[1] - ob.c[1]) * ob.u[1], t = Math.abs((q[0] - ob.c[0]) * ob.v[0] + (q[1] - ob.c[1]) * ob.v[1]); if (s > ob.L * 0.3) n0 = Math.max(n0, t); if (s < -ob.L * 0.3) n1 = Math.max(n1, t); } return n0 <= n1 ? 1 : -1; })();
@@ -1478,6 +1590,7 @@ function revWzTick(E, N) {
   const X = REVX; if (!X.wz) X.wz = new Map(); let bud = 4;
   for (const z of revWzIdx()) {
     const w = z.w, d = Math.hypot(w.x - E, w.y - N), have = X.wz.get(z);
+    if (!have && d < (w.turm > 50 ? 16000 : 8000)) { const tk = Math.floor(w.x / X.cs / X.T) + ',' + Math.floor((X.H - w.y) / X.cs / X.T), tt = X.tiles.get(tk); if (d < 9000 && X.meta.has(tk) && !(tt && tt.st === "da")) continue; }
     if (!have && d < (w.turm > 50 ? 16000 : 8000) && bud-- > 0) { const r = revWzBuild(z); X.wz.set(z, r); revWzLicht(r, X.wzN || 0); }
     else if (have && d > (w.turm > 50 ? 19000 : 10500)) { revDispose(have.grp); X.wz.delete(z); }
   }
@@ -1519,6 +1632,9 @@ function revCarLightMat() {
 }
 function revBrueckenBuild() {
   const X = REVX, F = SHORE.fwd, list = X.idx.bruecken || [];
+  const altAutos = X.verkehr ? X.verkehr.cars : null;
+  if (X.brGrp) revDispose(X.brGrp); if (X.verkehr) { revDispose(X.verkehr.im); revDispose(X.verkehr.pp); }
+  X.brGrp = null; X.brSig = revBrSig();
   X.brSolid = new Set(); X.brKlMap = new Map(); X.brMats = []; X.klappen = []; X.strassen = []; X.brBB = null; X.feuerExtra = []; X.verkehr = null;
   if (!list.length) return;
   const grp = new THREE.Group(), CS = 4, key = (E, N) => Math.floor(E / CS) + ',' + Math.floor(N / CS);
@@ -1566,7 +1682,7 @@ function revBrueckenBuild() {
       const prof = [[sb, 2], [sp - fe[0] - 60, H], [sp + fe[1] + 60, H], [st ? s[st[0]] : sp + 900, 30], [st ? s[st[1]] : sp + 1900, 12], [se, 2]];
       const pH = (sv) => { for (let k = 1; k < prof.length; k++) if (sv <= prof[k][0]) { const [a, ha] = prof[k - 1], [c, hc] = prof[k]; return ha + (hc - ha) * Math.max(0, Math.min(1, (sv - a) / ((c - a) || 1))); } return 2; };
       const i0 = iOf(sb), i1 = Math.max(i0 + 2, iOf(se));
-      for (let i = 0; i < n; i++) { const g = grund(P[i][0], P[i][1]); if (i >= i0 && i <= i1) { hArr[i] = Math.max(pH(s[i]), g + 1.2); deck[i] = 1; } else hArr[i] = Math.max(0.3, g + 0.35); }
+      for (let i = 0; i < n; i++) { const g = grund(P[i][0], P[i][1]); if (i >= i0 && i <= i1) { hArr[i] = Math.max(pH(s[i]), g + 1.2); deck[i] = 1; } else hArr[i] = Math.max(0.3, g + 0.5); }
       band(i0, i1, i => hArr[i], 7.5, 3.2, '#4b4e53', '#2f6db5', '#d9dcde');
       for (const o of [-7.35, 7.35]) band(i0, i1, i => hArr[i] + 1.2, 0.18, 1.2, '#2f6db5', '#2f6db5', '#2f6db5', 0.3, o);
       for (let sv = sb + 60; sv < se - 30; sv += 72) {
@@ -1605,7 +1721,7 @@ function revBrueckenBuild() {
         else if (runs[0]) { const sm = (s[runs[0][0]] + s[runs[0][1]]) / 2, L = kl.breite || 32; ks0 = sm - L / 2; ks1 = sm + L / 2; }
       }
       const kIdx = X.klappen.length;
-      for (let i = 0; i < n; i++) hArr[i] = Math.max(0.3, grund(P[i][0], P[i][1]) + 0.35);
+      for (let i = 0; i < n; i++) hArr[i] = Math.max(0.3, grund(P[i][0], P[i][1]) + 0.5);
       for (const r of runs) for (let i = Math.max(0, r[0] - 2); i <= Math.min(n - 1, r[1] + 2); i++) { hArr[i] = Math.max(H, hArr[i] + 0.6); deck[i] = 1; }
       /* Rampen glätten */
       const h2 = Float32Array.from(hArr); for (let i = 0; i < n; i++) { let a = 0, c = 0; for (let j = Math.max(0, i - 6); j <= Math.min(n - 1, i + 6); j++) { a += hArr[j]; c++; } h2[i] = Math.max(hArr[i] - (deck[i] ? 0 : 0), a / c); if (deck[i] && b.nass[i]) h2[i] = Math.max(h2[i], H); } hArr.set(h2);
@@ -1677,16 +1793,27 @@ function revBrueckenBuild() {
   grp.traverse(o => { o.userData.sznSkip = 1; });
   for (const k of X.brKlMap.keys()) X.brSolid.delete(k);
   shoreG.add(grp); X.brGrp = grp; X.brBB = [bb[0] - 8, bb[1] - 8, bb[2] + 8, bb[3] + 8]; X.brN = -1;
-  revVerkehrInit();
+  revVerkehrInit(altAutos);
+}
+/* Welche Geländedaten um die Brücken schon geladen sind – ändert sich das, werden Straßen neu auf den Boden gesetzt */
+function revBrSig() {
+  const X = REVX, L = X.idx.bruecken || []; if (!L.length) return '';
+  if (!X.brRects) X.brRects = L.map(b => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (let k = 0; k < b.pts.length; k += 2) { x0 = Math.min(x0, b.pts[k]); x1 = Math.max(x1, b.pts[k]); y0 = Math.min(y0, b.pts[k + 1]); y1 = Math.max(y1, b.pts[k + 1]); } return [x0 - 200, y0 - 200, x1 + 200, y1 + 200]; });
+  const hit = (a0, b0, a1, b1) => X.brRects.some(r => a1 > r[0] && a0 < r[2] && b1 > r[1] && b0 < r[3]);
+  const r = [];
+  for (const [k, t] of X.tiles) if (t.st === 'da') { const x0 = t.i1 * X.cs, y1 = X.H - t.j1 * X.cs; if (hit(x0, y1 - t.ky * X.cs, x0 + t.kx * X.cs, y1)) r.push(k); }
+  for (const h of X.haefen || []) if (h.st === 'da' && hit(h.x0, h.y0, h.x0 + revHW(h), h.y0 + revHH(h))) r.push(h.name);
+  return r.sort().join('|');
 }
 /* ---------- Verkehr: Autos in beiden Richtungen, halten vor offener Klappe ---------- */
-function revVerkehrInit() {
-  const X = REVX, cars = [];
+function revVerkehrInit(alt) {
+  const X = REVX; let cars = [];
   const FARBEN = ['#e9e9e6', '#1f2226', '#8a8f96', '#b3261e', '#23417a', '#d7d2c4', '#3d5a40', '#5b5e63', '#c7c9cc', '#7a1f1f'];
   X.strassen.forEach((st, si) => {
     const nPro = Math.max(3, Math.floor(st.L / (st.vmax > 20 ? 170 : 150)));
     for (const dirn of [1, -1]) for (let k = 0; k < nPro; k++) cars.push({ si, d: dirn, s: (k + Math.random() * 0.6) * st.L / nPro, v: st.vmax * (0.85 + Math.random() * 0.15), vm: st.vmax * (0.85 + Math.random() * 0.2), lkw: Math.random() < 0.12, c: FARBEN[Math.floor(Math.random() * FARBEN.length)] });
   });
+  if (alt && alt.length === cars.length) cars = alt;
   if (!cars.length) return;
   const box = new THREE.BoxGeometry(1.8, 1.45, 4.4); box.translate(0, 0.72, 0);
   const im = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: 0xffffff }), cars.length), c = new THREE.Color();
@@ -1729,6 +1856,7 @@ function revVerkehrTick() {
     let h = st.h[i] + (st.h[i + 1] - st.h[i]) * f;
     for (const K of st.klappen) if (a.s > K.s0 && a.s < K.s1 && K.auf > 0.01) h += 0;   /* niemand steht auf der offenen Klappe */
     const p0 = F(E, N), p1 = F(E + d[0] * a.d, N + d[1] * a.d), fx = p1[0] - p0[0], fz = -(p1[1] - p0[1]);
+    const weg = a.s < 25 || a.s > st.L - 25; if (weg) h -= 500;   /* an den Enden der Strecke unsichtbar */
     q.setFromAxisAngle(up, Math.atan2(fx, fz)); sv.set(a.lkw ? 1.3 : 1, a.lkw ? 2.2 : 1, a.lkw ? 2.6 : 1); pv.set(p0[0], h, -p0[1]); m4.compose(pv, q, sv); V.im.setMatrixAt(idx, m4);
     const lx = -fz * 0.65, lz = fx * 0.65, Lh = (a.lkw ? 5.95 : 2.45), j = idx * 12;
     pa[j] = p0[0] + fx * Lh + lx; pa[j + 1] = h + 0.7; pa[j + 2] = -p0[1] + fz * Lh + lz;
@@ -1753,6 +1881,7 @@ function revBrueckenTick() {
   }
   const f = revNacht(); if (f !== X.brN) { X.brN = f; const warm = new THREE.Color(1, 0.92, 0.8); for (const [m, k] of X.brMats) m.emissive.copy(m.color).multiply(warm).multiplyScalar(k * f * 1.1); }
   try { revVerkehrTick(); } catch (e) { console.error('Verkehr', e); X.verkehr = null; }
+  const tn = performance.now(); if (!X.brSigT || tn - X.brSigT > 1500) { X.brSigT = tn; const sg = revBrSig(); if (sg !== X.brSig) { try { revBrueckenBuild(); } catch (e) { console.error('Brücken', e); } return; } }
   /* Hinweis vor geschlossener Klappe */
   try {
     const pl = G && G.boats && G.boats[0]; if (!pl) return;
