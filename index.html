@@ -753,7 +753,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
    Grundberührung nach Tiefgang der Bootsklasse. KEINE Navigationskarte.
    ===================================================================== */
 var REV_BASES = ['../See-Editor/', ''];           /* erst die See-Editor-Seite, dann der eigene Ordner */
-var REVIERE_K = { ruegen: { datei: 'ruegen-spiel.json', name: 'Rügen · Bodden · Peenestrom' } };
+var REVIERE_K = { ruegen: { datei: 'ruegen-spiel.json', name: 'Rügen · Bodden · Peenestrom' }, usedom: { datei: 'usedom-spiel.json', name: 'Usedom · Haff · Peenestrom' } };
 var REVX = null, REVH = null, REVH_LOAD = null, REVH_ERR = null;
 var REV_DRAFT = { gorchfock: 4.8, jolle: 1.0, opti: 0.75, topcat: 0.7, viking: 1.0, imoca: 4.5, zk10: 1.0, ixylon: 0.9, k6: 0.9, moth: 1.0 };
 var REV_ORIG_ALT = { hiddensee: [366520, 6016000] };  /* Strecken aus der ersten Hiddensee-Version umrechnen */
@@ -772,7 +772,9 @@ async function revInflate(buf) {
   return await new Response(st).arrayBuffer();
 }
 async function revFetch(base, f, typ) { const r = await fetch(base + f, { cache: 'no-cache' }); if (!r.ok) throw new Error(f + ': HTTP ' + r.status); return typ === 'json' ? r.json() : r.arrayBuffer(); }
+function revReset() { REVX = null; REVH_LOAD = null; try { REV_WL.map.clear(); REV_WL.key = ''; } catch (e) {} }
 function revLoad() {
+  if ((REVX && REVX.rev !== S.revier) || (REVH_LOAD && REVH_LOAD.rev !== S.revier)) revReset();
   if (REVX || REVH_LOAD) return REVH_LOAD;
   const def = REVIERE_K[S.revier] || REVIERE_K.ruegen;
   try { msg('Küstenrevier wird geladen …', 'info'); } catch (e) {}
@@ -783,19 +785,23 @@ function revLoad() {
     const ob = await revInflate(await revFetch(base, idx.overview.file)); const o = idx.overview, n = o.nx * o.ny;
     const X = { idx, base, W: idx.size.w, H: idx.size.h, cs: idx.grid.cs, nx: idx.grid.nx, ny: idx.grid.ny, T: idx.grid.tile,
       ov: { z: new Int16Array(ob, 0, n), lu: new Uint8Array(ob, 2 * n, n), nx: o.nx, ny: o.ny, cs: o.cs },
-      meta: new Map(), tiles: new Map(), chunks: new Map(), scen: new Map(), nLoad: 0, tick: 0 };
+      meta: new Map(), tiles: new Map(), chunks: new Map(), scen: new Map(), nLoad: 0, tick: 0, rev: S.revier };
+    if (idx.courses && !idx.courses[S.revKurs] && !String(S.revKurs || '').startsWith('u:')) { const ks = Object.keys(idx.courses); if (ks.length) { S.revKurs = ks.find(k => !idx.courses[k].bahn) || ks[0]; try { saveS(); } catch (e) {} } }
     for (const t of idx.grid.tiles) X.meta.set(t[0] + ',' + t[1], { ti: t[0], tj: t[1], file: t[2], kx: t[3], ky: t[4], nh: t[5] });
+    if (X.rev !== S.revier) return; /* inzwischen anderes Revier gewählt */
     REVX = REVH = X;
     if (REVIERE_K[S.revier]) {
       /* Kacheln rund um den Start vorab laden, dann bauen */
-      const k = revK(S.revKurs || 'bb') || idx.courses.bb, st = k.bahn ? k.center : k.start;
+      const k = revK(S.revKurs || 'bb') || idx.courses.bb || idx.courses[Object.keys(idx.courses)[0]], st = k.bahn ? k.center : k.start;
       await Promise.all(revTilesNear(st[0], st[1], 3000).map(t => revTileLoad(t)));
       buildShore(); if (typeof G !== 'undefined' && G && !G.running) newRace(null); try { applyLight(); } catch (e) {}
     }
     try { buildForm(); } catch (e) {}
-  })().catch(e => {
+  })();
+  REVH_LOAD.rev = S.revier;
+  REVH_LOAD.catch(e => {
     REVH_ERR = e; REVH_LOAD = null; console.error('Küstenrevier', e);
-    try { msg('Küstenrevier konnte nicht geladen werden (' + e.message + '). Die Revierdaten entstehen im See-Editor über die Action „Revier bauen“ (Revier ruegen).', 'bad'); } catch (_) {}
+    try { msg('Küstenrevier konnte nicht geladen werden (' + e.message + '). Die Revierdaten entstehen im See-Editor über die Action „Revier bauen“ (Revier ' + S.revier + ').', 'bad'); } catch (_) {}
   });
   return REVH_LOAD;
 }
@@ -857,7 +863,7 @@ function revK(kurs) {
 /* ---------- Aufbau ---------- */
 function revBuild() {
   const X = REVX; let kurs = S.revKurs || 'bb'; let KK = revK(kurs);
-  if (!KK) { kurs = S.revKurs = 'bb'; KK = revK('bb') || Object.values(X.idx.courses)[0] || { bahn: true, name: 'Freies Wasser', center: [X.W / 2, X.H / 2] }; }
+  if (!KK) { kurs = S.revKurs = X.idx.courses.bb ? 'bb' : (Object.keys(X.idx.courses)[0] || 'bb'); KK = revK(kurs) || { bahn: true, name: 'Freies Wasser', center: [X.W / 2, X.H / 2] }; }
   const wf = (Number(S.windFrom) || 0) * DEG, cs = Math.cos(wf), sn = Math.sin(wf);
   const st = KK.bahn ? KK.center : KK.start;
   const bo = [st[0] * cs - st[1] * sn, st[0] * sn + st[1] * cs];
@@ -1326,7 +1332,7 @@ function revNacht() { return typeof NIGHT === 'number' && NIGHT > 0.5 ? 1 : S.li
 /* Hauswände mit Fenstern: Raster je nach Hausgröße, zufällig erleuchtet, warmes Licht */
 /* Hansestadt-Altstadt (Stralsund, Greifswald, Wolgast): Backstein, Ocker, rote Dächer */
 function revHanse(E, N) {
-  const X = REVX; if (!X.hanseOrte) X.hanseOrte = (X.idx.places || []).filter(p => /^(Stralsund|Greifswald|Wolgast)$/.test(p[2])).map(p => [p[0], p[1], p[2] === 'Stralsund' ? 1500 : 1000]);
+  const X = REVX; if (!X.hanseOrte) X.hanseOrte = (X.idx.places || []).filter(p => /^(Stralsund|Greifswald|Wolgast|Anklam|Usedom|Ueckermünde|Lassan)$/.test(p[2])).map(p => [p[0], p[1], p[2] === 'Stralsund' ? 1500 : 1000]);
   for (const b of X.hanseOrte) if (Math.hypot(b[0] - E, b[1] - N) < b[2]) return true;
   return false;
 }
@@ -1338,7 +1344,7 @@ function revReet(E, N) {
 }
 /* Seebäder mit weißer Bäderarchitektur */
 function revBad(E, N) {
-  const X = REVX; if (!X.badOrte) X.badOrte = (X.idx.places || []).filter(p => /Sassnitz|Binz|Sellin|Göhren|Baabe|Zinnowitz|Lohme|Glowe|Breege|Juliusruh|Thiessow|Lubmin|Zempin|Koserow|Trassenheide|Karlshagen|Vitte|Kloster|Neuendorf/.test(p[2])).map(p => [p[0], p[1], /Sassnitz|Binz/.test(p[2]) ? 2200 : 1300]);
+  const X = REVX; if (!X.badOrte) X.badOrte = (X.idx.places || []).filter(p => /Sassnitz|Binz|Sellin|Göhren|Baabe|Zinnowitz|Lohme|Glowe|Breege|Juliusruh|Thiessow|Lubmin|Zempin|Koserow|Trassenheide|Karlshagen|Vitte|Kloster|Neuendorf|Heringsdorf|Bansin|Ahlbeck|Ückeritz|Kölpinsee|Loddin|Świnoujście|Swinemünde/.test(p[2])).map(p => [p[0], p[1], /Sassnitz|Binz/.test(p[2]) ? 2200 : 1300]);
   for (const b of X.badOrte) if (Math.abs(b[0] - E) < b[2] && Math.abs(b[1] - N) < b[2] && Math.hypot(b[0] - E, b[1] - N) < b[2]) return true;
   return false;
 }
@@ -1672,6 +1678,7 @@ function revNachtTick() {
    Peenebrücke Wolgast: Klappe 42 m, 19 m breit (mageba); 5:45, 7:45, 12:45, 17:45, 20:45 je 15 min, Juni–Sept. auch 23:45 (YACHT). */
 function revKlZeit(k) {
   if (S.bruecke === 'offen') return { auf: 1, immer: true, bis: 999 };
+  try { if (G && G.running && !G.free && !G.over && !G.lesson) return { auf: 1, regatta: true, bis: 999 }; } catch (e) {}
   const d = new Date(), min = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60, md = (d.getMonth() + 1) * 100 + d.getDate(), dauer = k.dauer || 20, hub = 1.5;
   let auf = 0, naechste = null;
   for (const z0 of k.zeiten) {
@@ -2112,6 +2119,29 @@ function revGfGruppe() {
   g.traverse(o => { o.userData.sznSkip = 1; });
   g.userData.segel = segel; return g;
 }
+/* Wind unter Land: Abdeckung hinter Steilufer, Wald und Stadt, Dreher an der Küste, Düse an Kaps.
+   Abdeckung reicht etwa 20-mal so weit wie das Hindernis hoch ist; im Windschatten wird der Wind böig und dreht. */
+var REV_WL = { key: '', map: new Map() };
+function revWindLand(x, y, W0) {
+  const X = REVX; if (!X || !X.idx) return null;
+  const kk = Math.round(W0) + '|' + (S.windFrom || 0); if (REV_WL.key !== kk || REV_WL.map.size > 40000) { REV_WL.key = kk; REV_WL.map.clear(); }
+  const ck = Math.round(x / 30) + ',' + Math.round(y / 30); let r = REV_WL.map.get(ck); if (r !== undefined) return r;
+  const uw = dirv(W0), lat = [uw[1], -uw[0]];
+  const hoehe = (gx, gy) => { const q = SHORE.realOf(gx, gy), z = revZ(q[0], q[1]); if (z <= 0.3) return 0; const lu = revCellLu(Math.floor(q[0] / X.cs), Math.floor((X.H - q[1]) / X.cs)); return z + (lu === 1 ? 9 : lu === 2 ? 7 : lu === 6 ? 3 : 1); };
+  let sh = 0, land = 1e9;
+  for (let t = 15; t < 2200; t += t < 200 ? 15 : t < 800 ? 40 : 100) {
+    const h = hoehe(x + uw[0] * t, y + uw[1] * t); if (h <= 0) continue;
+    if (t < land) land = t; const s = 1 - smooth(0, 20 * h, t); if (s > sh) sh = s; if (sh > 0.97) break;
+  }
+  let bend = 0, acc = 0;
+  if (land < 1500 || sh > 0.05) {
+    let hl = 0, hr = 0; for (const t of [250, 600]) { hl = Math.max(hl, hoehe(x + uw[0] * t + lat[0] * 300, y + uw[1] * t + lat[1] * 300)); hr = Math.max(hr, hoehe(x + uw[0] * t - lat[0] * 300, y + uw[1] * t - lat[1] * 300)); }
+    bend = clamp((hl - hr) / 25, -1, 1) * 7 * (1 - Math.min(1, land / 1500));
+  }
+  if (sh < 0.1) { const sl = hoehe(x + lat[0] * 250, y + lat[1] * 250), sr = hoehe(x - lat[0] * 250, y - lat[1] * 250); if ((sl > 8) !== (sr > 8)) acc = clamp(Math.max(sl, sr) / 40, 0, 1); }
+  r = sh < 0.01 && Math.abs(bend) < 0.2 && acc < 0.01 ? null : { sh, bend, acc };
+  REV_WL.map.set(ck, r); return r;
+}
 /* Gorch Fock als segelbares Schiff: der Wikinger-Rumpf (für Physik und Mannschaft) bleibt unsichtbar, gezeigt wird das Werftkoje-Modell */
 function gfBoatApply(b, g) {
   const versteck = new THREE.Group(); versteck.visible = false;
@@ -2124,7 +2154,7 @@ function gfKlasseWechsel() {
   if (S.boatClass === 'gorchfock') {
     if (S.legLength < 1500) { S._legAlt = S.legLength; S.legLength = 2400; }
     if (S.cpuCount > 9) S.cpuCount = 9;
-    if (S.revier === 'ruegen' && REVX && REVX.idx && REVX.idx.courses) { const k = revK(S.revKurs || 'bb'); if (!k || !k.gross) { const g = Object.keys(REVX.idx.courses).find(c => REVX.idx.courses[c].gross); if (g) S.revKurs = g; } }
+    if (REVIERE_K[S.revier] && REVX && REVX.idx && REVX.idx.courses) { const k = revK(S.revKurs || 'bb'); if (!k || !k.gross) { const g = Object.keys(REVX.idx.courses).find(c => REVX.idx.courses[c].gross); if (g) S.revKurs = g; } }
   } else if (S.legLength > 1000) S.legLength = S._legAlt || 600;
   try { saveS(); buildForm(); } catch (e) {}
 }
@@ -2409,7 +2439,7 @@ function revZugTick(E0, N0) {
     for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const l = N_.gcells.get((Math.floor(E0 / C) + di) + ',' + (Math.floor(N0 / C) + dj)); if (l) for (const gi of l) if (N_.gleise[gi].length >= 8) cand.push(gi); }
     if (cand.length) {
       const gi = cand[Math.floor(Math.random() * cand.length)], w = N_.gleise[gi], i = Math.floor(Math.random() * (w.length / 2 - 1));
-      if (Math.hypot(w[2 * i] - E0, w[2 * i + 1] - N0) < 3500) { const ubb = w[2 * i] > 48000 && w[2 * i + 1] < 16000; Z.zuege.push({ gi, i, d: Math.random() < 0.5 ? 1 : -1, f: 0, v: ubb ? 16 : 20, vmax: ubb ? 22 : 27, ubb, hist: [], weg: 0 }); }
+      if (Math.hypot(w[2 * i] - E0, w[2 * i + 1] - N0) < 3500) { const ubb = S.revier === 'usedom' ? w[2 * i] > 9000 : (w[2 * i] > 48000 && w[2 * i + 1] < 16000); /* Usedom: UBB östlich der Strecke über Anklam */ Z.zuege.push({ gi, i, d: Math.random() < 0.5 ? 1 : -1, f: 0, v: ubb ? 16 : 20, vmax: ubb ? 22 : 27, ubb, hist: [], weg: 0 }); }
     }
   }
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(1, 1, 1), pv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), pa = Z.pp.geometry.attributes.position.array;
@@ -2606,6 +2636,7 @@ function revStrecken() {
 }
 function revLenSm(p) { let L = 0; for (let k = 1; k < p.length; k++) L += Math.hypot(p[k][0] - p[k - 1][0], p[k][1] - p[k - 1][1]); return L / 1852; }
 function revKursOptions() {
+  if (!REVX && S.revier === 'usedom') return [['haff', 'Wolgast → Ueckermünde übers Haff'], ['ruden', 'Ruden → Wolgast'], ['bahn_haff', 'Regattabahn Stettiner Haff']];
   if (!REVX) return [['bb', 'Blaues Band vom Strelasund'], ['rund', 'Rund Hiddensee'], ['bahn', 'Regattabahn vor Hiddensee (Westseite)']];
   const o = [];
   for (const k in REVX.idx.courses) { const c = REVX.idx.courses[k]; o.push([k, c.bahn ? c.name : c.name + ' (ca. ' + revFmt(c.sm, 0) + ' sm)']); }
@@ -2761,7 +2792,7 @@ function revEditList() {
     const sel = S.revKurs === 'u:' + s.id;
     row.innerHTML = '<span style="flex:1;min-width:140px">' + (sel ? '✅ ' : '') + '<b>' + revEsc(s.name) + '</b> · ' + revFmt(revLenSm(s.pts), 1) + ' sm · ' + Math.max(0, s.pts.length - 2) + ' Tore</span>';
     const mk = (txt, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; b.style.cssText = 'font:600 13px system-ui;color:#fff;background:#183342;border:1px solid #2f5a6e;border-radius:8px;padding:5px 9px;cursor:pointer'; b.onclick = fn; row.appendChild(b); };
-    mk('▶ Segeln', () => { S.revier = 'ruegen'; S.revKurs = 'u:' + s.id; saveS(); revEditClose(); onSetting('revKurs'); msg('Kurs „' + s.name + '“ gewählt – Regatta starten.', 'good'); });
+    mk('▶ Segeln', () => { S.revier = REVIERE_K[S.revier] ? S.revier : 'ruegen'; S.revKurs = 'u:' + s.id; saveS(); revEditClose(); onSetting('revKurs'); msg('Kurs „' + s.name + '“ gewählt – Regatta starten.', 'good'); });
     mk('✎ Bearbeiten', () => { RVE.pts = s.pts.map(p => p.slice()); RVE.editId = s.id; RVE.name = s.name; revEditDraw(); });
     mk('🗑', () => { if (!confirm('Strecke „' + s.name + '“ löschen?')) return; revStreckenSave(revStreckenRoh().filter(q => q.id !== s.id)); if (S.revKurs === 'u:' + s.id) { S.revKurs = 'bb'; saveS(); } if (RVE.editId === s.id) RVE.editId = null; revEditList(); revEditDraw(); });
     Lst.appendChild(row);
@@ -3098,7 +3129,7 @@ const SCHEMA=[
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
-  {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
   {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
   {k:'bruecke',label:'Klappbrücken (Ziegelgraben, Wolgast)',type:'select',options:[['echt','Öffnen zu den echten Zeiten'],['offen','Immer offen']],hint:'Ziegelgrabenbrücke im Rügendamm: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 Uhr je 20 min. Peenebrücke Wolgast: 5:45, 7:45, 12:45, 17:45, 20:45 Uhr je 15 min, Juni–September auch 23:45 Uhr. Es zählt die Uhrzeit deines Geräts. Unter der Rügenbrücke passt du mit 42 m immer durch – die Klappe daneben musst du abwarten. Autos halten vor der offenen Klappe.'},
   {k:'schiffsverkehr',label:'Schiffsverkehr',type:'select',options:[['an','Fähren, Ausflugsschiffe und Kutter fahren'],['aus','Alle bleiben im Hafen']],hint:'Hiddensee-Fähre Schaprode–Vitte, Ausflugsschiff Sassnitz–Königsstuhl, Bäderschiff Binz–Sellin und ein Fischkutter aus Sassnitz. Sie weichen Regattabahnen aus und warten vor Start und Ziel einer laufenden Regatta – nach den Ausweichregeln musst du ihnen aber trotzdem Platz lassen.'},
@@ -3189,7 +3220,7 @@ const WX_TXT={none:'kein Niederschlag',r1:'leichter Regen',r2:'mäßiger Regen',
 const WX_COMP=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 const LIGHT_TXT={mittag:'Mittag',nachmittag:'Nachmittag',gold:'Goldene Stunde',daemmerung:'Dämmerung',nacht:'Nacht'};
 let wxBusy=false;
-function wxSite(){revMigrate();if(REVIERE_K[S.revier]){const k=S.revKurs||'bb';if(/bahn_gfs|bahn_pr/.test(k))return {lat:54.50,lon:13.66,name:'Sassnitz/Binz'};if(k==='bahn_gft')return {lat:54.62,lon:13.45,name:'Tromper Wiek'};if(k==='bahn_gb')return {lat:54.20,lon:13.55,name:'Greifswalder Bodden'};if(k==='bb'||k==='rund'||k==='bahn')return {lat:54.53,lon:13.10,name:'Hiddensee'};return {lat:54.42,lon:13.35,name:'Rügen'};}return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
+function wxSite(){revMigrate();if(S.revier==='usedom'){const k=S.revKurs||'';if(/haff/.test(k))return {lat:53.78,lon:14.02,name:'Stettiner Haff'};if(/heringsdorf|gfu/.test(k))return {lat:53.98,lon:14.17,name:'Heringsdorf'};if(/achter/.test(k))return {lat:54.0,lon:13.97,name:'Achterwasser'};return {lat:54.1,lon:13.8,name:'Peenestrom'};}if(REVIERE_K[S.revier]){const k=S.revKurs||'bb';if(/bahn_gfs|bahn_pr/.test(k))return {lat:54.50,lon:13.66,name:'Sassnitz/Binz'};if(k==='bahn_gft')return {lat:54.62,lon:13.45,name:'Tromper Wiek'};if(k==='bahn_gb')return {lat:54.20,lon:13.55,name:'Greifswalder Bodden'};if(k==='bb'||k==='rund'||k==='bahn')return {lat:54.53,lon:13.10,name:'Hiddensee'};return {lat:54.42,lon:13.35,name:'Rügen'};}return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
 async function loadLiveWx(){if(wxBusy)return;wxBusy=true;const say=t=>{S.wxInfo=t;const st=document.getElementById('wxStatus');if(st)st.textContent=t;saveS();};
   try{say('Lade Live-Daten …');const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),9000);
     if(S.revier!=='rangs'&&S.revier!=='cospu'&&!REVIERE_K[S.revier]&&!(G&&G.running&&!G.over))S.revier='cospu';const site=wxSite();const r=await fetch(WX_URL.replace('latitude='+WX_LAT,'latitude='+site.lat).replace('longitude='+WX_LON,'longitude='+site.lon),{signal:ctl.signal,cache:'no-store'});clearTimeout(to);if(!r.ok)throw new Error('HTTP '+r.status);
@@ -3241,8 +3272,9 @@ class Wind{
     for(let i=0;i<this.puffs.length;i++){const p=this.puffs[i];p.x+=tow[0]*sp*dt;p.y+=tow[1]*sp*dt;p.age+=dt;p.env=Math.sin(Math.PI*clamp(p.age/p.life,0,1));if(p.age>p.life)this.puffs[i]=this.newPuff();}}
   sample(x,y){let f=1,d=this.cur;for(const p of this.puffs){const dd=Math.hypot(x-p.x,y-p.y);if(dd>p.r)continue;const k=(1-smooth(p.r*0.35,p.r,dd))*p.env;f+=p.str*k;d+=p.shift*k;}
     if(SHORE.kind==='poly'){const [t,h]=shoreRay(x,y,this.cur);const sh=1-smooth(0,22*h,t);f*=1-0.48*sh;d+=sh*(8*Math.sin(this.t*0.08+x*0.011+y*0.007)+3*Math.sin(this.t*0.23+y*0.02));}
+    if(SHORE.kind==='revier'&&typeof revWindLand==='function'){const r=revWindLand(x,y,this.W0);if(r){this.lastSh=r.sh;f*=1-0.55*r.sh+0.14*r.acc;d+=r.sh*(7*Math.sin(this.t*0.08+x*0.011+y*0.007)+3*Math.sin(this.t*0.23+y*0.02))+r.bend;}}
     if(SHORE.kind==='small'){const uw=dirv(this.cur);const rx=x-SHORE.c[0],ry=y-SHORE.c[1];const b=rx*uw[0]+ry*uw[1],cc=rx*rx+ry*ry-SHORE.R*SHORE.R;const t=-b+Math.sqrt(Math.max(b*b-cc,0));const sh=1-smooth(0,480,t);f*=1-0.42*sh;d+=sh*9*Math.sin(this.t*0.07+x*0.012);}
-    return {dir:d,tws:Math.max(1,S.tws*f)};}
+    const ls=this.lastSh||0;this.lastSh=0;return {dir:d,tws:Math.max(1,S.tws*f),land:ls};}
 }
 
 /* ================= Wellen ================= */
@@ -3973,7 +4005,7 @@ function buildShore(){try{waterMat.uniforms.uShOn.value=0;}catch(e){}
   if(shoreG){scene.remove(shoreG);shoreG.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material)(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>m&&m.dispose&&m.dispose());});}
   shoreG=new THREE.Group();scene.add(shoreG);
   revMigrate();try{if(!REVIERE_K[S.revier]){MZ_MIN=0.25;if(mz.z<MZ_MIN)mapZset(MZ_MIN);}}catch(e){}
-  if(REVIERE_K[S.revier]){TGM=null;if(REVX){try{revBuild();}catch(e){console.error('Küstenrevier',e);}return;}revLoad();}
+  if(REVIERE_K[S.revier]){TGM=null;if(REVX&&REVX.rev===S.revier){try{revBuild();}catch(e){console.error('Küstenrevier',e);}return;}if(REVX)revReset();revLoad();}
   if(S.revier==='cospu'||isGL()){objStart();try{buildCospu();}finally{objFinish();}try{seasonApply(shoreG);}catch(e){console.error('Jahreszeit',e);}try{shoreFoamBuild();}catch(e){console.error('Uferschaum',e);}try{shoreDampBuild();}catch(e){console.error('Uferwellen',e);}return;}
   const rev=S.revier||'open';let R0=1660,a0=0,a1=Math.PI*2;
   if(rev==='small')R0=Math.max(560,S.legLength*0.62+380);
@@ -6165,7 +6197,7 @@ function dirtyAir(b){if(!S.dirtyAir)return 1;let f=1;const LIM=7*L;
 function physics(b,dt){
   const w=G.wind.sample(b.x,b.y);let Wd=w.dir,Ts=w.tws;
   if(CUR[0]||CUR[1]){const t0=dirv(Wd+180);const gx=t0[0]*Ts*KN-CUR[0],gy=t0[1]*Ts*KN-CUR[1];Ts=Math.hypot(gx,gy)/KN;Wd=brg(0,0,-gx,-gy);}
-  b.W=Wd;b.twsL=Ts*dirtyAir(b);
+  b.W=Wd;b.twsL=Ts*dirtyAir(b);b.landSh=w.land||0;
   b.prevH=b.h;b.a=wrap180(b.W-b.h);
   const side=b.a>=0?1:-1;
   if(side!==b.side){if(Math.abs(b.a)<90)b.tackFlag=true;else if(b.spi>0.4)b.spiGybe=2.2;b.side=side;}
@@ -6742,6 +6774,7 @@ function analyzePlayer(dt){const b=P(),C=G.course,A=G.ana;if(A.side==null)A.side
     else if(b.started)A.gybes++;}
   if(A.checkLay&&G.t>A.checkLay&&!b.tackFlag){A.checkLay=0;const t=C.seq[b.leg];if(isMark(t)&&t.kind==='wind'){const aB=wrap180(b.W-brg(b.x,b.y,t.x,t.y));const o=opt(b.twsL,false,b.headsail);
       if(sgn(aB)===b.side&&Math.abs(aB)>o.up+7)ev('over','Layline überfahren: '+(Math.abs(aB)-o.up).toFixed(0)+'° zu weit, Höhe verschenkt',false);}}
+  if(b.started&&!b.finished&&b.landSh>0.45){A.landT=(A.landT||0)+dt;if(A.landT>6)coach('land','Unter Land: Abdeckung durch das Ufer – der Wind ist schwach und dreht. Raus ins freie Wasser oder die Dreher nutzen',25);}else A.landT=0;
   if(b.started&&!b.finished&&b.dirty){A.dirtyT+=dt;A.dirtyTot+=dt;if(A.dirtyT>3)coach('dirty','Abdeckung'+(b.dirtyBy?' von '+b.dirtyBy:'')+' – freisegeln: wenden oder etwas abfallen',12);}
   else{if(A.dirtyT>15)ev('dirty','Lange in Abdeckung ('+A.dirtyT.toFixed(0)+' s)',false);A.dirtyT=0;}
   if(G.t<-8&&G.t>-50){const lb=lineBias();if(lb.bl>0.5)coach('bias','Linie: '+lb.fav+' bevorteilt ('+lb.bl.toFixed(1).replace('.',',')+' Bootslängen)',40);}
@@ -6962,7 +6995,7 @@ function updateHud(){try{revSpeedBtn();const mb=$('mapBeam');if(mb)mb.hidden=!(G
   const tp=targetPoint(b);const vm=b.v*Math.cos((b.h-brg(b.x,b.y,tp.x,tp.y))*DEG)/KN;
   el.vmg.innerHTML=vm.toFixed(1)+'<small>kn</small>';
   el.hdg.innerHTML=String(Math.round(wrap360(b.h+HOFF()))%360).padStart(3,'0')+'°';
-  el.tws.innerHTML=b.twsL.toFixed(1)+'<small>kn</small>'+(b.dirty?'<span class="dirty">Abdeckung</span>':'');
+  el.tws.innerHTML=b.twsL.toFixed(1)+'<small>kn</small>'+(b.dirty?'<span class="dirty">Abdeckung</span>':b.landSh>0.25?'<span class="dirty">unter Land</span>':'');
   el.head.textContent=(b.headsail==='genua'?'Genua':'Fock')+(b.furl>0.02?' '+Math.round((1-b.furl)*100)+' %':'');el.head.classList.toggle('busy',b.hsChange>0);el.head.classList.add('on');
   const sn=CL.spi==='genn'?'Gennaker':'Spi';
   el.spi.textContent=b.spiWant?(b.spi<1?sn+' setzt…':sn):(b.spi>0?sn+' birgt…':sn+' ↓');
