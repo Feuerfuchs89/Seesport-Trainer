@@ -1438,11 +1438,22 @@ function revObb(P) {
   return { c: [cx + u[0] * sm + v[0] * tm, cy + u[1] * sm + v[1] * tm], u, v, L: a1 - a0, B: b1 - b0 };
 }
 var REV_WZ_FARBE = { ziegel: '#8a4430', dach: '#5b3a2c', kupfer: '#5f8f7b', putz: '#e4dac6', weiss: '#f0efe9', glas: '#9fbccc', stahl: '#3a3e42' };
+var REV_SCHILF = null;
+function revSchilfGeo() { if (REV_SCHILF && REV_SCHILF.g) return REV_SCHILF.g; const a = new THREE.PlaneGeometry(2, 2.3), b = a.clone(); a.translate(0, 1.15, 0); b.rotateY(Math.PI / 2); b.translate(0, 1.15, 0);
+  const g = new THREE.BufferGeometry(), pa = a.attributes.position.array, pb = b.attributes.position.array, P = new Float32Array(pa.length + pb.length); P.set(pa); P.set(pb, pa.length);
+  const U = new Float32Array(16); U.set(a.attributes.uv.array); U.set(b.attributes.uv.array, 8); const N = new Float32Array(24); for (let i = 0; i < 8; i++) N[i * 3 + 1] = 1;
+  g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.BufferAttribute(U, 2)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setIndex([0, 2, 1, 2, 3, 1, 4, 6, 5, 6, 7, 5]);
+  REV_SCHILF = REV_SCHILF || {}; return (REV_SCHILF.g = g); }
+function revSchilfMat() { if (REV_SCHILF && REV_SCHILF.m) return REV_SCHILF.m; const c = document.createElement('canvas'); c.width = 128; c.height = 128; const x = c.getContext('2d');
+  for (let i = 0; i < 70; i++) { const x0 = 4 + Math.random() * 120, h = 60 + Math.random() * 66, lean = (Math.random() - 0.5) * 18; x.strokeStyle = Math.random() < 0.5 ? '#d8cf9a' : '#b9c27a'; x.lineWidth = 1 + Math.random() * 1.4; x.beginPath(); x.moveTo(x0, 128); x.quadraticCurveTo(x0 + lean * 0.3, 128 - h * 0.6, x0 + lean, 128 - h); x.stroke();
+    if (Math.random() < 0.35) { x.fillStyle = '#8a6d4a'; x.beginPath(); x.ellipse(x0 + lean, 128 - h, 2.2, 6, lean * 0.02, 0, Math.PI * 2); x.fill(); } }
+  const t = new THREE.CanvasTexture(c); const m = new THREE.MeshLambertMaterial({ map: t, alphaTest: 0.4, side: THREE.DoubleSide, transparent: false });
+  REV_SCHILF = REV_SCHILF || {}; return (REV_SCHILF.m = m); }
 function revWzBuild(z) {
   const X = REVX, F = SHORE.fwd, w = z.w, P = z.P, grp = new THREE.Group(), mats = [];
   const M = (c, k) => { const m = new THREE.MeshLambertMaterial({ color: c }); mats.push([m, k == null ? 0.5 : k]); return m; };
   const G = (E, N) => { const q = F(E, N); return [q[0], -q[1]]; };     /* → Szene x/z */
-  let zmin = 1e9; for (const q of P) zmin = Math.min(zmin, revZ(q[0], q[1])); const wasser = /bark|uboot|schiff/.test(w.art);
+  let zmin = 1e9; for (const q of P) zmin = Math.min(zmin, revZ(q[0], q[1])); const wasser = /bark|uboot|schiff|yacht/.test(w.art);
   const base = wasser ? 0 : Math.max(0.2, zmin + 0.35) - 0.6;
   const ob = revObb(P);
   /* Grundriss hochziehen */
@@ -1475,13 +1486,137 @@ function revWzBuild(z) {
       const sp = Math.max(2, y + H - yy); cyl(s, t, r * 0.18, 0.05, sp, yy, 8, REV_WZ_FARBE.kupfer, 0.45);
     } else if (art === 'pyramide') {
       cyl(s, t, ts * 0.72, 0.1, Math.max(4, ts * 0.55), y, 4, REV_WZ_FARBE.kupfer, 0.45);
+    } else if (art === 'platt') {
+      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { box(s + a * ts / 2, t + b * ts / 2, a ? 0.35 : ts + 0.35, b ? 0.35 : ts + 0.35, 1.3, y, REV_WZ_FARBE.ziegel, 0.6); }
+      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const k of [-1, 0, 1]) box(s + a * (ts / 2 + 0.06) + (a ? 0 : k * ts * 0.26), t + b * (ts / 2 + 0.06) + (b ? 0 : k * ts * 0.26), a ? 0.14 : ts * 0.13, b ? 0.14 : ts * 0.13, ts * 1.6, y - ts * 1.85, '#ece6d8', 0.6);
+      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const uh = new THREE.Mesh(new THREE.CircleGeometry(ts * 0.11, 16), M('#e9e5da', 0.6)), q = at(s + a * (ts / 2 + 0.1), t + b * (ts / 2 + 0.1)), tq = at(s + a * ts * 2, t + b * ts * 2); uh.position.set(q[0], y - ts * 0.15, q[1]); uh.lookAt(tq[0], y - ts * 0.15, tq[1]); grp.add(uh); }
+      box(s, t, ts * 0.5, ts * 0.5, 2.6, y, '#5b5550', 0.3);
     } else if (art === 'flach') {
       cyl(s, t, ts * 0.72, 0.1, Math.max(3, H), y, 4, REV_WZ_FARBE.dach, 0.3);
       for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) cyl(s + a * ts * 0.4, t + b * ts * 0.4, ts * 0.09, 0.05, ts * 0.5, y, 8, REV_WZ_FARBE.kupfer, 0.45);
     } else cyl(s, t, ts * 0.7, 0.08, H, y, 8, REV_WZ_FARBE.kupfer, 0.45);
   };
   const westEnde = (() => { const a = ob.c[0] + ob.u[0] * ob.L / 2, b = ob.c[0] - ob.u[0] * ob.L / 2; return a < b ? 1 : -1; })();
-  if (w.art === 'kirche' && w.achteck) {
+  if (w.art === '-') {
+  } else if (w.art === 'verein') {
+    /* Kuttersegelclub Blau-Weiß Wolgast (Mahlzow): gelbes Vereinshaus mit Giebel zum Wasser, weißer Anbau, Rasen mit Trailerbooten,
+       Slip mit blauem Kran, Becken mit L-Steg, Kutter am Steg, Motorboot vor Anker, Schilf ringsum (Lage nach Luftbild, Maße geschätzt) */
+    const O = [w.x, w.y], L = (e, n) => G(O[0] + e, O[1] + n), zAt = (e, n) => revZ(O[0] + e, O[1] + n);
+    const a0 = L(0, 0), a1 = L(10, 0), rotE = Math.atan2(-(a1[1] - a0[1]), a1[0] - a0[0]);
+    const g0 = Math.max(0.6, zAt(0, 0)) - 0.3;
+    const bx = (e, n, se, sn, h, y, col, k) => { const m = new THREE.Mesh(new THREE.BoxGeometry(se, h, sn), M(col, k)); const p = L(e, n); m.position.set(p[0], y + h / 2, p[1]); m.rotation.y = rotE; grp.add(m); return m; };
+    const sattel = (e, n, se, sn, y, h, col, firstE) => {        /* Satteldach, First entlang E (firstE) oder N */
+      const c = [[-se / 2, -sn / 2], [se / 2, -sn / 2], [se / 2, sn / 2], [-se / 2, sn / 2]].map(q => L(e + q[0], n + q[1]));
+      const r0 = firstE ? L(e - se / 2, n) : L(e, n - sn / 2), r1 = firstE ? L(e + se / 2, n) : L(e, n + sn / 2);
+      const v = [c[0][0], y, c[0][1], c[1][0], y, c[1][1], c[2][0], y, c[2][1], c[3][0], y, c[3][1], r0[0], y + h, r0[1], r1[0], y + h, r1[1]];
+      const ix = firstE ? [0, 1, 5, 0, 5, 4, 2, 3, 4, 2, 4, 5, 3, 0, 4, 1, 2, 5] : [1, 2, 5, 1, 5, 4, 3, 0, 4, 3, 4, 5, 0, 1, 4, 2, 3, 5];
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.setIndex(ix); g.computeVertexNormals();
+      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: col, side: THREE.DoubleSide })); mats.push([m.material, 0.25]); grp.add(m);
+    };
+    const flaeche = (e, n, w_, h_, y, ne, nn, col, k, tex) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w_, h_), tex ? new THREE.MeshBasicMaterial({ map: tex, transparent: true }) : M(col, k)); const p = L(e, n), t = L(e + ne * 10, n + nn * 10); m.position.set(p[0], y, p[1]); m.lookAt(t[0], y, t[1]); grp.add(m); return m; };
+    /* Vereinshaus: gelb, Giebel nach Westen, First Ost–West */
+    const HG = 4.6, gelb = '#e8cf8e';
+    bx(0, 9.5, 18, 11, HG, g0, gelb, 0.55); sattel(0, 9.5, 18.6, 11.8, g0 + HG, 4.4, '#3b3f45', true);
+    const giebel = new THREE.Shape(); giebel.moveTo(-5.5, 0); giebel.lineTo(5.5, 0); giebel.lineTo(0, 4.2); giebel.closePath();
+    for (const sg of [-1, 1]) { const gm = new THREE.Mesh(new THREE.ShapeGeometry(giebel), M(gelb, 0.55)); gm.material.side = THREE.DoubleSide; const p = L(sg * 9.02, 9.5), t = L(sg * 20, 9.5); gm.position.set(p[0], g0 + HG, p[1]); gm.lookAt(t[0], g0 + HG, t[1]); grp.add(gm); }
+    bx(5, 9.5, 0.9, 0.9, 2.2, g0 + HG + 2.6, '#7a3b2c', 0.2);                     /* Schornstein */
+    /* Westgiebel: Schriftzug, dunkles Tor, zwei Fenster */
+    const ct = document.createElement('canvas'); ct.width = 512; ct.height = 64; const cx2 = ct.getContext('2d'); cx2.fillStyle = '#2a2a2a'; cx2.font = 'bold 44px Georgia,serif'; cx2.textAlign = 'center'; cx2.textBaseline = 'middle'; cx2.fillText('Kuttersegelclub Wolgast', 256, 34);
+    flaeche(-9.08, 9.5, 6.2, 0.78, g0 + 4.0, -1, 0, null, 0, new THREE.CanvasTexture(ct));
+    flaeche(-9.06, 9.5, 2.6, 3.0, g0 + 1.5, -1, 0, '#2c2b2a', 0.1);
+    for (const n of [6.6, 12.4]) flaeche(-9.06, n, 1.3, 1.5, g0 + 2.0, -1, 0, '#2e3a44', 1.4);
+    for (const e of [-5, 0, 5]) flaeche(e, 3.98, 1.3, 1.4, g0 + 2.1, 0, -1, '#2e3a44', 1.4);
+    /* Anbau: weiß, flach geneigtes graues Dach, rote Tür, Fensterreihe nach Westen */
+    bx(-1.5, -6, 11, 20, 3.2, g0, '#f1efe8', 0.55); sattel(-1.5, -6, 11.6, 20.4, g0 + 3.2, 1.5, '#8b9096', false);
+    for (const n of [-14, -10, -2, 2]) flaeche(-7.04, n, 1.4, 1.2, g0 + 1.9, -1, 0, '#2e3a44', 1.4);
+    flaeche(-7.04, -6, 1.1, 2.1, g0 + 1.05, -1, 0, '#b3261e', 0.3);
+    /* Terrasse mit Bänken, Laterne */
+    bx(-10, -4, 3, 12, 0.15, g0, '#b9b1a3', 0.2);
+    for (const n of [-8, -4, 0]) { bx(-10.5, n, 1.6, 0.5, 0.75, g0 + 0.15, '#6b4f36', 0.2); }
+    const lat = []; { const p = L(-30, -16); lat.push(p[0], Math.max(0.6, zAt(-30, -16)) + 4.2, p[1]); bx(-30, -16, 0.18, 0.18, 4.2, Math.max(0.6, zAt(-30, -16)) - 0.3, '#2e2e2e', 0.1); }
+    /* Rasen */
+    { const p = L(-46, 7), m = new THREE.Mesh(new THREE.PlaneGeometry(68, 46), M('#5e8f3c', 0.12)); m.rotation.x = -Math.PI / 2; m.rotation.z = rotE; m.position.set(p[0], Math.max(0.6, zAt(-46, 7)) + 0.06, p[1]); grp.add(m); }
+    /* Slip: gepflasterte Rampe bis ins Wasser, blauer Kran am Ende */
+    const slip = (e0, e1, n, br) => { const N_ = 8; for (let k = 0; k < N_; k++) { const ea = e0 + (e1 - e0) * k / N_, eb = e0 + (e1 - e0) * (k + 1) / N_, em = (ea + eb) / 2; const z = Math.max(-0.8, Math.min(zAt(em, n), 1.6)); bx(em, n, Math.abs(eb - ea) + 0.1, br, 0.3, z - 0.18, '#a6a39b', 0.2); } };
+    slip(-22, -46, -20, 7); slip(-46, -62, -22, 6);
+    bx(-34, -12, 24, 6, 0.25, Math.max(0.6, zAt(-34, -12)) - 0.1, '#b8b3a8', 0.2);
+    { const zk = Math.max(0.6, zAt(-52, -29)); bx(-52, -29, 1.1, 1.1, 7, zk, '#2c6fbf', 0.4); bx(-53.2, -29, 3.8, 0.5, 0.5, zk + 6.6, '#2c6fbf', 0.4); bx(-55, -29, 0.06, 0.06, 3.5, zk + 3.1, '#333', 0.1); bx(-52, -29, 2, 2, 0.4, zk, '#9a968e', 0.1); }
+    /* Stege (Holz auf Pfählen) */
+    const stegs = [[-122, -12.7, -87, -12.7, 2.4], [-120, -1, -120, -12.7, 2.0], [-99, 0, -89, 0, 2.0]], pf = [];
+    for (const [e0, n0, e1, n1, br] of stegs) { const l = Math.hypot(e1 - e0, n1 - n0), m = new THREE.Mesh(new THREE.BoxGeometry(br, 0.25, l), M('#9c8466', 0.2)), p = L((e0 + e1) / 2, (n0 + n1) / 2), q = L(e1, n1);
+      m.position.set(p[0], 1.05, p[1]); m.lookAt(q[0], 1.05, q[1]); grp.add(m); for (let d = 0; d <= l; d += 3) for (const sg of [-1, 1]) { const f = d / l, ux = (e1 - e0) / l, uy = (n1 - n0) / l; pf.push([e0 + (e1 - e0) * f - uy * sg * (br / 2 - 0.15), n0 + (n1 - n0) * f + ux * sg * (br / 2 - 0.15)]); } }
+    if (!X.stegSolid) X.stegSolid = new Set();
+    const fest = (e0, n0, e1, n1, br) => { const l = Math.hypot(e1 - e0, n1 - n0) || 1, ux = (e1 - e0) / l, uy = (n1 - n0) / l; for (let d = 0; d <= l; d += 1) for (let o = -br / 2; o <= br / 2; o += 0.8) X.stegSolid.add(Math.floor((O[0] + e0 + ux * d - uy * o) / 2) + ',' + Math.floor((O[1] + n0 + uy * d + ux * o) / 2)); };
+    for (const st of stegs) fest(...st);
+    fest(-113, -10, -103, -10, 2.4); fest(-101, -10, -91, -10, 2.4);
+    { const a = 250 * DEG, ux = Math.sin(a), uy = Math.cos(a); fest(-175 - ux * 6.5, -8 - uy * 6.5, -175 + ux * 6.5, -8 + uy * 6.5, 3.8); }
+    for (const e of [-116, -104, -92]) bx(e, -13.4, 1.6, 0.45, 0.45, 1.18, '#7a5a3c', 0.2);   /* Bänke */
+    if (pf.length) { const cy = new THREE.CylinderGeometry(0.13, 0.13, 1, 6); cy.translate(0, 0.5, 0); const im = new THREE.InstancedMesh(cy, M('#4f4236', 0.05), pf.length), m4 = new THREE.Matrix4(); pf.forEach((q, i) => { const pp = L(q[0], q[1]); m4.makeScale(1, 3.6, 1).setPosition(pp[0], -2.4, pp[1]); im.setMatrixAt(i, m4); }); im.frustumCulled = false; grp.add(im); }
+    /* Boote: Kutter (ZK 10) am Steg, Jollen im Graben, Trailerboote auf dem Rasen */
+    const rumpf = (len, br, fb) => { const sh = new THREE.Shape(), hl = len / 2, hb = br / 2; sh.moveTo(-hl, -hb * 0.75); sh.lineTo(hl * 0.35, -hb); sh.quadraticCurveTo(hl * 0.9, -hb * 0.75, hl, 0); sh.quadraticCurveTo(hl * 0.9, hb * 0.75, hl * 0.35, hb); sh.lineTo(-hl, hb * 0.75); sh.closePath(); const g = new THREE.ExtrudeGeometry(sh, { depth: fb, bevelEnabled: false }); g.rotateX(-Math.PI / 2); return g; };
+    const boot = (e, n, y, hd, len, br, fb, col, mast, name) => {      /* hd: Kurs in Grad (0 = Nord, 90 = Ost) */
+      const bg = new THREE.Group(), p = L(e, n), d = L(e + Math.sin(hd * DEG) * 10, n + Math.cos(hd * DEG) * 10); bg.position.set(p[0], y, p[1]); bg.rotation.y = Math.atan2(-(d[1] - p[1]), d[0] - p[0]);
+      const r = new THREE.Mesh(rumpf(len, br, fb), M(col, 0.35)); bg.add(r); const dk = new THREE.Mesh(rumpf(len * 0.96, br * 0.94, 0.06), M('#b79b72', 0.2)); dk.position.y = fb - 0.02; bg.add(dk);
+      if (mast) { const ms = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, mast, 6), M('#c9b28a', 0.2)); ms.position.set(len * 0.18, fb + mast / 2, 0); bg.add(ms); }
+      if (name) { const c = document.createElement('canvas'); c.width = 256; c.height = 48; const x = c.getContext('2d'); x.fillStyle = '#1e1e1e'; x.font = 'italic bold 34px Georgia,serif'; x.textAlign = 'center'; x.fillText(name, 128, 36); const pl = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.3), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true })); pl.position.set(len * 0.25, fb * 0.65, -br / 2 - 0.01); pl.rotation.y = Math.PI; bg.add(pl); }
+      grp.add(bg); return bg; };
+    boot(-108, -10, 0.05, 90, 10, 2.6, 1.05, '#f2f0ea', 8.5, 'Wolgaster Greif'); boot(-96, -10, 0.05, 90, 10, 2.6, 1.05, '#e9e4d6', 8.5, 'Paloma');
+    boot(-72, -21.5, 0.05, 80, 5, 1.6, 0.6, '#3d6f9e', 0, ''); boot(-64, -22.5, 0.05, 80, 4.2, 1.5, 0.55, '#c9c4b8', 0, '');
+    const tr = [['#e8892b', 'Kuddel'], ['#f1f1ee', ''], ['#252a2e', 'Moby Dick'], ['#2f6b4f', ''], ['#e7e1cf', '']];
+    tr.forEach(([c, nm], i) => { const e = -60 + i * 4.2, n = 8, z = Math.max(0.6, zAt(e, n)); bx(e, n, 0.15, 9, 0.12, z + 0.45, '#8f9499', 0.2); for (const dn of [-2.2, 2.2]) { const rd = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.22, 10), M('#1d1d1d', 0.05)); const p = L(e - 0.9, n + dn); rd.position.set(p[0], z + 0.33, p[1]); rd.rotation.z = Math.PI / 2; rd.rotation.y = rotE; grp.add(rd); const rd2 = rd.clone(); const p2 = L(e + 0.9, n + dn); rd2.position.set(p2[0], z + 0.33, p2[1]); grp.add(rd2); } boot(e, n, z + 0.6, 0, 7.5, 2.1, 0.9, c, 0, nm); });
+    bx(-30, 22, 2.2, 5, 2.2, Math.max(0.6, zAt(-30, 22)) + 0.3, '#f0eee6', 0.4);   /* Wohnwagen */
+    /* Motorboot vor Anker vor dem Becken */
+    { const mb = boot(-175, -8, 0.05, 250, 13, 4.0, 1.9, '#f4f4f1', 0, ''); const bxL = (x, y, z, sx, sy, sz, c, k) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), M(c, k)); m.position.set(x, y, z); mb.add(m); };
+      bxL(0.3, 1.9 + 0.7, 0, 6.0, 1.4, 3.0, '#f4f4f1', 0.5); bxL(0.3, 2.75, 0, 6.05, 0.5, 3.05, '#22303b', 1.2); bxL(1.0, 3.45, 0, 2.6, 0.18, 2.4, '#f4f4f1', 0.5); bxL(0, 1.3, 0, 13.05, 0.16, 4.02, '#24427a', 0.3);
+      const bug = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 4), M('#dddddd', 0.3)); bug.position.set(0.6, 4.9, 0); mb.add(bug); const kt = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 9, 3), M('#e8e8e8', 0.2)); kt.position.set(6.5, 0.2, 0); kt.rotation.z = 1.1; mb.add(kt); }
+    /* Schilf: Halme auf Feuchtwiesen und flachem Ufer rund um das Becken */
+    { const pos = [], cs = X.cs; let tries = 0;
+      while (pos.length < 2600 && tries++ < 16000) { const e = -210 + Math.random() * 215, n = -130 + Math.random() * 190;
+        if (e > -12 && n > -20) continue; if (e > -82 && e < -10 && n > -32 && n < 32) continue; if (e > -125 && e < -84 && n > -15 && n < 4) continue;
+        const E = O[0] + e, N_ = O[1] + n, z = revZ(E, N_); if (z < 0.05 || z > 2.2) continue;
+        const lu = revCellLu(Math.floor(E / cs), Math.floor((X.H - N_) / cs)); if (lu !== 5 && !(z < 1.0 && lu !== 2)) continue; pos.push([E, N_, z]); }
+      if (pos.length) { const im = new THREE.InstancedMesh(revSchilfGeo(), revSchilfMat(), pos.length), m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), c = new THREE.Color(), up = new THREE.Vector3(0, 1, 0), sv = new THREE.Vector3(), pv = new THREE.Vector3();
+        pos.forEach((q, i) => { const p = G(q[0], q[1]), s = 0.8 + Math.random() * 0.5; q4.setFromAxisAngle(up, Math.random() * Math.PI); sv.set(s * 1.6, s * (0.85 + Math.random() * 0.4), s * 1.6); pv.set(p[0], q[2] - 0.15, p[1]); m4.compose(pv, q4, sv); im.setMatrixAt(i, m4); c.setHSL(0.13 + Math.random() * 0.05, 0.35, 0.5 + Math.random() * 0.15); im.setColorAt(i, c); });
+        im.frustumCulled = false; grp.add(im); } }
+    const ll = revLampen(lat); if (ll) grp.add(ll);
+  } else if (w.art === 'werfthalle') {
+    /* Peene-Werft: blaue Hallen mit hellem Dach, Schriftzug zur Peene */
+    const h = w.h || 18; extr(h, '#2f6fc4', 0.35); extr(0.5, '#d4d8dc', 0.25, base + h);
+    if (w.schrift) {
+      let bestT = 1, bz = 1e9; for (const sg of [-1, 1]) { const q = [ob.c[0] + ob.v[0] * sg * (ob.B / 2 + 25), ob.c[1] + ob.v[1] * sg * (ob.B / 2 + 25)], z = revZ(q[0], q[1]); if (z < bz) { bz = z; bestT = sg; } }
+      for (const [txt, bg, fg, fs, off, br] of [[w.schrift, '#2f6fc4', '#ffffff', 0, 0.12, 0.55], [w.schrift2 || '', '#f4f4f4', '#1f3c78', 0, -0.36, 0.2]]) {
+        if (!txt) continue; const c = document.createElement('canvas'); c.width = 1024; c.height = 128; const x = c.getContext('2d'); x.fillStyle = bg; x.fillRect(0, 0, 1024, 128); x.fillStyle = fg; x.font = 'bold 92px Arial,Helvetica,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, 512, 68);
+        const wd = Math.min(ob.L * br, 80), m = new THREE.Mesh(new THREE.PlaneGeometry(wd, wd / 8), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c) })); const p = at(ob.L * off, bestT * (ob.B / 2 + 0.15)), t = at(ob.L * off, bestT * (ob.B / 2 + 10));
+        m.position.set(p[0], base + h - wd / 16 - 1.2, p[1]); m.lookAt(t[0], base + h - wd / 16 - 1.2, t[1]); grp.add(m); mats.push([m.material, 0]);
+      }
+    }
+  } else if (w.art === 'werftkran') {
+    /* Wippdrehkran auf Portal: blau, Ausleger zum Wasser */
+    const z0 = Math.max(0.6, revZ(w.x, w.y)) - 0.2, d = (w.dir || 0) * DEG, ux = Math.sin(d), uy = Math.cos(d), blau = M('#2c6fbf', 0.4);
+    const p0 = G(w.x, w.y), p1 = G(w.x + ux * 10, w.y + uy * 10), yaw = Math.atan2(p1[0] - p0[0], p1[1] - p0[1]);
+    const kg = new THREE.Group(); kg.position.set(p0[0], z0, p0[1]); kg.rotation.y = yaw; grp.add(kg);
+    const b3 = (x, y, z, sx, sy, sz, m) => { const o = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m); o.position.set(x, y, z); kg.add(o); return o; };
+    for (const [x, z] of [[-4, -4], [4, -4], [-4, 4], [4, 4]]) b3(x, 5, z, 0.9, 10, 0.9, blau);
+    b3(0, 10.4, 0, 9.5, 1.2, 9.5, blau); b3(0, 17, 0, 2.6, 12, 2.6, blau); b3(0, 23.5, -1.5, 4.2, 3, 6, blau); b3(1.6, 23.8, 1.0, 1.4, 2.2, 2.2, M('#f2f2ee', 0.8));
+    const jib = new THREE.Group(); jib.position.set(0, 24.5, 1); jib.rotation.x = -0.42; kg.add(jib);
+    const j = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.3, 34), blau); j.position.set(0, 0, 17); jib.add(j); const sp = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 7), blau); sp.position.set(0, 0.4, -4); jib.add(sp);
+    const ggw = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.4, 2.6), M('#3d4a55', 0.2)); ggw.position.set(0, 0.6, -7.5); jib.add(ggw);
+  } else if (w.art === 'yacht') {
+    /* Superyacht am Ausrüstungskai */
+    const Lh = (w.l || 80) / 2, B = w.b || 13, d = (w.dir || 0) * DEG, p0 = G(w.x, w.y), p1 = G(w.x + Math.sin(d) * 10, w.y + Math.cos(d) * 10);
+    const yg = new THREE.Group(); yg.position.set(p0[0], 0, p0[1]); yg.rotation.y = Math.atan2(-(p1[1] - p0[1]), p1[0] - p0[0]); grp.add(yg);
+    const sh = new THREE.Shape(), hb = B / 2; sh.moveTo(-Lh, -hb * 0.92); sh.lineTo(Lh * 0.45, -hb); sh.quadraticCurveTo(Lh * 0.92, -hb * 0.7, Lh, 0); sh.quadraticCurveTo(Lh * 0.92, hb * 0.7, Lh * 0.45, hb); sh.lineTo(-Lh, hb * 0.92); sh.closePath();
+    const hull = new THREE.ExtrudeGeometry(sh, { depth: 6.5, bevelEnabled: false }); hull.rotateX(-Math.PI / 2); const hm = new THREE.Mesh(hull, M('#f6f6f3', 0.5)); hm.position.y = -2.5; yg.add(hm);
+    const b3 = (x, y, sx, sy, sz, c, k) => { const o = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), M(c, k)); o.position.set(x, y, 0); yg.add(o); };
+    b3(-Lh * 0.08, 5.3, Lh * 1.3, 2.8, B * 0.86, '#f6f6f3', 0.6); b3(-Lh * 0.08, 5.3, Lh * 1.31, 1.1, B * 0.87, '#1f2a33', 1.2);
+    b3(-Lh * 0.15, 8.1, Lh * 0.95, 2.8, B * 0.78, '#f6f6f3', 0.6); b3(-Lh * 0.15, 8.1, Lh * 0.96, 1.0, B * 0.79, '#1f2a33', 1.2);
+    b3(-Lh * 0.22, 10.9, Lh * 0.55, 2.6, B * 0.66, '#f6f6f3', 0.6); b3(-Lh * 0.22, 10.9, Lh * 0.56, 0.9, B * 0.67, '#1f2a33', 1.2);
+    b3(-Lh * 0.2, 14.2, 2, 4, 2, '#e9e9e6', 0.5);
+  } else if (w.art === 'kirche' && w.zwoelfeck) {
+    /* Gertrudenkapelle Wolgast: zwölfeckiger Backstein-Zentralbau mit hohem Spitzdach */
+    const r = Math.max(5, Math.sqrt(ob.L * ob.B) * 0.55);
+    cyl(0, 0, r, r, 8, base, 12, REV_WZ_FARBE.ziegel, 0.55); cyl(0, 0, r * 1.08, 0.25, 15, base + 8, 12, '#4a4440', 0.25);
+  } else if (w.art === 'kirche' && w.achteck) {
     /* Uferkapelle Vitt: kleiner weißer Achteckbau mit Reetdach */
     const r = Math.max(4, Math.sqrt(ob.L * ob.B) * 0.55);
     cyl(0, 0, r, r, 4.5, base, 8, '#f4f2ea', 0.6); cyl(0, 0, r * 1.18, 0.4, 6.5, base + 4.5, 8, '#7b6a4e', 0.2);
@@ -1500,7 +1635,7 @@ function revWzBuild(z) {
       const ts = w.westwerk ? B * 0.9 : Math.min(B * 0.62, Math.max(6, turm * 0.13)), sw = westEnde * (L / 2 - ts / 2);
       const tz = w.tuerme === 2 ? [ts * 0.55, -ts * 0.55] : [0];
       tz.forEach((tt, i) => {
-        const T = i === 0 ? turm : (w.turm2 || turm), hl = i === 0 ? (w.helm || 'spitz') : (w.helm2 || 'flach'), hm = hl === 'flach' ? T - 3 : hl === 'pyramide' ? T - Math.max(4, ts * 0.45) : T * (hl === 'barock' ? 0.62 : 0.6), tw = w.tuerme === 2 ? ts * 0.8 : ts;
+        const T = i === 0 ? turm : (w.turm2 || turm), hl = i === 0 ? (w.helm || 'spitz') : (w.helm2 || 'flach'), hm = hl === 'platt' ? T - 1.3 : hl === 'flach' ? T - 3 : hl === 'pyramide' ? T - Math.max(4, ts * 0.45) : T * (hl === 'barock' ? 0.62 : 0.6), tw = w.tuerme === 2 ? ts * 0.8 : ts;
         box(sw, tt, tw, tw, hm, base, REV_WZ_FARBE.ziegel, 0.6);
         helm(sw, tt, tw, base + hm, T - hm, hl);
       });
@@ -1508,7 +1643,12 @@ function revWzBuild(z) {
   } else if (w.art === 'tor') {
     const h = Math.max(w.h, 18); extr(h, REV_WZ_FARBE.ziegel, 0.55); cyl(0, 0, Math.max(ob.L, ob.B) * 0.72, 0.1, 7, base + h, 4, REV_WZ_FARBE.dach, 0.3);
   } else if (w.art === 'rathaus') {
-    const h = Math.max(w.h, 14); extr(h, REV_WZ_FARBE.ziegel, 0.55, null, {}); dach(-ob.L / 2, ob.L / 2, ob.B, base + h, ob.B * 0.5, REV_WZ_FARBE.dach);
+    const barock = w.stil === 'barock', h = barock ? Math.max(w.h, 11) : Math.max(w.h, 14); extr(h, barock ? '#f1ece2' : REV_WZ_FARBE.ziegel, 0.55, null, {}); dach(-ob.L / 2, ob.L / 2, ob.B, base + h, ob.B * (barock ? 0.6 : 0.5), barock ? '#5a524c' : REV_WZ_FARBE.dach);
+    if (barock) {
+      /* Giebel mit Voluten (vereinfacht als Stufen) und Dachreiter mit welscher Haube */
+      for (const sg of [-1, 1]) for (let k = 0; k < 3; k++) { const wk = ob.B * (0.92 - k * 0.3), hk = ob.B * 0.6 / 3; box(sg * (ob.L / 2 - 0.3), 0, 0.7, wk, hk, base + h + k * hk, '#f1ece2', 0.55); cyl(sg * (ob.L / 2 - 0.3), wk / 2 - 0.4, 0.35, 0.35, 0.9, base + h + (k + 1) * hk, 8, '#e3dccd', 0.5); cyl(sg * (ob.L / 2 - 0.3), -wk / 2 + 0.4, 0.35, 0.35, 0.9, base + h + (k + 1) * hk, 8, '#e3dccd', 0.5); }
+      const dy = base + h + ob.B * 0.6 - 1.2; box(0, 0, 3.2, 3.2, 3.4, dy, '#f1ece2', 0.6); helm(0, 0, 3.2, dy + 3.4, 7, 'barock');
+    }
     if (/Altes Rathaus/.test(w.n)) {
       /* Schaufassade (Stralsund): hohe Backsteinwand mit sechs Türmchen und Rundfenstern, zum Alten Markt (Norden) */
       const nord = (ob.c[1] + ob.u[1] * ob.L / 2) > (ob.c[1] - ob.u[1] * ob.L / 2) ? 1 : -1, sF = nord * (ob.L / 2 + 0.6), HF = h + 12;
@@ -1741,7 +1881,7 @@ function revBrueckenBuild() {
         markV.push(p1[0], h0, p1[1], p3[0], h1, p3[1], p2[0], h0, p2[1], p2[0], h0, p2[1], p3[0], h1, p3[1], p4[0], h1, p4[1]); for (let k = 0; k < 6; k++) markC.push(w.r, w.g, w.b); };
       for (let i = i0; i < i1; i++) { if (i % 2 === 0) quad(i, 0, 0.08); quad(i, hw - 0.5, 0.08); quad(i, -(hw - 0.5), 0.08); }
     };
-    const saeulen = [];
+    const saeulen = [], pfosten = [], dalben = [];
     const hArr = new Float32Array(n), deck = new Uint8Array(n);
     let vmax = 14, spur = 1.9, hwStr = 4;
     if (b.art === 'schraegseil') {
@@ -1800,7 +1940,12 @@ function revBrueckenBuild() {
         const ra = Math.max(0, r[0] - 2), rb = Math.min(n - 1, r[1] + 2), hasK = kl && s[ra] <= ks0 && s[rb] >= ks1;
         if (hasK) { const ka = iOf(ks0), kb = iOf(ks1); band(ra, ka, i => hArr[i], hwD, 1.8, '#4b4e53', wippe ? '#2f6db5' : '#5d6a74', '#7b8187'); band(kb, rb, i => hArr[i], hwD, 1.8, '#4b4e53', wippe ? '#2f6db5' : '#5d6a74', '#7b8187'); }
         else band(ra, rb, i => hArr[i], hwD, 1.8, '#4b4e53', wippe ? '#2f6db5' : '#5d6a74', '#7b8187');
-        for (let sv = s[r[0]] + 4; sv <= s[r[1]]; sv += wippe ? 30 : 24) { if (hasK && sv > ks0 - 6 && sv < ks1 + 6) continue; const q = at(sv); saeulen.push([q.E, q.N, 0, -4, hArr[q.i] - 1.8, q.d, hwD * 1.7]); }
+        if (wippe) {
+          const seg = hasK ? [[ra, iOf(ks0)], [iOf(ks1), rb]] : [[ra, rb]];
+          for (const [a0, a1] of seg) for (const o of [-hwD + 0.15, hwD - 0.15]) { band(a0, a1, i => hArr[i] + 1.15, 0.06, 0.1, '#f4f4f0', '#f4f4f0', '#f4f4f0', 0.5, o); band(a0, a1, i => hArr[i] + 0.55, 0.04, 0.06, '#f4f4f0', '#f4f4f0', '#f4f4f0', 0.5, o);
+            for (let sv = s[a0]; sv <= s[a1]; sv += 1.6) { const q = at(sv), pa = sc(q.E - q.d[1] * o, q.N + q.d[0] * o); pfosten.push(pa[0], hArr[q.i], pa[1], pa[0], hArr[q.i] + 1.15, pa[1]); } }
+        }
+        for (let sv = s[r[0]] + 4; sv <= s[r[1]]; sv += wippe ? 30 : 24) { if (hasK && sv > ks0 - 6 && sv < ks1 + 6) continue; const q = at(sv); saeulen.push([q.E, q.N, wippe ? -1 : 0, -4, hArr[q.i] - 1.8, q.d, wippe ? hwD * 1.5 : hwD * 1.7]); }
         for (let i = r[0]; i <= r[1]; i++) { const inK = hasK && s[i] >= ks0 && s[i] <= ks1; for (let o = -hwD - 1; o <= hwD + 1; o += 2) for (let a = -3; a <= 3; a += 3) solid(P[i][0] - dir[i][1] * o + dir[i][0] * a, P[i][1] + dir[i][0] * o + dir[i][1] * a, inK ? kIdx : null); }
       });
       if (kl && ks0 > 0) {
@@ -1812,17 +1957,46 @@ function revBrueckenBuild() {
           const hinge = new THREE.Group(); hinge.position.set(A[0], hh, A[1]); hinge.rotation.y = th; const piv = new THREE.Group(); hinge.add(piv);
           const leaf = new THREE.Mesh(new THREE.BoxGeometry(L, 1.8, hwD * 2), M('#2f6db5', 0.4)); leaf.position.set(L / 2, -0.9, 0); piv.add(leaf);
           const top = new THREE.Mesh(new THREE.BoxGeometry(L, 0.06, hwD * 2 - 0.6), M('#4b4e53', 0.1)); top.position.set(L / 2, 0.03, 0); piv.add(top);
-          for (const z of [-hwD + 0.2, hwD - 0.2]) { const gl = new THREE.Mesh(new THREE.BoxGeometry(L, 1.1, 0.25), M('#2f6db5', 0.4)); gl.position.set(L / 2, 0.55, z); piv.add(gl); }
+          for (const z of [-hwD + 0.2, hwD - 0.2]) { if (wippe) { for (const y of [1.15, 0.55]) { const gl = new THREE.Mesh(new THREE.BoxGeometry(L, 0.1, 0.1), M('#f4f4f0', 0.5)); gl.position.set(L / 2, y, z); piv.add(gl); } for (let x = 0.8; x < L; x += 1.6) { const pf = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.15, 0.07), M('#f4f4f0', 0.5)); pf.position.set(x, 0.58, z); piv.add(pf); } } else { const gl = new THREE.Mesh(new THREE.BoxGeometry(L, 1.1, 0.25), M('#2f6db5', 0.4)); gl.position.set(L / 2, 0.55, z); piv.add(gl); } }
           if (wippe) {
-            /* Wippbrücke: hohe blaue Portaltürme, oben der Waagebalken mit Gegengewicht, der mitschwingt */
-            for (const z of [-hwD - 1.2, hwD + 1.2]) { const t = new THREE.Mesh(new THREE.BoxGeometry(3, 26, 2.4), M('#2f6db5', 0.55)); t.position.set(-3, 13 - 1.8, z); hinge.add(t); }
-            const qb = new THREE.Mesh(new THREE.BoxGeometry(3, 2.2, hwD * 2 + 4.8), M('#2f6db5', 0.55)); qb.position.set(-3, 24, 0); hinge.add(qb);
-            const wp = new THREE.Group(); wp.position.set(-3, 24, 0); hinge.add(wp);
-            for (const z of [-hwD - 1.2, hwD + 1.2]) { const bm = new THREE.Mesh(new THREE.BoxGeometry(34, 1.6, 1.2), M('#2f6db5', 0.55)); bm.position.set(5, 1.2, z); wp.add(bm); }
-            const gg = new THREE.Mesh(new THREE.BoxGeometry(6, 4.5, hwD * 2 + 3.6), M('#3d4a55', 0.2)); gg.position.set(-10, 0.5, 0); wp.add(gg);
+            /* Peenebrücke Wolgast (nach Fotos): blaues Portal mit Bullaugen, oben zwei Waagebalken mit Gegengewichtswalzen und Querrohr,
+               Zugstangen zur Klappe, auskragendes Steuerhaus mit Glasband */
+            const blau = M('#2f74c8', 0.5), weiss = M('#f2f2ee', 0.6), zT = hwD + 1.6, HT = 17, PX = -2.5;
+            const bull = (x, y, z, nz) => { const r = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.11, 6, 14), weiss); r.position.set(x, y, z); r.rotation.y = nz ? 0 : Math.PI / 2; hinge.add(r); const gl = new THREE.Mesh(new THREE.CircleGeometry(0.36, 12), M('#1c2a36', 0.9)); gl.position.set(x + (nz ? 0 : 0.02), y, z + (nz ? 0.02 : 0)); gl.rotation.y = nz ? 0 : Math.PI / 2; hinge.add(gl); };
+            for (const z of [-zT, zT]) {
+              const t = new THREE.Mesh(new THREE.BoxGeometry(2.6, HT + 6, 2.6), blau); t.position.set(PX, (HT + 6) / 2 - 6, z); hinge.add(t);
+              for (const y of [2.5, 5.5, 13.5]) bull(PX + 1.32, y, z, false);
+              const kopf = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.2, 3.4), blau); kopf.position.set(PX, HT - 0.4, z); hinge.add(kopf);
+            }
+            /* unterer Querriegel mit Bullaugenreihe */
+            const qr = new THREE.Mesh(new THREE.BoxGeometry(2.4, 4.2, zT * 2), blau); qr.position.set(PX, 9.6, 0); hinge.add(qr);
+            for (let z = -zT + 2.6; z <= zT - 2.5; z += 2.6) { bull(PX + 1.22, 9.6, z, false); bull(PX - 1.22, 9.6, z, false); }
+            const fest = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, zT * 2, 14), blau); fest.rotation.x = Math.PI / 2; fest.position.set(PX - 1.2, HT + 0.6, 0); hinge.add(fest);
+            /* Waagebalken mit Walzen (schwingt mit der Klappe) */
+            const wp = new THREE.Group(); wp.position.set(PX, HT + 1.6, 0); hinge.add(wp);
+            const ARM = 19, HECK = 8;
+            for (const z of [-zT, zT]) {
+              const bm = new THREE.Mesh(new THREE.BoxGeometry(ARM + HECK, 1.9, 1.3), blau); bm.position.set((ARM - HECK) / 2, 0, z); wp.add(bm);
+              const st = new THREE.Mesh(new THREE.BoxGeometry(5, 3.2, 1.3), blau); st.position.set(-HECK + 2.5, -1.2, z); wp.add(st);
+              const walze = new THREE.Mesh(new THREE.CylinderGeometry(2.9, 2.9, 2.2, 22), blau); walze.rotation.x = Math.PI / 2; walze.position.set(-HECK, 0.4, z + Math.sign(z) * 1.6); wp.add(walze);
+              const deckel = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 2.3, 22), M('#2a66b2', 0.5)); deckel.rotation.x = Math.PI / 2; deckel.position.copy(walze.position); wp.add(deckel);
+            }
+            const rohr = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, zT * 2 + 2, 16), blau); rohr.rotation.x = Math.PI / 2; rohr.position.set(-HECK, 0.4, 0); wp.add(rohr);
             K.piv.push(wp);
-            const hut = new THREE.Mesh(new THREE.BoxGeometry(5, 3.5, 5), M('#efece4', 0.6)); hut.position.set(-8, 1.75, hwD + 5); hinge.add(hut);
-          } else {
+            /* Zugstangen: von den Balkenspitzen zur Klappe, werden in revBrueckenTick nachgeführt */
+            const stangen = [];
+            for (const z of [-zT, zT]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1, 6), blau); hinge.add(c); stangen.push([c, z]); }
+            const dA = Math.min(L - 2, ARM + PX + 0.5), kmax = K.max, up = new THREE.Vector3(0, 1, 0), va = new THREE.Vector3(), vb = new THREE.Vector3();
+            K.upd = (auf) => { const th = auf * kmax; for (const [c, z] of stangen) { va.set(PX + Math.cos(th) * ARM, HT + 1.6 + Math.sin(th) * ARM, z); vb.set(Math.cos(th) * dA, Math.sin(th) * dA + 0.6, Math.sign(z) * (hwD - 0.3)); const l = va.distanceTo(vb); c.position.copy(va).add(vb).multiplyScalar(0.5); c.scale.set(1, l, 1); c.quaternion.setFromUnitVectors(up, vb.clone().sub(va).normalize()); } };
+            /* Steuerhaus: auskragend auf schräger Konsole, Glasband, flaches Walmdach */
+            const zh = -zT - 5.5;
+            const kons = new THREE.Mesh(new THREE.BoxGeometry(5, 2.2, 7), blau); kons.position.set(PX - 5, 2.4, -zT - 3.2); kons.rotation.x = -0.35; hinge.add(kons);
+            const haus = new THREE.Mesh(new THREE.BoxGeometry(7.5, 3.4, 5.5), blau); haus.position.set(PX - 5, 4.9, zh); hinge.add(haus);
+            const glas = new THREE.Mesh(new THREE.BoxGeometry(7.7, 1.6, 5.7), M('#1d3346', 1.2)); glas.position.set(PX - 5, 5.4, zh); hinge.add(glas);
+            const kanzel = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.8, 1.6, 8, 1, false, 0, Math.PI), M('#1d3346', 1.2)); kanzel.position.set(PX - 5, 5.4, zh - 2.75); kanzel.rotation.y = Math.PI / 2; hinge.add(kanzel);
+            const dach = new THREE.Mesh(new THREE.ConeGeometry(5.6, 1.6, 4), M('#8d949b', 0.2)); dach.position.set(PX - 5, 7.4, zh - 0.6); dach.rotation.y = Math.PI / 4; dach.scale.set(1, 1, 0.8); hinge.add(dach);
+            const gel = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.9, 0.08), weiss); gel.position.set(PX - 5, 6.5, zh - 3.0); hinge.add(gel);
+                    } else {
             const ggw = new THREE.Mesh(new THREE.BoxGeometry(5, 4, hwD * 2 - 1.5), M('#3d4a55', 0.2)); ggw.position.set(-3, -2.5, 0); piv.add(ggw);
             for (const z of [-hwD - 1, hwD + 1]) { const pf = new THREE.Mesh(new THREE.BoxGeometry(1.2, 13, 1.2), M('#2f6db5', 0.5)); pf.position.set(-2, 6.5 - 1.8, z); hinge.add(pf); }
             const qbm = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, hwD * 2 + 3), M('#2f6db5', 0.5)); qbm.position.set(-2, 11, 0); hinge.add(qbm);
@@ -1832,6 +2006,11 @@ function revBrueckenBuild() {
           grp.add(hinge); K.piv.push(piv);
         }
         X.klappen.push(K);
+        if (wippe) {
+          /* Leitdalben: schwarze Pfähle mit weißem Kopf, in Reihen vor und hinter der Durchfahrt */
+          for (const sv of [ks0 - 2, ks1 + 2]) { const q = at(sv), nx = -q.d[1], ny = q.d[0];
+            for (const sg of [-1, 1]) for (let k = 0; k < 5; k++) { const dd = hwD + 10 + k * 15, E = q.E + nx * sg * dd, N = q.N + ny * sg * dd; if (revZ(E, N) > -1) continue; dalben.push([E, N]); solid(E, N); } }
+        }
       }
       for (const r of runs) for (let sv = s[r[0]]; sv < s[r[1]]; sv += 30) { const q = at(sv); const p = sc(q.E - q.d[1] * (hwD - 0.5), q.N + q.d[0] * (hwD - 0.5)); lampe(p[0], hArr[q.i] + 7, p[1], 7); }
     }
@@ -1846,11 +2025,15 @@ function revBrueckenBuild() {
     /* Pfeiler gebündelt */
     if (saeulen.length) {
       const cy = new THREE.CylinderGeometry(1, 1, 1, 12); cy.translate(0, 0.5, 0); const bx = new THREE.BoxGeometry(1, 1, 1); bx.translate(0, 0.5, 0);
-      const rund = saeulen.filter(q => q[2] > 0), eckig = saeulen.filter(q => q[2] === 0);
+      const rund = saeulen.filter(q => q[2] > 0), eckig = saeulen.filter(q => q[2] === 0), kelch = saeulen.filter(q => q[2] < 0);
       const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
       if (rund.length) { const im = new THREE.InstancedMesh(cy, M('#e9e8e3', 0.35), rund.length); rund.forEach((q, i) => { const p = sc(q[0], q[1]); sv.set(q[2], q[4] - q[3], q[2]); pv.set(p[0], q[3], p[1]); qq.identity(); m4.compose(pv, qq, sv); im.setMatrixAt(i, m4); }); im.frustumCulled = false; grp.add(im); }
+      if (kelch.length) { const kg = new THREE.CylinderGeometry(1, 0.55, 1, 20); kg.translate(0, 0.5, 0); const im = new THREE.InstancedMesh(kg, M('#dcd9d1', 0.3), kelch.length); kelch.forEach((q, i) => { const p = sc(q[0], q[1]), p2 = sc(q[0] + q[5][0], q[1] + q[5][1]); qq.setFromAxisAngle(up, Math.atan2(p2[0] - p[0], p2[1] - p[1])); sv.set(q[6] / 2, q[4] - q[3], 2.4); pv.set(p[0], q[3], p[1]); m4.compose(pv, qq, sv); im.setMatrixAt(i, m4); }); im.frustumCulled = false; grp.add(im); }
       if (eckig.length) { const im = new THREE.InstancedMesh(bx, M('#9a958b', 0.2), eckig.length); eckig.forEach((q, i) => { const p = sc(q[0], q[1]), p2 = sc(q[0] + q[5][0], q[1] + q[5][1]); qq.setFromAxisAngle(up, Math.atan2(p2[0] - p[0], p2[1] - p[1])); sv.set(q[6] || 11, q[4] - q[3], 3); pv.set(p[0], q[3], p[1]); m4.compose(pv, qq, sv); im.setMatrixAt(i, m4); }); im.frustumCulled = false; grp.add(im); }
     }
+    if (pfosten.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pfosten, 3)); grp.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: '#f4f4f0' }))); }
+    if (dalben.length) { const cg = new THREE.CylinderGeometry(0.85, 0.85, 1, 12); cg.translate(0, 0.5, 0); const im = new THREE.InstancedMesh(cg, M('#23262a', 0.1), dalben.length), ik = new THREE.InstancedMesh(cg, M('#f2f2ee', 0.6), dalben.length), m4 = new THREE.Matrix4();
+      dalben.forEach((q, i) => { const p = sc(q[0], q[1]); m4.makeScale(1, 6.5, 1).setPosition(p[0], -3, p[1]); im.setMatrixAt(i, m4); m4.makeScale(1.04, 0.9, 1.04).setPosition(p[0], 3.5, p[1]); ik.setMatrixAt(i, m4); }); im.frustumCulled = ik.frustumCulled = false; grp.add(im, ik); }
     if (!X.brSkip) X.brSkip = new Set(); for (const q of P) for (let a = -1; a <= 1; a++) for (let c2 = -1; c2 <= 1; c2++) X.brSkip.add((Math.floor(q[0] / 16) + a) + ',' + (Math.floor(q[1] / 16) + c2));
     X.strassen.push({ name: b.n, P, s, dir, h: hArr, L: s[n - 1], vmax, spur, klappen: X.klappen.filter(k => k.strasse === X.strassen.length) });
   }
@@ -1940,6 +2123,7 @@ function revVerkehrTick() {
 }
 /* Hindernis für die Physik: Pfeiler, Pylon, niedrige Fahrbahnen, geschlossene Klappen */
 function revBrHit(E, N) {
+  if (REVX && REVX.stegSolid && REVX.stegSolid.has(Math.floor(E / 2) + ',' + Math.floor(N / 2))) return true;
   const X = REVX, b = X && X.brBB; if (!b || E < b[0] || E > b[2] || N < b[1] || N > b[3]) return false;
   const k = Math.floor(E / 4) + ',' + Math.floor(N / 4);
   if (X.brSolid.has(k)) return true;
@@ -1949,7 +2133,7 @@ function revBrueckenTick() {
   const X = REVX; if (!X || !X.brGrp) return;
   for (const K of X.klappen) {
     const z = revKlZeit(K.def); K.zeit = z;
-    if (Math.abs(z.auf - K.auf) > 0.002) { K.auf = z.auf; for (const p of K.piv) p.rotation.z = z.auf * K.max; for (const sg of K.sig) sg.material.color.set(z.auf > 0.95 ? '#2bff5a' : '#ff2a1a'); }
+    if (Math.abs(z.auf - K.auf) > 0.002) { K.auf = z.auf; for (const p of K.piv) p.rotation.z = z.auf * K.max; if (K.upd) K.upd(z.auf); for (const sg of K.sig) sg.material.color.set(z.auf > 0.95 ? '#2bff5a' : '#ff2a1a'); }
   }
   const f = revNacht(); if (f !== X.brN) { X.brN = f; const warm = new THREE.Color(1, 0.92, 0.8); for (const [m, k] of X.brMats) m.emissive.copy(m.color).multiply(warm).multiplyScalar(k * f * 1.1); }
   try { revVerkehrTick(); } catch (e) { console.error('Verkehr', e); X.verkehr = null; }
@@ -3094,7 +3278,7 @@ const RIG=()=>RIGS[CL.key];
 /* ================= Einstellungen ================= */
 const DEFAULTS={tws:10,shiftAmp:8,shiftPeriod:70,puffs:2,puffStrength:25,dirtyAir:true,waveH:0,legLength:450,laps:2,startTime:60,zone:3,
   boatClass:'jolle',sailNo:'GER 1',headsail:'fock',autoTrim:true,gameSpeed:1.5,laylines:true,showZone:true,roundArrow:true,vectors:true,cpuCount:6,lineScale:100,cpuSkill:1,
-  rules:true,cpuCalm:true,markRules:true,markTouch:true,ocs:true,penaltyMode:'one',allMsgs:false,gfx:isTouch?'mittel':'hoch',courseType:'wl',finishUp:false,series:1,revier:'open',revKurs:'bb',mapTrack:false,ladder:true,count10:true,startSound:'horn',rowBoat:'zk10',courseFan:true,windFrom:225,rowDist:500,current:0,currentDir:'lee',coach:true,ghost:true,touchMode:'slider',wxCloud:25,wxPrecip:'none',wxUseWind:true,wxUseWx:true,wxUseTime:true,season:'auto'};
+  rules:true,cpuCalm:true,markRules:true,markTouch:true,ocs:true,penaltyMode:'one',allMsgs:false,gfx:isTouch?'mittel':'hoch',courseType:'wl',finishUp:false,series:1,revier:'open',revKurs:'bb',mapNord:'nord',mapTrack:false,ladder:true,count10:true,startSound:'horn',rowBoat:'zk10',courseFan:true,windFrom:225,rowDist:500,current:0,currentDir:'lee',coach:true,ghost:true,touchMode:'slider',wxCloud:25,wxPrecip:'none',wxUseWind:true,wxUseWx:true,wxUseTime:true,season:'auto'};
 let S=Object.assign({},DEFAULTS),S_main=null;
 try{const raw=localStorage.getItem('regattakoje.v1');if(raw)Object.assign(S,JSON.parse(raw));}catch(e){}
 if(!CLASSES[S.boatClass])S.boatClass='jolle';
@@ -3153,6 +3337,7 @@ const SCHEMA=[
   {k:'laylines',label:'Laylines anzeigen',type:'check'},
   {k:'ladder',label:'Lineal (Abstandslinien quer zum Wind)',type:'check',hint:'Linien alle 50 m quer zum aktuellen Wind, auf der Karte und auf dem Wasser: wer auf derselben Linie liegt, ist gleich weit in Luv'},
   {k:'mapTrack',label:'Eigene Spur auf der Karte',type:'check'},
+  {k:'mapNord',label:'Karte ausrichten',type:'select',options:[['nord','Norden oben'],['wind','Wind oben']],hint:'Norden oben wie auf der Seekarte; Wind oben dreht die Karte mit dem Kurs (Regatta-Ansicht)'},
   {k:'courseFan',label:'Kursfächer am Bug',type:'check',hint:'Farbiger Fächer vor dem Boot: grün bringt dich am schnellsten Richtung Ziel, gelb geht so, rot kostet'},
   {k:'showZone',label:'Zonenkreis anzeigen',type:'check'},
   {k:'roundArrow',label:'Umrundungspfeil an der nächsten Tonne',type:'check'},
@@ -7060,6 +7245,7 @@ $('mapBeam').addEventListener('click',e=>{e.stopPropagation();beamToggle();});
 function laylines(b){const C=G.course;let m=b.started?C.seq[b.leg]:C.wm;if(!isMark(m)||C.lesson||(m.kind!=='wind'&&m.kind!=='lee'&&m.kind!=='gate'))return null;
   const W=G.wind.sample(m.x,m.y).dir;const o=opt(b.twsL,m.kind!=='wind'?(b.spiWant||b.spi>0.5):false,b.headsail);const ang=m.kind==='wind'?o.up:o.down;
   return {m,b1:W-ang+180,b2:W+ang+180};}
+var MAPROT=0;
 function drawMap(){
   const dpr=Math.min(2,window.devicePixelRatio||1);const W=mapCv.clientWidth,H=mapCv.clientHeight;if(!W)return;
   if(mapCv.width!==Math.round(W*dpr)||mapCv.height!==Math.round(H*dpr)){mapCv.width=Math.round(W*dpr);mapCv.height=Math.round(H*dpr);}
@@ -7069,6 +7255,8 @@ function drawMap(){
   else if(C.wps||SHORE.kind==='revier'){const RR=1500,s0=Math.min(W,H)/(2*RR);sc=s0;const cx=pl.x*C.R[0]+pl.y*C.R[1],ca=pl.x*C.U[0]+pl.y*C.U[1];mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+(lat-cx)*s0,H/2-(al-ca)*s0];};}
   else{const LW=Math.max(C.lineLen*1.1,S.legLength*0.5,C.wing||C.om?S.legLength*0.5+60:0);const aMin=-110,aMax=S.legLength+50;const pad=8;sc=Math.min((W-2*pad)/(2*LW),(H-2*pad)/(aMax-aMin));
     mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+lat*sc,H-pad-(al-aMin)*sc];};}
+  MAPROT=0;if(S.mapNord!=='wind'&&!C.lesson&&SHORE.realOf&&SHORE.fwd){const r0=SHORE.realOf(pl.x,pl.y),w1=SHORE.fwd(r0[0],r0[1]+100),a0=mp(pl.x,pl.y),a1=mp(w1[0],w1[1]),al=Math.atan2(a1[0]-a0[0],-(a1[1]-a0[1]));
+    if(Math.abs(al)>1e-4){MAPROT=-al;const cs=Math.cos(MAPROT),sn=Math.sin(MAPROT),cx0=W/2,cy0=H/2,mpR=mp;mp=(wx,wy)=>{const [a,b]=mpR(wx,wy),dx=a-cx0,dy=b-cy0;return [cx0+dx*cs-dy*sn,cy0+dx*sn+dy*cs];};}}
   {const Z=mz.z;let fx,fy;
     if(mz.free){const rv=SHORE.kind==='revier',[ox,oy]=rv?[W/2,H/2]:mp(0,0),lim=(rv?80000:2600)*sc;mz.fx=clamp(mz.fx,ox-lim,ox+lim);mz.fy=clamp(mz.fy,oy-lim,oy+lim);fx=mz.fx;fy=mz.fy;}
     else if(Z>1){const [bx,by]=mp(pl.x,pl.y);fx=bx-mz.px/Z;fy=by-mz.py/Z;}else{fx=W/2;fy=H/2;}
@@ -7082,27 +7270,28 @@ function drawMap(){
   const tgt=pl.started&&!pl.finished?C.seq[pl.leg]:(!pl.started?C.wm:null);
   if(C.finishUp){const [fx1,fy1]=mp(C.fin.a.x,C.fin.a.y),[fx2,fy2]=mp(C.fin.b.x,C.fin.b.y);x.setLineDash([3,3]);x.strokeStyle='#5fb4ff';x.lineWidth=1;x.beginPath();x.moveTo(fx1,fy1);x.lineTo(fx2,fy2);x.stroke();x.setLineDash([]);}
   if(isMark(tgt)&&tgt.kind==='gate'&&S.roundArrow){const [gx,gy]=mp(tgt.x+C.U[0]*14,tgt.y+C.U[1]*14),[hx,hy]=mp(tgt.x-C.U[0]*8,tgt.y-C.U[1]*8);x.strokeStyle='#ffd23f';x.lineWidth=1.8;x.beginPath();x.moveTo(gx,gy);x.lineTo(hx,hy);x.stroke();x.fillStyle='#ffd23f';x.beginPath();x.moveTo(hx,hy+4);x.lineTo(hx-3.5,hy-2);x.lineTo(hx+3.5,hy-2);x.fill();x.lineWidth=1;}
-  if(CUR[0]||CUR[1]){x.save();x.translate(14,H-16);x.rotate(Math.atan2(CUR[0],CUR[1]));x.strokeStyle='#7fd3ff';x.fillStyle='#7fd3ff';x.lineWidth=2;x.beginPath();x.moveTo(0,7);x.lineTo(0,-6);x.stroke();x.beginPath();x.moveTo(0,-10);x.lineTo(-4,-3);x.lineTo(4,-3);x.closePath();x.fill();x.restore();}
+  if(CUR[0]||CUR[1]){x.save();x.translate(14,H-16);x.rotate(Math.atan2(CUR[0],CUR[1])+MAPROT);x.strokeStyle='#7fd3ff';x.fillStyle='#7fd3ff';x.lineWidth=2;x.beginPath();x.moveTo(0,7);x.lineTo(0,-6);x.stroke();x.beginPath();x.moveTo(0,-10);x.lineTo(-4,-3);x.lineTo(4,-3);x.closePath();x.fill();x.restore();}
   for(const bu of C.buoys){const m=bu.m;const [mx,my]=mp(bu.x,bu.y);if(S.showZone&&m.kind!=='wp'){x.strokeStyle='rgba(255,255,255,.25)';x.lineWidth=1;x.beginPath();x.arc(mx,my,S.zone*L*sc,0,7);x.stroke();}
     x.fillStyle='#ff7a1a';x.beginPath();x.arc(mx,my,3.5,0,7);x.fill();
     if(m===tgt&&m.kind==='wp'){const [ax,ay]=mp(m.a.x,m.a.y),[bx2,by2]=mp(m.b.x,m.b.y);x.strokeStyle='#ffd23f';x.lineWidth=2;x.beginPath();x.moveTo(ax,ay);x.lineTo(bx2,by2);x.stroke();x.lineWidth=1;}
     else if(m.kind==='wp'){}
     else if(m===tgt&&m.kind==='gate'){}
-    else if(m===tgt&&S.roundArrow){const dB=Math.atan2(m.d[0],m.d[1])/DEG-C.W0;const a0=(dB+125)*DEG,a1=(dB-115)*DEG,r=9;x.strokeStyle='#ffd23f';x.lineWidth=1.8;x.beginPath();
+    else if(m===tgt&&S.roundArrow){const dB=Math.atan2(m.d[0],m.d[1])/DEG-C.W0+MAPROT/DEG;const a0=(dB+125)*DEG,a1=(dB-115)*DEG,r=9;x.strokeStyle='#ffd23f';x.lineWidth=1.8;x.beginPath();
       for(let k=0;k<=24;k++){const th=a0+(a1-a0)*k/24;const px=mx+Math.sin(th)*r,py=my-Math.cos(th)*r;k?x.lineTo(px,py):x.moveTo(px,py);}x.stroke();
       const ex=mx+Math.sin(a1)*r,ey=my-Math.cos(a1)*r,dx=-Math.cos(a1),dy=-Math.sin(a1);x.fillStyle='#ffd23f';x.beginPath();x.moveTo(ex+dx*5,ey+dy*5);x.lineTo(ex-dy*3.5,ey+dx*3.5);x.lineTo(ex+dy*3.5,ey-dx*3.5);x.fill();x.lineWidth=1;}
     else if(m===tgt){x.strokeStyle='#ffd23f';x.lineWidth=1.5;x.beginPath();x.arc(mx,my,7,0,7);x.stroke();x.lineWidth=1;}}
   if(G.ghostB&&G.ghostB.vis){const [gx,gy]=mp(G.ghostB.x,G.ghostB.y);x.strokeStyle='rgba(232,244,255,.8)';x.lineWidth=1.2;x.beginPath();x.arc(gx,gy,4,0,7);x.stroke();}
   if(S.mapTrack&&G.rec&&G.rec[0]&&G.rec[0].length&&!pl.spec){const r=G.rec[0];x.save();x.strokeStyle=pl.color;x.globalAlpha=0.8;x.lineWidth=1.6;x.beginPath();r.forEach((q,i)=>{const [a,b2]=mp(q[1],q[2]);i?x.lineTo(a,b2):x.moveTo(a,b2);});const [a,b2]=mp(pl.x,pl.y);x.lineTo(a,b2);x.stroke();x.restore();}
   {const LB=BIRDS&&BIRDS.L;if(LB){x.save();x.fillStyle='rgba(236,242,246,.8)';
-    for(const lb of LB.boats){const [px,py]=mp(lb.x,lb.y);x.save();x.translate(px,py);x.rotate((lb.h-C.W0)*DEG);const s=3;x.beginPath();x.moveTo(0,-s);x.lineTo(s*0.5,s*0.8);x.lineTo(-s*0.5,s*0.8);x.closePath();x.fill();x.restore();}
+    for(const lb of LB.boats){const [px,py]=mp(lb.x,lb.y);x.save();x.translate(px,py);x.rotate((lb.h-C.W0)*DEG+MAPROT);const s=3;x.beginPath();x.moveTo(0,-s);x.lineTo(s*0.5,s*0.8);x.lineTo(-s*0.5,s*0.8);x.closePath();x.fill();x.restore();}
     if(LB.anchor){const [px,py]=mp(LB.anchor.x,LB.anchor.y);x.strokeStyle='rgba(236,242,246,.9)';x.lineWidth=1.2;x.beginPath();x.arc(px,py,2.6,0,7);x.stroke();x.beginPath();x.moveTo(px,py-2.6);x.lineTo(px,py+2.6);x.moveTo(px-1.8,py);x.lineTo(px+1.8,py);x.stroke();}
     x.restore();}}
-  for(const b of G.boats){if(b.gone||b.spec)continue;const [px,py]=mp(b.x,b.y);x.save();x.translate(px,py);x.rotate((b.h-C.W0)*DEG);const s=b.isPlayer?5.5:4.2;
+  for(const b of G.boats){if(b.gone||b.spec)continue;const [px,py]=mp(b.x,b.y);x.save();x.translate(px,py);x.rotate((b.h-C.W0)*DEG+MAPROT);const s=b.isPlayer?5.5:4.2;
     x.beginPath();x.moveTo(0,-s);x.lineTo(s*0.55,s*0.8);x.lineTo(-s*0.55,s*0.8);x.closePath();x.fillStyle=b.color;x.globalAlpha=b.finished?0.45:1;x.fill();
     if(b.isPlayer){x.strokeStyle='#fff';x.lineWidth=1.5;x.stroke();}x.restore();x.globalAlpha=1;
     if(b.penalty>0){x.fillStyle='#ff4f5f';x.beginPath();x.arc(px+5,py-5,2.5,0,7);x.fill();}}
-  const sh=wrap180(G.wind.cur-C.W0);x.save();x.translate(14,16);x.rotate(sh*DEG);x.strokeStyle='#fff';x.fillStyle='#fff';x.lineWidth=2;x.beginPath();x.moveTo(0,-8);x.lineTo(0,7);x.stroke();x.beginPath();x.moveTo(0,10);x.lineTo(-4,3);x.lineTo(4,3);x.closePath();x.fill();x.restore();
+  const sh=wrap180(G.wind.cur-C.W0);x.save();x.translate(14,16);x.rotate(sh*DEG+MAPROT);x.strokeStyle='#fff';x.fillStyle='#fff';x.lineWidth=2;x.beginPath();x.moveTo(0,-8);x.lineTo(0,7);x.stroke();x.beginPath();x.moveTo(0,10);x.lineTo(-4,3);x.lineTo(4,3);x.closePath();x.fill();x.restore();
+  if(MAPROT||(S.mapNord!=='wind'&&SHORE.realOf&&!C.lesson)){x.save();x.translate(14,44);x.fillStyle='#fff';x.font='bold 11px system-ui,sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('N',0,1);x.beginPath();x.moveTo(0,-11);x.lineTo(-3.5,-6);x.lineTo(3.5,-6);x.closePath();x.fill();x.restore();}
 }
 
 /* ================= Render ================= */
