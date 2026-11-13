@@ -885,6 +885,7 @@ function revBuild() {
   try { revFeuerBuild(); } catch (e) { console.error('Leuchtfeuer', e); }
   revSeamarks();
   SHORE.landMap = X.idx.land.map(f => { const p = []; for (let k = 0; k < f.length; k += 2) p.push(fwd(f[k], f[k + 1])); return p; });
+  SHORE.binnenMap = (X.idx.binnen || []).map(f => { const p = []; for (let k = 0; k < f.length; k += 2) p.push(fwd(f[k], f[k + 1])); return p; });
   SHORE.places = X.idx.places.map(p => { const q = fwd(p[0], p[1]); return [q[0], q[1], p[2], p[3]]; });
   X.built = false;
   try { seasonApply(shoreG); } catch (e) { console.error('Jahreszeit', e); }
@@ -3001,6 +3002,13 @@ function revMapDraw(x, mp, W, H) {
     for (let k = 0; k < ring.length; k++) { const q = mp(ring[k][0], ring[k][1]); if (q[0] > -400 && q[0] < W + 400 && q[1] > -400 && q[1] < H + 400) any = true; k ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1]); }
     if (any) { x.closePath(); x.fill(); x.stroke(); }
   }
+  /* Flüsse und Hafenbecken, die in OSM nicht hinter der Küste liegen (Unterwarnow): aus dem Land ausschneiden */
+  if (SHORE.binnenMap && SHORE.binnenMap.length) {
+    const pfad = ring => { let any = false; x.beginPath(); for (let k = 0; k < ring.length; k++) { const q = mp(ring[k][0], ring[k][1]); if (q[0] > -400 && q[0] < W + 400 && q[1] > -400 && q[1] < H + 400) any = true; k ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1]); } x.closePath(); return any; };
+    x.globalCompositeOperation = 'destination-out'; x.fillStyle = '#000'; for (const r of SHORE.binnenMap) if (pfad(r)) x.fill();
+    x.globalCompositeOperation = 'source-over'; x.fillStyle = 'rgba(14,52,70,.55)'; for (const r of SHORE.binnenMap) if (pfad(r)) { x.fill(); x.stroke(); }
+    x.fillStyle = 'rgba(206,196,160,.85)';
+  }
   /* Brücken: Rügenbrücke blau, Rügendamm grau, Klappe rot/grün */
   if (REVX && REVX.idx.bruecken) for (const b of REVX.idx.bruecken) {
     x.strokeStyle = b.art === 'damm' ? 'rgba(90,90,90,.9)' : 'rgba(47,109,181,.95)'; x.lineWidth = b.art === 'damm' ? 1.6 : 2.2; x.beginPath();
@@ -3269,8 +3277,10 @@ function heliUi() {
 #heliUi .hBtns{position:absolute;right:12px;bottom:calc(env(safe-area-inset-bottom) + 14px);display:flex;flex-direction:column;gap:8px;pointer-events:auto}
 #heliUi button{pointer-events:auto;border:0;border-radius:12px;background:rgba(10,20,28,.78);color:#fff;font:700 15px system-ui,sans-serif;min-width:64px;min-height:52px;padding:0 12px;touch-action:none}
 #heliUi button.on{background:#d62d20}
-#heliUi .hTop{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 44px);display:flex;gap:8px;pointer-events:auto}
-#heliUi .hTop button{min-height:40px;font-size:13px}
+#heliUi .hTop{position:absolute;left:12px;top:calc(env(safe-area-inset-top) + 150px);display:flex;flex-direction:column;gap:6px;pointer-events:auto}
+#heliUi .hTop button{min-height:36px;font-size:13px;text-align:left}
+@media (max-width:760px){#heliUi .hInfo{top:calc(env(safe-area-inset-top) + 140px);font-size:13px}#heliUi .hTop{top:calc(env(safe-area-inset-top) + 180px)}}
+body.heliAn #hud .bottom{visibility:hidden}
 #heliUi .hPad{position:absolute;left:18px;bottom:calc(env(safe-area-inset-bottom) + 18px);width:150px;height:150px;border-radius:50%;background:rgba(10,20,28,.45);border:2px solid rgba(255,255,255,.35);pointer-events:auto;touch-action:none}
 #heliUi .hKnob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;background:rgba(255,255,255,.85)}
 #heliUi .hHilfe{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 8px);transform:translateX(-50%);font-size:12px;opacity:.85;background:rgba(10,20,28,.55);padding:4px 10px;border-radius:8px;white-space:nowrap}
@@ -3279,7 +3289,7 @@ function heliUi() {
   document.head.appendChild(st);
   const d = document.createElement('div'); d.id = 'heliUi'; d.hidden = true;
   d.innerHTML = `<div class="hInfo" id="hInfo"></div>
-<div class="hTop"><button id="hCam" type="button">Kamera</button><button id="hHier" type="button">Boot hierher</button><button id="hAus" type="button">✕ Zurück zum Boot</button></div>
+<div class="hTop"><button id="hCam" type="button">Kamera</button><button id="hHier" type="button">Boot hierher</button><button id="hAus" type="button">✕ Zum Boot</button></div>
 <div class="hPad" id="hPad"><div class="hKnob" id="hKnob"></div></div>
 <div class="hBtns"><button id="hTurbo" type="button">Turbo</button><button id="hUp" type="button">▲ Steigen</button><button id="hDn" type="button">▼ Sinken</button></div>
 <div class="hHilfe">W/S oder ↑/↓ Fahrt · A/D oder ←/→ drehen · Leertaste/Q steigen · E/X sinken · T Turbo · C Kamera · Karte: Pin-Knopf = hinfliegen · J/Esc zurück</div>`;
@@ -3305,7 +3315,7 @@ function heliStart() {
   const pl = P(); HELI.x = pl.x; HELI.y = pl.y; HELI.hdg = pl.h; HELI.v = 0; HELI.vz = 0; HELI.yr = 0; HELI.alt = heliBoden(pl.x, pl.y) + 60; HELI.cam = 0;
   if (!HELI.grp) { const m = heliModell(); HELI.grp = m.g; HELI.rotor = m.rotor; HELI.heck = m.heck; }
   scene.add(HELI.grp); HELI.an = true; HELI.warPause = G.paused; G.paused = true; pauseEl.hidden = true; for (const k in keys) keys[k] = false;
-  const ui = heliUi(); ui.hidden = false; document.getElementById('touch').hidden = true;
+  const ui = heliUi(); ui.hidden = false; document.getElementById('touch').hidden = true; document.body.classList.add('heliAn');
   const bh = document.getElementById('bHeli'); if (bh) bh.classList.add('on');
   msg('Rundflug: Dein Boot wartet hier. ' + (isTouch ? 'Links steuern, rechts steigen/sinken, Turbo für weite Strecken.' : 'W/S Fahrt, A/D drehen, Leertaste/E Höhe, T Turbo.'), 'info');
 }
@@ -3319,7 +3329,7 @@ function heliStop(bootHier) {
     for (const b of G.boats) if (b !== pl && b.cpuTrainer) { b.x = HELI.x + 10; b.y = HELI.y - 9; b.v = 0; }
     pl.x = HELI.x; pl.y = HELI.y; pl.h = HELI.hdg; pl.v = 0;
   }
-  HELI.an = false; scene.remove(HELI.grp); G.paused = false; if (HELI.ui) HELI.ui.hidden = true; document.getElementById('touch').hidden = !isTouch;
+  HELI.an = false; scene.remove(HELI.grp); G.paused = false; document.body.classList.remove('heliAn'); if (HELI.ui) HELI.ui.hidden = true; document.getElementById('touch').hidden = !isTouch;
   const bh = document.getElementById('bHeli'); if (bh) bh.classList.remove('on');
   snapCam = true; HELI.stick = [0, 0]; HELI.hoch = 0; HELI.keys = {};
   if (SHORE.kind === 'revier' && REVX) revTick(true);
