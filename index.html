@@ -755,7 +755,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
 var REV_BASES = ['../See-Editor/', ''];           /* erst die See-Editor-Seite, dann der eigene Ordner */
 var REVIERE_K = { ruegen: { datei: 'ruegen-spiel.json', name: 'Rügen · Bodden · Peenestrom' } };
 var REVX = null, REVH = null, REVH_LOAD = null, REVH_ERR = null;
-var REV_DRAFT = { jolle: 1.0, opti: 0.75, topcat: 0.7, viking: 1.0, imoca: 4.5, zk10: 1.0, ixylon: 0.9, k6: 0.9, moth: 1.0 };
+var REV_DRAFT = { gorchfock: 4.8, jolle: 1.0, opti: 0.75, topcat: 0.7, viking: 1.0, imoca: 4.5, zk10: 1.0, ixylon: 0.9, k6: 0.9, moth: 1.0 };
 var REV_ORIG_ALT = { hiddensee: [366520, 6016000] };  /* Strecken aus der ersten Hiddensee-Version umrechnen */
 
 function revDraft() { return REV_DRAFT[CL.key] || 1.0; }
@@ -838,7 +838,7 @@ function revCellCd(gi, gj) {
 }
 /* Höhe (m) im Revier-Koordinatensystem E/N (Meter ab Südwest-Ecke). <0 = Wassertiefe */
 function revZ(E, N) {
-  if (revBrHit(E, N)) return 2.5;
+  if (revBrHit(E, N) || revSchiffHit(E, N)) return 2.5;
   const hf = revHafenAt(E, N); if (hf) return revHafenZ(hf, E, N);
   const X = REVX, cs = X.cs, fx = E / cs - 0.5, fy = (X.H - N) / cs - 0.5;
   const i0 = Math.floor(fx), j0 = Math.floor(fy), tx = fx - i0, ty = fy - j0;
@@ -870,8 +870,9 @@ function revBuild() {
   try { MZ_MIN = 0.01; } catch (e) {}
   X.chunks = new Map(); X.scen = new Map(); X.lastE = null;
   X.matT = new THREE.MeshLambertMaterial({ vertexColors: true });
-  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null; X.brGrp = null; X.verkehr = null;
+  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null; X.brGrp = null; X.verkehr = null; X.brSkip = null; X.nv = null; X.zug = null;
   X.haefen = (X.idx.haefen || []).map(h => Object.assign({}, h, { st: null, z: null, m: null, teile: null, grp: null }));
+  revStrLoad(); revSchiffeInit();
   try { revTuerme(); } catch (e) { console.error('Leuchttürme', e); }
   try { revBrueckenBuild(); } catch (e) { console.error('Brücken', e); }
   try { revFeuerBuild(); } catch (e) { console.error('Leuchtfeuer', e); }
@@ -947,13 +948,13 @@ function revScenBuild(t) {
       if (X.lampen && X.lampen.some(L => Math.abs(L[0] - E) < 14 && Math.abs(L[1] - N) < 14)) continue;
       if (revInWz(E, N)) continue;
       if (k % 4 === 0) { const la = ang + 1.3, lr = Math.max(l, w) * 0.5 + 3; const [lx, ly] = F(E + Math.cos(la) * lr, N + Math.sin(la) * lr); lamps.push(lx, h0 + 4.5, -ly); }
-      const bad = revBad(E, N), hanse = !bad && revHanse(E, N);
-      const Hh = Math.min(bad ? Math.max(hh, 12) : hanse ? Math.max(hh, 13) : hh, 25); q.setFromAxisAngle(up, ang + wf);
+      const reet = revReet(E, N) && (k % 5) < 4, bad = !reet && revBad(E, N), hanse = !bad && !reet && revHanse(E, N);
+      const Hh = Math.min(reet ? 7.5 : bad ? Math.max(hh, 12) : hanse ? Math.max(hh, 13) : hh, 25); q.setFromAxisAngle(up, ang + wf);
       sc.set(l, Hh * 0.72, w); p.set(x, h0 - 0.2, -y); m4.compose(p, q, sc);
-      c.set(bad ? ['#f6f5f0', '#f1efe8', '#ebe8df', '#f6f5f0', '#e3ddcd'][(k * 7) % 5] : hanse ? ['#a5543c', '#c9a46a', '#b5623f', '#e6dccb', '#8f3f2e', '#d8c39a', '#9c4a36'][(k * 7) % 7] : ['#e8e1d2', '#d9cdb5', '#f1ece2', '#c9b79a', '#b4553f'][(k * 7) % 5]);
+      c.set(reet ? ['#f4f2ea', '#efe9dc', '#f6f4ee', '#e9e0cc'][(k * 7) % 4] : bad ? ['#f6f5f0', '#f1efe8', '#ebe8df', '#f6f5f0', '#e3ddcd'][(k * 7) % 5] : hanse ? ['#a5543c', '#c9a46a', '#b5623f', '#e6dccb', '#8f3f2e', '#d8c39a', '#9c4a36'][(k * 7) % 7] : ['#e8e1d2', '#d9cdb5', '#f1ece2', '#c9b79a', '#b4553f'][(k * 7) % 5]);
       if (bad) { imV.setMatrixAt(nv, m4); imV.setColorAt(nv++, c); } else { imW.setMatrixAt(nw, m4); imW.setColorAt(nw++, c); }
-      sc.set(l * 1.05, Math.min(Hh * 0.38, 6), w * 1.05); p.set(x, h0 - 0.2 + Hh * 0.72, -y); m4.compose(p, q, sc); imR.setMatrixAt(n2, m4);
-      c.set(bad ? ((k * 13) % 9 < 6 ? '#5e6368' : (k * 13) % 9 < 8 ? '#6f6b66' : '#8c3b2a') : hanse ? ((k * 13) % 9 < 7 ? '#a8452e' : '#6e3a2c') : (k * 13) % 9 < 5 ? '#8c3b2a' : (k * 13) % 9 < 7 ? '#5a4a3a' : '#c8b27a'); imR.setColorAt(n2, c); n2++;
+      sc.set(l * (reet ? 1.12 : 1.05), reet ? Math.min(Math.max(l, w) * 0.55, 7) : Math.min(Hh * 0.38, 6), w * (reet ? 1.12 : 1.05)); p.set(x, h0 - 0.2 + Hh * 0.72, -y); m4.compose(p, q, sc); imR.setMatrixAt(n2, m4);
+      c.set(reet ? ((k * 13) % 5 < 3 ? '#7b6a4e' : '#6e5f45') : bad ? ((k * 13) % 9 < 6 ? '#5e6368' : (k * 13) % 9 < 8 ? '#6f6b66' : '#8c3b2a') : hanse ? ((k * 13) % 9 < 7 ? '#a8452e' : '#6e3a2c') : (k * 13) % 9 < 5 ? '#8c3b2a' : (k * 13) % 9 < 7 ? '#5a4a3a' : '#c8b27a'); imR.setColorAt(n2, c); n2++;
     }
     imW.count = nw; imV.count = nv; imR.count = n2; grp.add(imW, imV, imR);
     const lp = revLampen(lamps); if (lp) grp.add(lp);
@@ -998,6 +999,7 @@ function revTick(force) {
     else if (d > RS + 2500 && s) { revDispose(s); X.scen.delete(k); }
   }
   try { revHafenTick(E, N); revTurmGrund(); revWzTick(E, N); } catch (e) { console.error('Hafen', e); }
+  try { revStrTick(E, N); } catch (e) { console.error('Straßen', e); }
 }
 function revRectDist(E, N, x0, y0, size) { const dx = Math.max(x0 - E, 0, E - (x0 + size)), dy = Math.max(y0 - N, 0, N - (y0 + size)); return Math.hypot(dx, dy); }
 
@@ -1328,6 +1330,12 @@ function revHanse(E, N) {
   for (const b of X.hanseOrte) if (Math.hypot(b[0] - E, b[1] - N) < b[2]) return true;
   return false;
 }
+/* Reetdachdörfer: Vitt am Kap Arkona, Hiddensee (Kloster, Vitte, Neuendorf, Grieben), Groß und Klein Zicker */
+function revReet(E, N) {
+  const X = REVX; if (!X.reetOrte) X.reetOrte = (X.idx.places || []).filter(p => /^(Vitt|Vitte|Kloster|Grieben|Groß Zicker|Klein Zicker)$/.test(p[2]) || (p[2] === 'Neuendorf' && p[0] < 15000 && p[1] > 50000)).map(p => [p[0], p[1], p[2] === 'Vitt' ? 380 : 650]);
+  for (const b of X.reetOrte) if (Math.hypot(b[0] - E, b[1] - N) < b[2]) return true;
+  return false;
+}
 /* Seebäder mit weißer Bäderarchitektur */
 function revBad(E, N) {
   const X = REVX; if (!X.badOrte) X.badOrte = (X.idx.places || []).filter(p => /Sassnitz|Binz|Sellin|Göhren|Baabe|Zinnowitz|Lohme|Glowe|Breege|Juliusruh|Thiessow|Lubmin|Zempin|Koserow|Trassenheide|Karlshagen|Vitte|Kloster|Neuendorf/.test(p[2])).map(p => [p[0], p[1], /Sassnitz|Binz/.test(p[2]) ? 2200 : 1300]);
@@ -1413,7 +1421,7 @@ function revWzIdx() {
   return X.wzIdx;
 }
 function revInPoly(P, x, y) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; }
-function revInWz(E, N) { for (const z of revWzIdx()) { const b = z.bb; if (E < b[0] - 3 || E > b[2] + 3 || N < b[1] - 3 || N > b[3] + 3) continue; if (revInPoly(z.P, E, N)) return true; } return false; }
+function revInWz(E, N) { for (const z of revWzIdx()) { if (z.w.art === 'seebruecke' || z.w.art === 'haengebruecke') continue; const b = z.bb; if (E < b[0] - 3 || E > b[2] + 3 || N < b[1] - 3 || N > b[3] + 3) continue; if (revInPoly(z.P, E, N)) return true; } return false; }
 /* Hauptachse (längste Ausdehnung) eines Grundrisses in E/N */
 function revObb(P) {
   let cx = 0, cy = 0; for (const q of P) { cx += q[0]; cy += q[1]; } cx /= P.length; cy /= P.length;
@@ -1467,7 +1475,19 @@ function revWzBuild(z) {
     } else cyl(s, t, ts * 0.7, 0.08, H, y, 8, REV_WZ_FARBE.kupfer, 0.45);
   };
   const westEnde = (() => { const a = ob.c[0] + ob.u[0] * ob.L / 2, b = ob.c[0] - ob.u[0] * ob.L / 2; return a < b ? 1 : -1; })();
-  if (w.art === 'kirche') {
+  if (w.art === 'kirche' && w.achteck) {
+    /* Uferkapelle Vitt: kleiner weißer Achteckbau mit Reetdach */
+    const r = Math.max(4, Math.sqrt(ob.L * ob.B) * 0.55);
+    cyl(0, 0, r, r, 4.5, base, 8, '#f4f2ea', 0.6); cyl(0, 0, r * 1.18, 0.4, 6.5, base + 4.5, 8, '#7b6a4e', 0.2);
+    box(0, 0, 0.25, 0.25, 2.2, base + 10.6, '#2e2a28', 0.3); box(0, 0, 0.25, 1.2, 0.25, base + 11.8, '#2e2a28', 0.3);
+  } else if (w.art === 'burgwall') {
+    /* Burgwall Jaromarsburg: Erdwall im Bogen quer über das Kap, mit Gras bewachsen */
+    const R = w.r || 190, Hh = w.h || 11, v = [], ix = []; const prof = [[-16, 0], [-4, 1], [4, 1], [16, 0]];
+    for (let k = 0; k <= 40; k++) { const a = Math.PI + (k / 40 - 0.5) * 2.6; for (const [o, t] of prof) { const E = w.x + Math.cos(a) * (R + o), N = w.y + Math.sin(a) * (R + o), z = Math.max(0, revZ(E, N)) + 0.2, p = G(E, N); v.push(p[0], z + t * Hh, p[1]); } }
+    for (let k = 0; k < 40; k++) for (let f = 0; f < 3; f++) { const a = k * 4 + f, b = a + 4; ix.push(a, b, a + 1, a + 1, b, b + 1); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); geo.setIndex(ix); geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: '#6c8a46', side: THREE.DoubleSide })); mats.push([m.material, 0.15]); grp.add(m);
+  } else if (w.art === 'kirche') {
     const L = ob.L, B = Math.max(6, ob.B), hw = w.schiff || Math.min(18, Math.max(7, L * 0.28)), turm = w.turm != null ? w.turm : (L > 22 ? 32 : 20);
     extr(hw, REV_WZ_FARBE.ziegel, 0.5); dach(-L / 2, L / 2, B, base + hw, Math.min(B * 0.6, 20), REV_WZ_FARBE.dach);
     if (turm > 0) {
@@ -1506,7 +1526,49 @@ function revWzBuild(z) {
   } else if (w.art === 'glas') {
     extr(Math.max(w.h, 9), REV_WZ_FARBE.glas, 0.95);
   } else if (w.art === 'ozeaneum') {
-    extr(Math.max(w.h, 18), REV_WZ_FARBE.weiss, 0.7);
+    /* Ozeaneum: vier weiße, geschwungene Baukörper („Segel“) über einem gläsernen Sockel */
+    extr(9, '#9fb8c8', 0.9);
+    const L = ob.L, B = Math.max(20, ob.B), parts = [[-0.34, 0.12, 0.30, 0.78, 22], [-0.06, -0.2, 0.26, 0.62, 26], [0.2, 0.15, 0.24, 0.7, 19], [0.4, -0.12, 0.18, 0.55, 24]];
+    for (const [fs, ft, fl, fb, hh] of parts) {
+      const g = new THREE.CylinderGeometry(1, 1, 1, 32, 1, true), m = new THREE.Mesh(g, M('#f1f1ee', 0.75)); const p = at(fs * L, ft * B);
+      m.scale.set(fb * B / 2, hh, fl * L / 2); m.position.set(p[0], base + hh / 2, p[1]); m.rotation.y = ang + (fs * 0.6); grp.add(m);
+      const deckel = new THREE.Mesh(new THREE.CircleGeometry(1, 32), M('#c9cbc8', 0.3)); deckel.rotation.x = -Math.PI / 2; deckel.scale.set(fb * B / 2, fl * L / 2, 1); deckel.position.set(p[0], base + hh, p[1]); deckel.rotation.z = -(ang + fs * 0.6); grp.add(deckel);
+      for (let k = 1; k < 4; k++) { const r = new THREE.Mesh(new THREE.TorusGeometry(1, 0.012, 3, 40), M('#d8d9d6', 0.5)); r.rotation.x = Math.PI / 2; r.scale.set(fb * B / 2 + 0.05, fl * L / 2 + 0.05, 1); r.position.set(p[0], base + hh * k / 4, p[1]); r.rotation.z = -(ang + fs * 0.6); grp.add(r); }
+    }
+  } else if (w.art === 'seebruecke') {
+    /* Seebrücke: Holzdeck auf Pfählen, weißes Geländer, Laternen; in Sellin das Brückenhaus mit Ecktürmchen */
+    const DY = 4.2, holz = M('#b5a184', 0.2), weissM = M('#f2f2ee', 0.5), pfahl = [], rail = [], lp = [];
+    const strecke = (A, B, br) => { const L = Math.hypot(B[0] - A[0], B[1] - A[1]); if (L < 1) return; const ux = (B[0] - A[0]) / L, uy = (B[1] - A[1]) / L, nx = -uy, ny = ux;
+      const pa = G(A[0], A[1]), pb = G(B[0], B[1]), m = new THREE.Mesh(new THREE.BoxGeometry(br, 0.5, L + 0.3), holz); m.position.set((pa[0] + pb[0]) / 2, DY - 0.25, (pa[1] + pb[1]) / 2); m.rotation.y = Math.atan2(pb[0] - pa[0], pb[1] - pa[1]); grp.add(m);
+      for (let d = 0; d <= L; d += 8) for (const sg of [-1, 1]) pfahl.push([A[0] + ux * d + nx * sg * (br / 2 - 0.4), A[1] + uy * d + ny * sg * (br / 2 - 0.4)]);
+      for (const sg of [-1, 1]) rail.push([A[0] + nx * sg * br / 2, A[1] + ny * sg * br / 2, B[0] + nx * sg * br / 2, B[1] + ny * sg * br / 2]);
+      for (let d = 10; d < L; d += 22) lp.push([A[0] + ux * d + nx * (br / 2 - 0.3), A[1] + uy * d + ny * (br / 2 - 0.3)]); };
+    let ends = [];
+    for (const t of w.teile || []) {
+      const Q = []; for (let k = 0; k < t.g.length; k += 2) Q.push([t.g[k], t.g[k + 1]]);
+      if (t.t === 'L') { for (let k = 1; k < Q.length; k++) strecke(Q[k - 1], Q[k], 3.6); ends.push(Q[0], Q[Q.length - 1]); continue; }
+      const o2 = revObb(Q); if (o2.L < 2) continue;
+      if (o2.B < 14) { const A = [o2.c[0] - o2.u[0] * o2.L / 2, o2.c[1] - o2.u[1] * o2.L / 2], B = [o2.c[0] + o2.u[0] * o2.L / 2, o2.c[1] + o2.u[1] * o2.L / 2]; strecke(A, B, Math.max(3, o2.B)); ends.push(A, B); }
+      else { const sh = new THREE.Shape(), c0 = G(o2.c[0], o2.c[1]); Q.forEach((q, i) => { const pp = G(q[0], q[1]); i ? sh.lineTo(pp[0] - c0[0], -(pp[1] - c0[1])) : sh.moveTo(pp[0] - c0[0], -(pp[1] - c0[1])); });
+        const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.5, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); const m = new THREE.Mesh(geo, holz); m.position.set(c0[0], DY - 0.5, c0[1]); grp.add(m);
+        for (let k = 0; k < Q.length; k++) { const A = Q[k], B = Q[(k + 1) % Q.length]; rail.push([A[0], A[1], B[0], B[1]]); for (let d = 0; d < Math.hypot(B[0] - A[0], B[1] - A[1]); d += 8) { const f = d / Math.hypot(B[0] - A[0], B[1] - A[1]); pfahl.push([A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f]); } }
+        ends.push([o2.c[0] - o2.u[0] * o2.L / 2, o2.c[1] - o2.u[1] * o2.L / 2], [o2.c[0] + o2.u[0] * o2.L / 2, o2.c[1] + o2.u[1] * o2.L / 2]); }
+    }
+    if (pfahl.length) { const cy = new THREE.CylinderGeometry(0.22, 0.22, 1, 6); cy.translate(0, 0.5, 0); const im = new THREE.InstancedMesh(cy, M('#5d4c3b', 0.05), pfahl.length), m4 = new THREE.Matrix4();
+      pfahl.forEach((q, i) => { const pp = G(q[0], q[1]); m4.makeScale(1, DY + 2.5, 1).setPosition(pp[0], -2.5, pp[1]); im.setMatrixAt(i, m4); }); im.frustumCulled = false; grp.add(im); }
+    for (const r of rail) { const pa = G(r[0], r[1]), pb = G(r[2], r[3]), L = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]); if (L < 0.5) continue; const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.0, L), weissM); m.position.set((pa[0] + pb[0]) / 2, DY + 0.5, (pa[1] + pb[1]) / 2); m.rotation.y = Math.atan2(pb[0] - pa[0], pb[1] - pa[1]); grp.add(m); }
+    const lpp = revLampen(lp.map(q => { const pp = G(q[0], q[1]); return [pp[0], DY + 4, pp[1]]; }).flat()); if (lpp) grp.add(lpp);
+    if (w.haus && ends.length) {
+      let best = ends[0], bz = 1e9; for (const e of ends) { const z = revZ(e[0], e[1]); if (z < bz) { bz = z; best = e; } }
+      const pc = G(best[0], best[1]), hg = new THREE.Group(); hg.position.set(pc[0], DY, pc[1]);
+      const lk = ends.reduce((a, e) => Math.hypot(e[0] - best[0], e[1] - best[1]) > Math.hypot(a[0] - best[0], a[1] - best[1]) ? e : a, ends[0]), pl = G(lk[0], lk[1]); hg.rotation.y = Math.atan2(pc[0] - pl[0], pc[1] - pl[1]);
+      const bx = (x, y, z, ww, hh, ll, c, k) => { const m = new THREE.Mesh(new THREE.BoxGeometry(ww, hh, ll), M(c, k)); m.position.set(x, y + hh / 2, z); hg.add(m); };
+      bx(0, 0, 0, 24, 6, 16, '#f6f5f1', 0.7); bx(0, 6, 0, 18, 4, 11, '#f6f5f1', 0.7);
+      const dach = new THREE.Mesh(new THREE.ConeGeometry(9.5, 5, 4), M('#4f8a6e', 0.4)); dach.rotation.y = Math.PI / 4; dach.scale.set(1, 1, 0.65); dach.position.set(0, 12.5, 0); hg.add(dach);
+      for (const [x, z] of [[-11, -7], [11, -7], [-11, 7], [11, 7]]) { const t = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 9, 10), M('#f6f5f1', 0.7)); t.position.set(x, 4.5, z); hg.add(t); const k2 = new THREE.Mesh(new THREE.ConeGeometry(2.0, 4, 10), M('#4f8a6e', 0.4)); k2.position.set(x, 11, z); hg.add(k2); }
+      for (const z of [-8.05, 8.05]) { const f = new THREE.Mesh(new THREE.PlaneGeometry(20, 2.2), new THREE.MeshBasicMaterial({ color: '#2a3a46', side: THREE.DoubleSide })); f.position.set(0, 3.2, z); hg.add(f); }
+      grp.add(hg);
+    }
   } else if (w.art === 'haengebruecke') {
     /* Hängebrücke Sassnitz: gekrümmter Steg (243 m) um einen schlanken Mast, vom Hang hinunter zum Stadthafen */
     const MH = w.mast || 38, CH_ = 190, R = 102; let th = 0, bz = -1e9;
@@ -1562,7 +1624,9 @@ function revWzBuild(z) {
       for (const sgn of [1, -1]) { const c = new THREE.Mesh(new THREE.ConeGeometry(B * 0.32, L * 0.1, 16), M(REV_WZ_FARBE.stahl, 0.15)); c.rotation.z = -sgn * Math.PI / 2; c.position.x = sgn * L * 0.45; hg.add(c); }
       const p = at(0, 0); hg.position.set(p[0], 0.4, p[1]); hg.rotation.y = ang - Math.PI / 2; grp.add(hg);
       box(bug * L * 0.12, 0, L * 0.12, B * 0.25, 4.5, 0.4 + B * 0.3, REV_WZ_FARBE.stahl, 0.15);
-    } else if (w.art === 'bark') {
+    } else if (w.art === 'bark' && X.schiffe && X.schiffe.some(sc => sc.wz === w.n)) {
+    /* wird als fahrendes Schiff mit dem Werftkoje-Modell gezeigt */
+  } else if (w.art === 'bark') {
       huelle('#f2f1ec', 4.5, 0.25); box(0, 0, L * 0.85, B * 0.9, 0.3, 4.4, '#a07a52', 0.2);
       const ms = w.masten || [36, 40, 32], pos = [0.3, 0.02, -0.28];
       const lp = [], sc = (s, t, y) => { const q = at(s, t); lp.push(q[0], y, q[1]); };
@@ -1780,6 +1844,7 @@ function revBrueckenBuild() {
       if (rund.length) { const im = new THREE.InstancedMesh(cy, M('#e9e8e3', 0.35), rund.length); rund.forEach((q, i) => { const p = sc(q[0], q[1]); sv.set(q[2], q[4] - q[3], q[2]); pv.set(p[0], q[3], p[1]); qq.identity(); m4.compose(pv, qq, sv); im.setMatrixAt(i, m4); }); im.frustumCulled = false; grp.add(im); }
       if (eckig.length) { const im = new THREE.InstancedMesh(bx, M('#9a958b', 0.2), eckig.length); eckig.forEach((q, i) => { const p = sc(q[0], q[1]), p2 = sc(q[0] + q[5][0], q[1] + q[5][1]); qq.setFromAxisAngle(up, Math.atan2(p2[0] - p[0], p2[1] - p[1])); sv.set(q[6] || 11, q[4] - q[3], 3); pv.set(p[0], q[3], p[1]); m4.compose(pv, qq, sv); im.setMatrixAt(i, m4); }); im.frustumCulled = false; grp.add(im); }
     }
+    if (!X.brSkip) X.brSkip = new Set(); for (const q of P) for (let a = -1; a <= 1; a++) for (let c2 = -1; c2 <= 1; c2++) X.brSkip.add((Math.floor(q[0] / 16) + a) + ',' + (Math.floor(q[1] / 16) + c2));
     X.strassen.push({ name: b.n, P, s, dir, h: hArr, L: s[n - 1], vmax, spur, klappen: X.klappen.filter(k => k.strasse === X.strassen.length) });
   }
   if (markV.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(markV, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(markC, 3)); g.computeVertexNormals(); const m = new THREE.MeshBasicMaterial({ vertexColors: true }); grp.add(new THREE.Mesh(g, m)); }
@@ -1891,6 +1956,501 @@ function revBrueckenTick() {
       if (!K.msg || now - K.msg > 180000) { K.msg = now; const z = K.zeit || {}; msg(K.name + ' geschlossen – nächste Öffnung ' + z.naechste + ' Uhr für ' + (z.dauer || 20) + ' Minuten (in ' + Math.round(z.bis) + ' min). In den Einstellungen kannst du die Klappbrücken „immer offen“ stellen.', 'warn'); }
     }
   } catch (e) {}
+}
+
+/* ---------- Straßennetz: Autobahn, Bundes-, Landes-, Kreis- und Ortsstraßen aus OpenStreetMap ----------
+   In 2-km-Zellen rund ums Boot gebaut, liegt auf dem Gelände, mit Markierung und Laternen in Orten. */
+var REV_STR = {               /* Breite, Farbe, Markierung (0 keine, 1 Mitte, 2 Mitte+Rand) */
+  motorway: [22, '#4a4d51', 2], trunk: [12, '#4c4f53', 2], primary: [9, '#505357', 2], secondary: [7.5, '#55585c', 1],
+  tertiary: [6.5, '#5a5c60', 1], unclassified: [5, '#606265', 0], residential: [5.5, '#5d5f62', 0]
+};
+function revStrLoad() {
+  const X = REVX; X.netz = null; X.netzG = new Map();
+  if (!X.idx.strassen) return;
+  revFetch(X.base, X.idx.strassen).then(revInflate).then(buf => {
+    const j = JSON.parse(new TextDecoder().decode(buf)), C = 2000, cells = new Map();
+    j.wege.forEach((w, wi) => { const seen = new Set(); for (let k = 1; k < w.length - 1; k += 2) { const key = Math.floor(w[k] / C) + ',' + Math.floor(w[k + 1] / C); if (!seen.has(key)) { seen.add(key); (cells.get(key) || cells.set(key, []).get(key)).push(wi); } } });
+    const gcells = new Map(); (j.gleise || []).forEach((w, wi) => { const seen = new Set(); for (let k = 0; k < w.length - 1; k += 2) { const key = Math.floor(w[k] / C) + ',' + Math.floor(w[k + 1] / C); if (!seen.has(key)) { seen.add(key); (gcells.get(key) || gcells.set(key, []).get(key)).push(wi); } } });
+    X.netz = { kl: j.klassen, wege: j.wege, cells, C, gleise: j.gleise || [], gcells };
+    for (const k of gcells.keys()) if (!cells.has(k)) cells.set(k, []);
+  }).catch(e => console.warn('Straßennetz', e));
+}
+function revStrZelle(ci, cj) {
+  const X = REVX, N_ = X.netz, F = SHORE.fwd, C = N_.C, x0 = ci * C, y0 = cj * C, x1 = x0 + C, y1 = y0 + C, grp = new THREE.Group();
+  const v = [], col = [], ix = [], mv = [], sv = [], lampen = [], masten = [], tmp = new THREE.Color();
+  const skip = X.brSkip || new Set();
+  const sc = (E, N) => { const q = F(E, N); return [q[0], -q[1]]; };
+  for (const wi of N_.cells.get(ci + ',' + cj) || []) {
+    const w = N_.wege[wi], kl = N_.kl[w[0]], D = REV_STR[kl]; if (!D) continue;
+    const hw = D[0] / 2; tmp.set(D[1]);
+    /* abtasten (alle 10 m), nur was in dieser Zelle liegt (mit 10 m Überlapp gegen Lücken) */
+    const P = [];
+    for (let k = 1; k < w.length - 3; k += 2) {
+      const ax = w[k], ay = w[k + 1], bx = w[k + 2], by = w[k + 3], L = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(L / 10));
+      for (let s = (k === 1 ? 0 : 1); s <= n; s++) P.push([ax + (bx - ax) * s / n, ay + (by - ay) * s / n]);
+    }
+    const drin = q => q[0] >= x0 - 10 && q[0] < x1 + 10 && q[1] >= y0 - 10 && q[1] < y1 + 10 && !skip.has(Math.floor(q[0] / 16) + ',' + Math.floor(q[1] / 16));
+    let run = [];
+    const flush = () => {
+      if (run.length >= 2) {
+        const base = v.length / 3, hs = [];
+        run.forEach((q, i) => {
+          const a = run[Math.max(0, i - 1)], b = run[Math.min(run.length - 1, i + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / l, ny = (b[0] - a[0]) / l;
+          let z = revZ(q[0], q[1]); const h = z < 0.2 ? 1.8 : z + 0.42; hs.push(h);
+          for (const [o, dy] of [[-hw - 0.6, -1.4], [-hw, 0], [hw, 0], [hw + 0.6, -1.4]]) { const p = sc(q[0] + nx * o, q[1] + ny * o); v.push(p[0], h + dy, p[1]); col.push(tmp.r, tmp.g, tmp.b); }
+          q.nx = nx; q.ny = ny;
+        });
+        for (let i = 0; i < run.length - 1; i++) { const a = base + i * 4, b = a + 4; for (let f = 0; f < 3; f++) ix.push(a + f, b + f, a + f + 1, a + f + 1, b + f, b + f + 1); }
+        /* Markierung */
+        const quad = (i, o, br) => { const A = run[i], B = run[i + 1], h0 = hs[i] + 0.04, h1 = hs[i + 1] + 0.04;
+          const p1 = sc(A[0] + A.nx * (o - br), A[1] + A.ny * (o - br)), p2 = sc(A[0] + A.nx * (o + br), A[1] + A.ny * (o + br)), p3 = sc(B[0] + B.nx * (o - br), B[1] + B.ny * (o - br)), p4 = sc(B[0] + B.nx * (o + br), B[1] + B.ny * (o + br));
+          mv.push(p1[0], h0, p1[1], p3[0], h1, p3[1], p2[0], h0, p2[1], p2[0], h0, p2[1], p3[0], h1, p3[1], p4[0], h1, p4[1]); };
+        for (let i = 0; i < run.length - 1; i++) {
+          if (D[2] >= 1 && i % 2 === 0) quad(i, 0, 0.07);
+          if (D[2] >= 2) { quad(i, hw - 0.45, 0.08); quad(i, -(hw - 0.45), 0.08); }
+        }
+        /* Laternen in Orten */
+        for (let i = 0; i < run.length; i += 4) {
+          const q = run[i], ort = revHanse(q[0], q[1]) || revBad(q[0], q[1]) || revCellLu(Math.floor(q[0] / X.cs), Math.floor((X.H - q[1]) / X.cs)) === 2;
+          if (!ort && kl !== 'motorway') continue; if (kl === 'unclassified' && !ort) continue;
+          const sd = (i / 4) % 2 ? 1 : -1, p = sc(q[0] + q.nx * sd * (hw + 1), q[1] + q.ny * sd * (hw + 1)); lampen.push(p[0], hs[i] + 6.5, p[1]); masten.push([p[0], hs[i] - 0.4, p[1], 6.9]);
+        }
+      }
+      run = [];
+    };
+    for (const q of P) { if (drin(q)) run.push(q); else flush(); }
+    flush();
+  }
+  const schotter = new THREE.Color('#6d665c');
+  for (const gi of N_.gcells.get(ci + ',' + cj) || []) {
+    const w = N_.gleise[gi], P = [];
+    for (let k = 0; k < w.length - 3; k += 2) { const ax = w[k], ay = w[k + 1], bx = w[k + 2], by = w[k + 3], L = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(L / 10)); for (let s2 = (k === 0 ? 0 : 1); s2 <= n; s2++) P.push([ax + (bx - ax) * s2 / n, ay + (by - ay) * s2 / n]); }
+    let run = [];
+    const flush = () => {
+      if (run.length >= 2) {
+        const base = v.length / 3, hs = [];
+        run.forEach((q, i) => { const a = run[Math.max(0, i - 1)], b = run[Math.min(run.length - 1, i + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; q.nx = -(b[1] - a[1]) / l; q.ny = (b[0] - a[0]) / l;
+          const z = revZ(q[0], q[1]), h = z < 0.2 ? 1.8 : z + 0.5; hs.push(h);
+          for (const [o, dy] of [[-2.6, -1.2], [-1.7, 0], [1.7, 0], [2.6, -1.2]]) { const p = sc(q[0] + q.nx * o, q[1] + q.ny * o); v.push(p[0], h + dy, p[1]); col.push(schotter.r, schotter.g, schotter.b); } });
+        for (let i = 0; i < run.length - 1; i++) { const a = base + i * 4, b = a + 4; for (let f = 0; f < 3; f++) ix.push(a + f, b + f, a + f + 1, a + f + 1, b + f, b + f + 1); }
+        for (let i = 0; i < run.length - 1; i++) for (const o of [-0.72, 0.72]) { const A = run[i], B = run[i + 1], h0 = hs[i] + 0.16, h1 = hs[i + 1] + 0.16;
+          const p1 = sc(A[0] + A.nx * (o - 0.05), A[1] + A.ny * (o - 0.05)), p2 = sc(A[0] + A.nx * (o + 0.05), A[1] + A.ny * (o + 0.05)), p3 = sc(B[0] + B.nx * (o - 0.05), B[1] + B.ny * (o - 0.05)), p4 = sc(B[0] + B.nx * (o + 0.05), B[1] + B.ny * (o + 0.05));
+          sv.push(p1[0], h0, p1[1], p3[0], h1, p3[1], p2[0], h0, p2[1], p2[0], h0, p2[1], p3[0], h1, p3[1], p4[0], h1, p4[1]); }
+      }
+      run = [];
+    };
+    for (const q of P) { if (q[0] >= x0 - 10 && q[0] < x1 + 10 && q[1] >= y0 - 10 && q[1] < y1 + 10 && !skip.has(Math.floor(q[0] / 16) + ',' + Math.floor(q[1] / 16))) run.push(q); else flush(); }
+    flush();
+  }
+  if (sv.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3)); g.computeVertexNormals(); grp.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: '#4a4440' }))); }
+  if (v.length) {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(ix); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, revStrMat()); m.receiveShadow = false; grp.add(m);
+  }
+  if (mv.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(mv, 3)); grp.add(new THREE.Mesh(g, revStrMark())); }
+  const lp = revLampen(lampen); if (lp) grp.add(lp);
+  if (masten.length) {
+    const cy = new THREE.CylinderGeometry(0.08, 0.12, 1, 5); cy.translate(0, 0.5, 0); const im = new THREE.InstancedMesh(cy, revStrMast(), masten.length), m4 = new THREE.Matrix4();
+    masten.forEach((q, i) => { m4.makeScale(1, q[3], 1).setPosition(q[0], q[1], q[2]); im.setMatrixAt(i, m4); }); im.frustumCulled = false; grp.add(im);
+  }
+  grp.traverse(o => { o.userData.sznSkip = 1; });
+  shoreG.add(grp);
+  return grp;
+}
+var REV_STRMAT = null, REV_STRMARK = null, REV_STRMAST = null;
+function revStrMat() { return REV_STRMAT || (REV_STRMAT = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); }
+function revStrMark() { return REV_STRMARK || (REV_STRMARK = new THREE.MeshBasicMaterial({ color: '#d9d9d3', polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })); }
+function revStrMast() { return REV_STRMAST || (REV_STRMAST = new THREE.MeshLambertMaterial({ color: '#8d9196' })); }
+function revStrTick(E, N) {
+  const X = REVX; if (!X.netz) return; const C = X.netz.C, ci0 = Math.floor(E / C), cj0 = Math.floor(N / C); let bud = 1;
+  for (const [k, g] of X.netzG) { const [ci, cj] = k.split(',').map(Number); if (revRectDist(E, N, ci * C, cj * C, C) > 6000) { revStrWeg(g); X.netzG.delete(k); } }
+  const cand = [];
+  for (let dj = -3; dj <= 3; dj++) for (let di = -3; di <= 3; di++) {
+    const ci = ci0 + di, cj = cj0 + dj, k = ci + ',' + cj; if (X.netzG.has(k) || !X.netz.cells.has(k)) continue;
+    const d = revRectDist(E, N, ci * C, cj * C, C); if (d > 4200) continue;
+    const tk = Math.floor((ci + 0.5) * C / X.cs / X.T) + ',' + Math.floor((X.H - (cj + 0.5) * C) / X.cs / X.T), tt = X.tiles.get(tk);
+    if (X.meta.has(tk) && !(tt && tt.st === 'da')) continue;
+    cand.push([d, ci, cj, k]);
+  }
+  cand.sort((a, b) => a[0] - b[0]);
+  for (const c of cand) { if (bud-- <= 0) break; X.netzG.set(c[3], revStrZelle(c[1], c[2])); }
+}
+function revStrWeg(g) { shoreG.remove(g); g.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+
+/* ---------- Gorch Fock (Modell aus der Werftkoje) – liegt in Stralsund, segelt bis vor Hiddensee und zurück ----------
+   Modell: gorchfock.bin (aus dem GLB-Export der Werftkoje: Meter, Y oben, Bug in −Z, Wasserlinie Y = 0).
+   Sie meidet Regattabahnen sowie Start und Ziel; während einer Regatta wartet sie, solange Start oder Ziel vor ihr liegt. */
+var REV_GF = { modell: null, laden: null };
+function revGfLaden() {
+  if (REV_GF.modell || REV_GF.laden) return REV_GF.laden;
+  REV_GF.laden = fetch('gorchfock.bin').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); }).then(revInflate).then(buf => {
+    const dv = new DataView(buf), hl = dv.getUint32(4, true), kopf = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 8, hl)));
+    let o = 8 + hl; const teile = [];
+    for (const g of kopf.gruppen) {
+      const pos = new Float32Array(buf.slice(o, o + g.nv * 12)); o += g.nv * 12;
+      const nor = new Int8Array(buf.slice(o, o + g.nv * 3)); o += g.nv * 3;
+      const ib = g.i32 ? 4 : 2, idx = g.i32 ? new Uint32Array(buf.slice(o, o + g.ni * 4)) : new Uint16Array(buf.slice(o, o + g.ni * 2)); o += g.ni * ib;
+      o += (4 - ((g.nv * 3 + g.ni * ib) % 4)) % 4;
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3, true)); geo.setIndex(new THREE.BufferAttribute(idx, 1)); geo.computeBoundingSphere();
+      teile.push({ geo, segel: g.segel, farbe: g.farbe });
+    }
+    REV_GF.modell = teile; return teile;
+  }).catch(e => { console.warn('Gorch Fock Modell', e); REV_GF.laden = null; return null; });
+  return REV_GF.laden;
+}
+function revGfGruppe() {
+  const g = new THREE.Group(), rumpf = new THREE.Group(), segel = new THREE.Group(); g.add(rumpf, segel);
+  for (const t of REV_GF.modell) {
+    const c = new THREE.Color(t.farbe[0], t.farbe[1], t.farbe[2]);
+    const m = new THREE.MeshLambertMaterial({ color: c, side: THREE.DoubleSide, transparent: t.farbe[3] < 1, opacity: t.farbe[3] });
+    (t.segel ? segel : rumpf).add(new THREE.Mesh(t.geo, m));
+  }
+  /* Positionslaternen: rot Backbord, grün Steuerbord, weiß Topp und Heck */
+  const lp = [-6.2, 7.5, -8, 6.2, 7.5, -8, 0, 47, -20, 0, 8, 38], lc = [1, 0.1, 0.05, 0.1, 1, 0.25, 1, 0.95, 0.85, 1, 0.95, 0.85];
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)); lg.setAttribute('col', new THREE.Float32BufferAttribute(lc, 3));
+  const pts = new THREE.Points(lg, revCarLightMat()); pts.frustumCulled = false; g.add(pts);
+  g.traverse(o => { o.userData.sznSkip = 1; });
+  g.userData.segel = segel; return g;
+}
+/* Gorch Fock als segelbares Schiff: der Wikinger-Rumpf (für Physik und Mannschaft) bleibt unsichtbar, gezeigt wird das Werftkoje-Modell */
+function gfBoatApply(b, g) {
+  const versteck = new THREE.Group(); versteck.visible = false;
+  for (const c of g.children.slice()) if (!c.isSprite) { g.remove(c); versteck.add(c); }
+  g.add(versteck);
+  const dazu = () => { if (!REV_GF.modell || g.userData.gf) return; const m = revGfGruppe(); g.add(m); g.userData.gf = m; };
+  if (REV_GF.modell) dazu(); else { const pr = revGfLaden(); if (pr) pr.then(dazu); }
+}
+function gfKlasseWechsel() {
+  if (S.boatClass === 'gorchfock') {
+    if (S.legLength < 1500) { S._legAlt = S.legLength; S.legLength = 2400; }
+    if (S.cpuCount > 9) S.cpuCount = 9;
+    if (S.revier === 'ruegen' && REVX && REVX.idx && REVX.idx.courses) { const k = revK(S.revKurs || 'bb'); if (!k || !k.gross) { const g = Object.keys(REVX.idx.courses).find(c => REVX.idx.courses[c].gross); if (g) S.revKurs = g; } }
+  } else if (S.legLength > 1000) S.legLength = S._legAlt || 600;
+  try { saveS(); buildForm(); } catch (e) {}
+}
+/* Schiffsmodelle nach den echten Schiffen (Maße der Reedereien), Bug in −Z, Wasserlinie y = 0
+   faehre  = MS „Insel Hiddensee“ (FRS Reederei Hiddensee, 1995, 40,25 × 7,58 m, 400 Fahrgäste)
+   ausflug = MS „Binz“ (Adler-Schiffe, 1967 als „Stadt Flensburg“, 39,60 × 7,50 m) – klassische Linien
+   baeder  = MS „Adler-Mönchgut“ (Adler-Schiffe, 1981, 32,90 × 7,60 m, Heimathafen Binz)
+   kutter  = Sassnitzer Fischkutter (Stahlkutter um 20 m mit Galgen und Netztrommel) */
+function revTexFenster(n, hell) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 32; const x = c.getContext('2d');
+  x.fillStyle = hell || '#f4f4f1'; x.fillRect(0, 0, 256, 32);
+  for (let i = 0; i < 8; i++) { x.fillStyle = '#22313c'; x.fillRect(i * 32 + 4, 6, 24, 20); x.fillStyle = 'rgba(160,200,220,0.25)'; x.fillRect(i * 32 + 5, 7, 10, 8); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.repeat.set(n / 8, 1); return t;
+}
+function revTexName(txt, farbe, bg) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 64; const x = c.getContext('2d');
+  if (bg) { x.fillStyle = bg; x.fillRect(0, 0, 512, 64); } x.fillStyle = farbe; x.font = 'bold 44px Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, 256, 34);
+  return new THREE.CanvasTexture(c);
+}
+function revSchiffModell(typ, farbe, name) {
+  const g = new THREE.Group(), M = (c, o) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, o || {}));
+  const D = { faehre: [40.25, 7.58, 2.4, '#1c3f78'], ausflug: [39.6, 7.5, 2.3, '#1e3d73'], baeder: [32.9, 7.6, 2.2, '#1e3d73'], kutter: [20.5, 6.4, 2.0, '#1d3557'] }[typ] || [30, 7, 2, farbe];
+  const [L, B, fb] = D, blau = farbe || D[3], hb = B / 2, Lh = L / 2, weiss = '#f5f5f2';
+  /* Rumpf mit Deckssprung und ausfallendem Steven */
+  const sh = new THREE.Shape(); sh.moveTo(-hb * 0.82, Lh); sh.lineTo(-hb, Lh * 0.2); sh.lineTo(-hb * 0.98, -Lh * 0.35); sh.quadraticCurveTo(-hb * 0.75, -Lh * 0.9, 0, -Lh); sh.quadraticCurveTo(hb * 0.75, -Lh * 0.9, hb * 0.98, -Lh * 0.35); sh.lineTo(hb, Lh * 0.2); sh.lineTo(hb * 0.82, Lh); sh.closePath();
+  const schicht = (y0, h, c, sc) => { const geo = new THREE.ExtrudeGeometry(sh, { depth: h, bevelEnabled: false }); geo.rotateX(Math.PI / 2); geo.translate(0, y0 + h, 0); if (sc) geo.scale(sc, 1, sc); const m = new THREE.Mesh(geo, M(c)); g.add(m); return m; };
+  const box = (x, y, z, w, h, l, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), mat.isMaterial ? mat : M(mat)); m.position.set(x, y + h / 2, z); g.add(m); return m; };
+  const fensterBand = (y, z, w, h, l, n, hell) => { const tex = revTexFenster(n, hell), m = M('#ffffff', { map: tex }); const side = new THREE.Mesh(new THREE.BoxGeometry(w + 0.03, h, l), [m, m, M(hell || weiss), M(hell || weiss), M('#22313c'), M(hell || weiss)]); side.position.set(0, y + h / 2, z); g.add(side); };
+  const reling = (y, z0, z1, w) => { for (const sd of [-1, 1]) box(sd * w / 2, y + 0.95, (z0 + z1) / 2, 0.05, 0.06, Math.abs(z1 - z0), weiss); for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z += 1.5) for (const sd of [-1, 1]) box(sd * w / 2, y, z, 0.04, 1.0, 0.04, weiss); };
+  const nameTafel = (txt, y, z, farbeT) => { const t = revTexName(txt, farbeT); for (const sd of [-1, 1]) { const pl = new THREE.Mesh(new THREE.PlaneGeometry(6, 0.75), new THREE.MeshBasicMaterial({ map: t, transparent: true })); pl.position.set(sd * (hb * 0.99 + 0.02), y, z); pl.rotation.y = sd * Math.PI / 2 * (sd > 0 ? 1 : 1) + (sd > 0 ? 0 : Math.PI); pl.rotation.y = sd > 0 ? Math.PI / 2 : -Math.PI / 2; g.add(pl); } };
+  const ring = (x, y, z) => { const r = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.09, 6, 14), M('#ff6a13')); r.position.set(x, y, z); r.rotation.y = Math.PI / 2; g.add(r); };
+  if (typ === 'kutter') {
+    schicht(-1.7, 1.7, '#8c2a1e'); schicht(0, 0.35, '#f2f2ee'); schicht(0.35, fb - 0.35, blau);
+    box(0, fb - 0.05, 0, B * 0.86, 0.12, L * 0.9, '#6f6555');
+    box(0, fb, -L * 0.18, 3.6, 2.4, 4.6, weiss); fensterBand(fb + 1.3, -L * 0.18 - 0.5, 3.62, 0.9, 3.4, 3); box(0, fb + 2.4, -L * 0.18, 3.9, 0.25, 5.0, '#c0392b');
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.17, 10, 6), M('#e8e6e0')); mast.position.set(0, fb + 5, -L * 0.36); g.add(mast);
+    const baum = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 7, 6), M('#e8e6e0')); baum.rotation.x = 1.1; baum.position.set(0, fb + 3.5, -L * 0.22); g.add(baum);
+    const gal = new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.13, 4, 12, Math.PI), M('#d63a2a')); gal.position.set(0, fb, L * 0.38); g.add(gal);
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 3.2, 14), M('#2e7d4f')); tr.rotation.z = Math.PI / 2; tr.position.set(0, fb + 1.2, L * 0.22); g.add(tr);
+    nameTafel('SAS 12', fb - 0.55, -L * 0.36, '#ffffff'); ring(hb + 0.05, fb + 1.2, -L * 0.18);
+  } else {
+    const gross = typ === 'faehre';
+    schicht(-1.9, 1.9, '#2b2b2b'); schicht(0, 0.9, blau); schicht(0.9, fb - 0.9, weiss); box(0, fb - 0.55, 0, B + 0.04, 0.22, L * 0.86, blau);
+    /* Hauptdeck-Salon mit Fensterreihe */
+    const d1 = L * (gross ? 0.7 : 0.62), z1 = L * 0.03;
+    box(0, fb, z1, B * 0.94, 2.4, d1, weiss); fensterBand(fb + 0.7, z1, B * 0.94, 1.1, d1 * 0.94, Math.round(d1 / 1.4));
+    /* Oberdeck */
+    const d2 = L * (gross ? 0.5 : 0.36), z2 = gross ? L * 0.0 : -L * 0.06;
+    box(0, fb + 2.4, z2, B * (gross ? 0.92 : 0.82), 2.3, d2, weiss); fensterBand(fb + 3.0, z2, B * (gross ? 0.92 : 0.82), 1.0, d2 * 0.92, Math.round(d2 / 1.4));
+    reling(fb + 2.4, z1 + d1 / 2 - 0.5, z2 + d2 / 2 + 0.5, B * 0.92); reling(fb + 4.7, z2 - d2 / 2, z2 + d2 / 2, B * (gross ? 0.92 : 0.82));
+    /* Steuerhaus vorn auf dem Oberdeck, breite Scheiben */
+    const zs = z2 - d2 / 2 + 2.2; box(0, fb + 4.7, zs, B * 0.55, 2.1, 3.6, weiss); fensterBand(fb + 5.35, zs, B * 0.55, 0.95, 3.62, 3); box(0, fb + 6.8, zs, B * 0.6, 0.18, 4.0, weiss);
+    /* Mast mit Radar, Schornstein */
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 5.5, 6), M('#e8e6e0')); mast.position.set(0, fb + 9.7, zs + 0.5); g.add(mast);
+    box(0, fb + 8.6, zs + 0.5, 2.2, 0.12, 0.3, '#2b2b2b');
+    const sch = new THREE.Mesh(new THREE.CylinderGeometry(gross ? 0.8 : 1.0, gross ? 1.0 : 1.15, gross ? 2.4 : 3.2, 14), M(blau)); sch.scale.set(gross ? 1 : 0.8, 1, gross ? 1.4 : 1.3); sch.position.set(0, fb + 4.7 + (gross ? 1.2 : 1.6), z2 + d2 / 2 - (gross ? 2.5 : 3)); g.add(sch);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(gross ? 0.82 : 1.02, gross ? 0.86 : 1.07, 0.45, 14), M(weiss)); band.scale.copy(sch.scale); band.position.copy(sch.position); band.position.y += 0.3; g.add(band);
+    /* Rettungsringe und Rettungsinseln */
+    for (const sd of [-1, 1]) { ring(sd * (B * 0.47 + 0.05), fb + 1.3, -L * 0.2); ring(sd * (B * 0.47 + 0.05), fb + 1.3, L * 0.2); const ri = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.3, 10), M('#f2f2ee')); ri.rotation.x = Math.PI / 2; ri.position.set(sd * B * 0.35, fb + 5.0, z2 + 1); g.add(ri); }
+    nameTafel(name || (gross ? 'INSEL HIDDENSEE' : typ === 'baeder' ? 'ADLER-MÖNCHGUT' : 'BINZ'), fb - 0.2, -L * 0.33, blau);
+    /* Flagge am Heck */
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.75), new THREE.MeshBasicMaterial({ map: revTexName('', '#000', null), color: '#ffffff', side: THREE.DoubleSide })); fl.visible = false; g.add(fl);
+  }
+  const lp = [-hb, fb + 3, -L * 0.1, hb, fb + 3, -L * 0.1, 0, fb + (typ === 'kutter' ? 10 : 12.4), -L * 0.12, 0, fb + 1.5, Lh], lc = [1, 0.1, 0.05, 0.1, 1, 0.25, 1, 0.95, 0.85, 1, 0.95, 0.85];
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)); lg.setAttribute('col', new THREE.Float32BufferAttribute(lc, 3));
+  const pts = new THREE.Points(lg, revCarLightMat()); pts.frustumCulled = false; g.add(pts);
+  g.traverse(o => { o.userData.sznSkip = 1; }); g.userData.segel = null; g.userData.LB = [L / 2, B / 2]; return g;
+}
+function revSchiffeInit() {
+  const X = REVX; X.schiffe = [];
+  for (const sd of X.idx.schiffe || []) {
+    if (!sd.route || sd.route.length < 2) continue;
+    const wzE = sd.wz ? (X.idx.wahrzeichen || []).find(w => w.n === sd.wz) : null;
+    if (!wzE) {
+      const r0 = sd.route[0], r1 = sd.route[1], h0 = Math.atan2(r1[0] - r0[0], r1[1] - r0[1]), weg = sd.route.slice(), s = [0];
+      for (let i = 1; i < weg.length; i++) s.push(s[i - 1] + Math.hypot(weg[i][0] - weg[i - 1][0], weg[i][1] - weg[i - 1][1]));
+      const now = performance.now() / 1000;
+      X.schiffe.push({ sd, wz: null, typ: sd.typ || 'ausflug', liege: { E: r0[0], N: r0[1], h: h0 }, weg, s, L: s[s.length - 1], v: (sd.kn || 9) * 0.5144,
+        zustand: 'liegt', t0: now - Math.random() * 100, sPos: 0, rueck: false, E: r0[0], N: r0[1], h: h0, grp: null, segelAuf: 0, krg: 0, erst: true });
+      continue;
+    }
+    /* Liegeplatz-Lage aus dem Grundriss: Mitte, Achse, Bug ans schmalere Ende */
+    const P = []; for (let k = 0; k < wzE.g.length; k += 2) P.push([wzE.g[k], wzE.g[k + 1]]);
+    const ob = revObb(P); let n0 = 0, n1 = 0;
+    for (const q of P) { const sv = (q[0] - ob.c[0]) * ob.u[0] + (q[1] - ob.c[1]) * ob.u[1], tv = Math.abs((q[0] - ob.c[0]) * ob.v[0] + (q[1] - ob.c[1]) * ob.v[1]); if (sv > ob.L * 0.3) n0 = Math.max(n0, tv); if (sv < -ob.L * 0.3) n1 = Math.max(n1, tv); }
+    const bug = n0 <= n1 ? 1 : -1, hdg = Math.atan2(ob.u[0] * bug, ob.u[1] * bug);   /* Kurs rechtweisend im E/N-System */
+    /* Fahrweg: Liegeplatz → Ablegepunkt → Route → Wendepunkt (und zurück) */
+    const weg = [[ob.c[0], ob.c[1]], ...sd.route];
+    const s = [0]; for (let i = 1; i < weg.length; i++) s.push(s[i - 1] + Math.hypot(weg[i][0] - weg[i - 1][0], weg[i][1] - weg[i - 1][1]));
+    X.schiffe.push({ sd, wz: wzE.n, liege: { E: ob.c[0], N: ob.c[1], h: hdg }, weg, s, L: s[s.length - 1], v: (sd.kn || 7) * 0.5144,
+      zustand: 'liegt', t0: performance.now() / 1000, sPos: 0, rueck: false, E: ob.c[0], N: ob.c[1], h: hdg, grp: null, segelAuf: 0, krg: 0 });
+  }
+}
+function revSchiffePos(sch, sv) {
+  const w = sch.weg, s = sch.s; let i = 0; while (i < w.length - 2 && s[i + 1] < sv) i++;
+  const f = Math.max(0, Math.min(1, (sv - s[i]) / ((s[i + 1] - s[i]) || 1))); return [w[i][0] + (w[i + 1][0] - w[i][0]) * f, w[i][1] + (w[i + 1][1] - w[i][1]) * f];
+}
+/* Wartet sie wegen einer laufenden Regatta? (Start bis 3 min nach dem Startschuss, Ziel immer) */
+function revSchiffWartet(E, N) {
+  try {
+    if (!G || G.free || !G.running || G.over || !C || SHORE.kind !== 'revier') return false;
+    const q = SHORE.fwd(E, N), z = [];
+    if (C.pin && C.cb && (G.t || 0) < 180) z.push([(C.pin.x + C.cb.x) / 2, (C.pin.y + C.cb.y) / 2]);
+    if (C.fin && C.fin.c) z.push([C.fin.c.x, C.fin.c.y]);
+    for (const p of z) if (Math.hypot(p[0] - q[0], p[1] - q[1]) < 900) return true;
+  } catch (e) {}
+  return false;
+}
+function revSchiffeTick(E0, N0) {
+  const X = REVX; if (!X || !X.schiffe || !X.schiffe.length) return;
+  if (!REV_GF.modell && X.schiffe.some(sc => !sc.typ || sc.typ === 'gorchfock')) { revGfLaden(); if (!REV_GF.modell) return; }
+  const now = performance.now() / 1000, F = SHORE.fwd, wf = (Number(S.windFrom) || 0) * DEG;
+  for (const sch of X.schiffe) {
+    if (!sch.grp) { sch.grp = sch.typ && sch.typ !== 'gorchfock' ? revSchiffModell(sch.typ, sch.sd.farbe, sch.sd.schiff) : revGfGruppe(); shoreG.add(sch.grp); const lb = sch.grp.userData.LB || [36, 5.8]; sch.hl = lb[0]; sch.hb = lb[1]; }
+    const dt = Math.min(0.2, now - (sch.tl || now)); sch.tl = now;
+    const fahrt = sch.typ && sch.typ !== 'gorchfock' ? S.schiffsverkehr !== 'aus' : S.gorchfock !== 'liegt';
+    /* Ablauf: liegt 3 min → fährt hinaus → wendet vor Hiddensee (4 min) → kehrt zurück → liegt 8 min → … */
+    if (!fahrt) { sch.zustand = 'liegt'; sch.sPos = 0; sch.rueck = false; }
+    const gf = !sch.typ || sch.typ === 'gorchfock', tL = gf ? (sch.erst ? 480 : 180) : 90, tW = gf ? 240 : 100;
+    if (sch.zustand === 'liegt' && fahrt && now - sch.t0 > tL) { sch.zustand = 'faehrt'; sch.rueck = false; }
+    else if (sch.zustand === 'wendet' && now - sch.t0 > tW) { sch.zustand = 'faehrt'; sch.rueck = true; }
+    let zE = sch.liege.E, zN = sch.liege.N, zh = sch.liege.h, v = 0;
+    if (sch.zustand === 'faehrt') {
+      const ziel = sch.rueck ? 0 : sch.L, dir = sch.rueck ? -1 : 1, rest = Math.abs(ziel - sch.sPos);
+      const nahHafen = Math.min(sch.sPos, gf ? 1200 : 400, sch.L - sch.sPos + (gf ? 0 : 0)) / (gf ? 1200 : 400);               /* im Hafen langsam (Schlepper-/Maschinenfahrt) */
+      v = sch.v * (0.25 + 0.75 * nahHafen) * Math.min(1, rest / 300 + 0.15);
+      const [nE, nN] = revSchiffePos(sch, sch.sPos + dir * v * dt * 40);
+      if (revSchiffWartet(nE, nN) && !revSchiffWartet(sch.E, sch.N)) v = 0;   /* vor Start/Ziel warten */
+      sch.sPos = Math.max(0, Math.min(sch.L, sch.sPos + dir * v * dt));
+      if ((dir > 0 && sch.sPos >= sch.L - 1) || (dir < 0 && sch.sPos <= 1)) { sch.zustand = sch.rueck ? 'liegt' : 'wendet'; sch.t0 = now; sch.erst = true; if (sch.rueck) sch.sPos = 0; }
+      const [pE, pN] = revSchiffePos(sch, sch.sPos), [aE, aN] = revSchiffePos(sch, Math.max(0, Math.min(sch.L, sch.sPos + dir * 160)));
+      zE = pE; zN = pN; zh = Math.atan2(aE - pE, aN - pN);
+      if (sch.sPos < 60 && sch.rueck) zh = sch.liege.h + (1 - sch.sPos / 60) * 0;   /* zum Anlegen in Liegeplatzrichtung eindrehen */
+      if (sch.sPos < 120) { const f = 1 - sch.sPos / 120; let dh = sch.liege.h - zh; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI; zh += dh * f; }
+    } else if (sch.zustand === 'wendet') {
+      const [pE, pN] = revSchiffePos(sch, sch.L), [aE, aN] = revSchiffePos(sch, sch.L - 200); zE = pE; zN = pN;
+      const f = Math.min(1, (now - sch.t0) / 200), h0 = Math.atan2(sch.weg[sch.weg.length - 1][0] - aE, sch.weg[sch.weg.length - 1][1] - aN); zh = h0 + Math.PI * f;
+    }
+    /* weich nachführen */
+    const k = Math.min(1, dt * 1.5); sch.E += (zE - sch.E) * k; sch.N += (zN - sch.N) * k;
+    let dh = zh - sch.h; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI; sch.h += Math.max(-0.03 * dt * 10, Math.min(0.03 * dt * 10, dh));
+    /* Segel: gesetzt, wenn draußen und in Fahrt */
+    const auf = sch.zustand === 'faehrt' && sch.sPos > 1500 && sch.sPos < sch.L - 200 ? 1 : 0;
+    sch.segelAuf += (auf - sch.segelAuf) * Math.min(1, dt * 0.3);
+    const seg = sch.grp.userData.segel; if (seg) { seg.visible = sch.segelAuf > 0.05; seg.scale.set(1, Math.max(0.05, sch.segelAuf), 1); seg.position.y = 46 * (1 - sch.segelAuf) * 0.45; }
+    sch.krg += ((auf && gf ? 3 : 0) * DEG - sch.krg) * Math.min(1, dt * 0.2);
+    /* Szene: Modell-Bug zeigt nach −Z */
+    const p = F(sch.E, sch.N), p1 = F(sch.E + Math.sin(sch.h), sch.N + Math.cos(sch.h)), fx = p1[0] - p[0], fz = -(p1[1] - p[1]);
+    sch.grp.position.set(p[0], 0.0, -p[1]); sch.grp.rotation.set(0, Math.atan2(fx, fz) + Math.PI, 0); sch.grp.rotateZ(sch.krg);
+    sch.hit = { E: sch.E, N: sch.N, h: sch.h };
+  }
+}
+/* Rumpf als Hindernis für die Physik (ca. 70 × 11 m) */
+function revSchiffHit(E, N) {
+  const X = REVX; if (!X || !X.schiffe) return false;
+  for (const sch of X.schiffe) { const h = sch.hit; if (!h) continue; const dx = E - h.E, dy = N - h.N; if (Math.abs(dx) > 50 || Math.abs(dy) > 50) continue;
+    const a = dx * Math.sin(h.h) + dy * Math.cos(h.h), b = dx * Math.cos(h.h) - dy * Math.sin(h.h); if (Math.abs(a) < (sch.hl || 36) && Math.abs(b) < (sch.hb || 5.8)) return true; }
+  return false;
+}
+
+/* ---------- Verkehr im ganzen Straßennetz: Autos rund ums Boot, biegen an Kreuzungen ab, Licht bei Nacht ---------- */
+var REV_NV_V = { motorway: 33, trunk: 25, primary: 22, secondary: 19, tertiary: 15, unclassified: 11, residential: 8.5 };
+function revNvInit() {
+  const X = REVX, N_ = X.netz; if (!N_ || X.nv) return;
+  /* Endpunkte für Anschlüsse */
+  const ends = new Map(), key = (x, y) => Math.round(x / 4) + ',' + Math.round(y / 4);
+  N_.wege.forEach((w, wi) => { const n = (w.length - 1) / 2; for (const [e, k] of [[0, 1], [1, w.length - 2]]) { const kk = key(w[k], w[k + 1]); (ends.get(kk) || ends.set(kk, []).get(kk)).push([wi, e]); } });
+  const max = S.gfx === 'niedrig' ? 16 : 40;
+  const FARBEN = ['#e9e9e6', '#1f2226', '#8a8f96', '#b3261e', '#23417a', '#d7d2c4', '#3d5a40', '#5b5e63', '#c7c9cc', '#7a1f1f', '#e0b23a'];
+  const box = new THREE.BoxGeometry(1.8, 1.45, 4.4); box.translate(0, 0.72, 0);
+  const im = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: 0xffffff }), max), c = new THREE.Color();
+  for (let i = 0; i < max; i++) { c.set(FARBEN[i % FARBEN.length]); im.setColorAt(i, c); }
+  im.count = 0; im.frustumCulled = false; im.userData.sznSkip = 1;
+  const pts = new Float32Array(max * 12), col = new Float32Array(max * 12);
+  for (let i = 0; i < max * 4; i++) { const v = i % 4 < 2; col[i * 3] = 1; col[i * 3 + 1] = v ? 0.93 : 0.08; col[i * 3 + 2] = v ? 0.75 : 0.05; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pts, 3)); g.setAttribute('col', new THREE.BufferAttribute(col, 3));
+  const pp = new THREE.Points(g, revCarLightMat()); pp.frustumCulled = false; pp.renderOrder = 21;
+  shoreG.add(im, pp);
+  X.nv = { ends, key, max, im, pp, cars: [], t: performance.now(), spawnT: 0 };
+}
+function revNvSpawn(E, N) {
+  const X = REVX, N_ = X.netz, C = N_.C, cand = [];
+  for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const l = N_.cells.get((Math.floor(E / C) + di) + ',' + (Math.floor(N / C) + dj)); if (l) for (const wi of l) cand.push(wi); }
+  for (let tries = 0; tries < 12 && cand.length; tries++) {
+    const wi = cand[Math.floor(Math.random() * cand.length)], w = N_.wege[wi], kl = N_.kl[w[0]];
+    if (kl === 'residential' && Math.random() < 0.6) continue;
+    const n = (w.length - 1) / 2; if (n < 2) continue;
+    const i = Math.floor(Math.random() * (n - 1)), x = w[1 + 2 * i], y = w[2 + 2 * i];
+    if (Math.hypot(x - E, y - N) > 3500 || Math.hypot(x - E, y - N) < 250) continue;
+    if (X.brSkip && X.brSkip.has(Math.floor(x / 16) + ',' + Math.floor(y / 16))) continue;
+    const d = Math.random() < 0.5 ? 1 : -1;
+    return { wi, i: d > 0 ? i : i + 1, d, f: 0, v: REV_NV_V[kl] * (0.8 + Math.random() * 0.25), lkw: Math.random() < 0.1 };
+  }
+  return null;
+}
+function revNvTick(E0, N0) {
+  const X = REVX; if (!X || !X.netz) return; if (!X.nv) revNvInit(); const V = X.nv; if (!V) return;
+  const now = performance.now(), dt = Math.min(0.1, (now - V.t) / 1000); V.t = now;
+  const N_ = X.netz, F = SHORE.fwd;
+  if (V.cars.length < V.max && now - V.spawnT > 250) { V.spawnT = now; const c = revNvSpawn(E0, N0); if (c) V.cars.push(c); }
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), pa = V.pp.geometry.attributes.position.array;
+  const ac = REV_CARLIGHT; if (ac) { ac.uniforms.uN.value = revNacht(); ac.uniforms.uPx.value = renderer.getPixelRatio(); }
+  let k = 0;
+  for (let ci = V.cars.length - 1; ci >= 0; ci--) {
+    const a = V.cars[ci]; let w = N_.wege[a.wi], n = (w.length - 1) / 2, weg = false;
+    let rest = a.v * dt;
+    while (rest > 0 && !weg) {
+      const j = a.i + a.d; if (j < 0 || j >= n) {
+        /* Ende des Weges: an einem Anschluss weiterfahren */
+        const ex = w[1 + 2 * a.i], ey = w[2 + 2 * a.i], L = (V.ends.get(V.key(ex, ey)) || []).filter(o => o[0] !== a.wi);
+        if (!L.length) { weg = true; break; }
+        const o = L[Math.floor(Math.random() * L.length)]; a.wi = o[0]; w = N_.wege[a.wi]; n = (w.length - 1) / 2;
+        if (o[1] === 0) { a.i = 0; a.d = 1; } else { a.i = n - 1; a.d = -1; } a.f = 0; continue;
+      }
+      const ax = w[1 + 2 * a.i], ay = w[2 + 2 * a.i], bx = w[1 + 2 * j], by = w[2 + 2 * j], L = Math.hypot(bx - ax, by - ay) || 0.01;
+      const f2 = a.f + rest / L; if (f2 < 1) { a.f = f2; rest = 0; } else { rest -= (1 - a.f) * L; a.i = j; a.f = 0; }
+    }
+    if (!weg) {
+      const j = Math.max(0, Math.min(n - 1, a.i + a.d)), ax = w[1 + 2 * a.i], ay = w[2 + 2 * a.i], bx = w[1 + 2 * j], by = w[2 + 2 * j], L = Math.hypot(bx - ax, by - ay) || 1;
+      const dx = (bx - ax) / L, dy = (by - ay) / L, kl = N_.kl[w[0]], off = (REV_STR[kl] ? REV_STR[kl][0] : 6) * 0.22;
+      const E = ax + (bx - ax) * a.f + dy * off, N = ay + (by - ay) * a.f - dx * off;
+      if (Math.hypot(E - E0, N - N0) > 4200 || (X.brSkip && X.brSkip.has(Math.floor(E / 16) + ',' + Math.floor(N / 16)))) weg = true;
+      else {
+        const z = revZ(E, N), h = z < 0.2 ? 1.8 : z + 0.42, p0 = F(E, N), p1 = F(E + dx, N + dy), fx = p1[0] - p0[0], fz = -(p1[1] - p0[1]);
+        q.setFromAxisAngle(up, Math.atan2(fx, fz)); sv.set(a.lkw ? 1.3 : 1, a.lkw ? 2.2 : 1, a.lkw ? 2.6 : 1); pv.set(p0[0], h, -p0[1]); m4.compose(pv, q, sv); V.im.setMatrixAt(k, m4);
+        const lx = -fz * 0.65, lz = fx * 0.65, Lh = a.lkw ? 5.95 : 2.45, o = k * 12;
+        pa[o] = p0[0] + fx * Lh + lx; pa[o + 1] = h + 0.7; pa[o + 2] = -p0[1] + fz * Lh + lz; pa[o + 3] = p0[0] + fx * Lh - lx; pa[o + 4] = h + 0.7; pa[o + 5] = -p0[1] + fz * Lh - lz;
+        pa[o + 6] = p0[0] - fx * Lh + lx; pa[o + 7] = h + 0.8; pa[o + 8] = -p0[1] - fz * Lh + lz; pa[o + 9] = p0[0] - fx * Lh - lx; pa[o + 10] = h + 0.8; pa[o + 11] = -p0[1] - fz * Lh - lz;
+        k++;
+      }
+    }
+    if (weg) V.cars.splice(ci, 1);
+  }
+  for (let i = k * 12; i < V.max * 12; i++) pa[i] = i % 3 === 1 ? -9999 : 0;
+  V.im.count = k; V.im.instanceMatrix.needsUpdate = true; V.pp.geometry.attributes.position.needsUpdate = true;
+}
+
+/* ---------- Züge auf allen Gleisen (DB Regio rot, auf Usedom die UBB weiß-grün), halten vor offener Klappbrücke ---------- */
+function revZugTex(farbe, band) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 64; const x = c.getContext('2d');
+  x.fillStyle = farbe; x.fillRect(0, 0, 512, 64); x.fillStyle = band; x.fillRect(0, 40, 512, 8);
+  for (let i = 0; i < 16; i++) { x.fillStyle = '#1e2a33'; x.fillRect(i * 32 + 4, 12, 24, 20); }
+  x.fillStyle = '#2a2a2a'; x.fillRect(150, 10, 18, 44); x.fillRect(344, 10, 18, 44);
+  return new THREE.CanvasTexture(c);
+}
+function revZugInit() {
+  const X = REVX, N_ = X.netz; if (!N_ || !N_.gleise.length || X.zug) return;
+  const ends = new Map(), key = (x, y) => Math.round(x / 3) + ',' + Math.round(y / 3);
+  N_.gleise.forEach((w, wi) => { for (const [e, k] of [[0, 0], [1, w.length - 2]]) { const kk = key(w[k], w[k + 1]); (ends.get(kk) || ends.set(kk, []).get(kk)).push([wi, e]); } });
+  const WAG = 4, max = S.gfx === 'niedrig' ? 2 : 4, n = max * WAG;
+  const mk = (farbe, band) => { const t = revZugTex(farbe, band), side = new THREE.MeshLambertMaterial({ map: t }), roof = new THREE.MeshLambertMaterial({ color: '#8d9196' }), end = new THREE.MeshLambertMaterial({ color: farbe });
+    const geo = new THREE.BoxGeometry(2.9, 3.6, 25.5); geo.translate(0, 1.8 + 0.9, 0); return new THREE.InstancedMesh(geo, [side, side, roof, end, end, end], n); };
+  const db = mk('#c4161c', '#f2f2f2'), ubb = mk('#f2f2ee', '#1f8a70');
+  db.count = ubb.count = 0; db.frustumCulled = ubb.frustumCulled = false; db.userData.sznSkip = ubb.userData.sznSkip = 1;
+  const pts = new Float32Array(max * 12), col = new Float32Array(max * 12);
+  for (let i = 0; i < max * 4; i++) { const v = i % 4 < 2; col[i * 3] = 1; col[i * 3 + 1] = v ? 0.95 : 0.08; col[i * 3 + 2] = v ? 0.8 : 0.05; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pts, 3)); g.setAttribute('col', new THREE.BufferAttribute(col, 3));
+  const pp = new THREE.Points(g, revCarLightMat()); pp.frustumCulled = false;
+  shoreG.add(db, ubb, pp);
+  X.zug = { ends, key, max, WAG, db, ubb, pp, zuege: [], t: performance.now(), spawnT: 0 };
+}
+/* Höhe am Gleis: Gelände, auf Brücken die Fahrbahnhöhe der Brücke */
+function revZugH(E, N) {
+  const X = REVX;
+  if (X.brSkip && X.brSkip.has(Math.floor(E / 16) + ',' + Math.floor(N / 16)) && X.strassen) {
+    let best = null, bd = 40; for (const st of X.strassen) for (let i = 0; i < st.P.length; i += 2) { const d = Math.hypot(st.P[i][0] - E, st.P[i][1] - N); if (d < bd) { bd = d; best = st.h[i]; } }
+    if (best != null) return best;
+  }
+  const z = revZ(E, N); return z < 0.2 ? 1.8 : z + 0.5;
+}
+function revZugKlappeZu(E, N) {
+  const X = REVX; if (!X.brKlMap) return false;
+  for (let d = -2; d <= 2; d++) for (let e = -2; e <= 2; e++) { const ki = X.brKlMap.get((Math.floor(E / 4) + d) + ',' + (Math.floor(N / 4) + e)); if (ki != null) { const K = X.klappen[ki]; if (K && K.zeit && (K.zeit.auf > 0.001 || K.zeit.bis < 1.5)) return true; } }
+  return false;
+}
+function revZugTick(E0, N0) {
+  const X = REVX; if (!X || !X.netz) return; if (!X.zug) revZugInit(); const Z = X.zug; if (!Z) return;
+  const now = performance.now(), dt = Math.min(0.1, (now - Z.t) / 1000); Z.t = now; const N_ = X.netz, F = SHORE.fwd;
+  /* neue Züge auf langen Gleisen in der Nähe */
+  if (Z.zuege.length < Z.max && now - Z.spawnT > 1500) {
+    Z.spawnT = now; const C = N_.C, cand = [];
+    for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const l = N_.gcells.get((Math.floor(E0 / C) + di) + ',' + (Math.floor(N0 / C) + dj)); if (l) for (const gi of l) if (N_.gleise[gi].length >= 8) cand.push(gi); }
+    if (cand.length) {
+      const gi = cand[Math.floor(Math.random() * cand.length)], w = N_.gleise[gi], i = Math.floor(Math.random() * (w.length / 2 - 1));
+      if (Math.hypot(w[2 * i] - E0, w[2 * i + 1] - N0) < 3500) { const ubb = w[2 * i] > 48000 && w[2 * i + 1] < 16000; Z.zuege.push({ gi, i, d: Math.random() < 0.5 ? 1 : -1, f: 0, v: ubb ? 16 : 20, vmax: ubb ? 22 : 27, ubb, hist: [], weg: 0 }); }
+    }
+  }
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(1, 1, 1), pv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), pa = Z.pp.geometry.attributes.position.array;
+  let nDb = 0, nUb = 0, li = 0;
+  for (let zi = Z.zuege.length - 1; zi >= 0; zi--) {
+    const z = Z.zuege[zi]; let w = N_.gleise[z.gi], n = w.length / 2, ende = false;
+    /* Spitze: Position auf dem Gleis */
+    const spitze = () => { const j = Math.max(0, Math.min(n - 1, z.i + z.d)); return [w[2 * z.i] + (w[2 * j] - w[2 * z.i]) * z.f, w[2 * z.i + 1] + (w[2 * j + 1] - w[2 * z.i + 1]) * z.f]; };
+    const [hE, hN] = spitze();
+    /* vor offener Klappe halten (Blick 120 m voraus) */
+    let ziel = z.vmax; const j0 = Math.max(0, Math.min(n - 1, z.i + z.d * 6)); if (revZugKlappeZu(w[2 * j0], w[2 * j0 + 1]) || revZugKlappeZu(hE, hN)) ziel = 0;
+    z.v += Math.max(-1.2 * dt, Math.min(0.6 * dt, ziel - z.v));
+    let rest = z.v * dt;
+    while (rest > 0 && !ende) {
+      const j = z.i + z.d; if (j < 0 || j >= n) {
+        const ex = w[2 * z.i], ey = w[2 * z.i + 1], L = (Z.ends.get(Z.key(ex, ey)) || []).filter(o => o[0] !== z.gi);
+        if (!L.length) { ende = true; break; }
+        const o = L[Math.floor(Math.random() * L.length)]; z.gi = o[0]; w = N_.gleise[z.gi]; n = w.length / 2; if (o[1] === 0) { z.i = 0; z.d = 1; } else { z.i = n - 1; z.d = -1; } z.f = 0; continue;
+      }
+      const L = Math.hypot(w[2 * j] - w[2 * z.i], w[2 * j + 1] - w[2 * z.i + 1]) || 0.01, f2 = z.f + rest / L;
+      if (f2 < 1) { z.f = f2; rest = 0; } else { rest -= (1 - z.f) * L; z.i = j; z.f = 0; }
+    }
+    const [aE, aN] = spitze();
+    if (!z.hist.length || Math.hypot(aE - z.hist[z.hist.length - 1][0], aN - z.hist[z.hist.length - 1][1]) > 2) { z.hist.push([aE, aN]); if (z.hist.length > 80) z.hist.shift(); }
+    if (ende || Math.hypot(aE - E0, aN - N0) > 4500) { Z.zuege.splice(zi, 1); continue; }
+    /* Wagen entlang der gefahrenen Spur */
+    const H = z.hist; let acc = 0, k = H.length - 1, wagen = 0, gesetzt = 0;
+    const im = z.ubb ? Z.ubb : Z.db;
+    for (; wagen < Z.WAG; wagen++) {
+      const want = wagen * 26.5 + 12.7; while (k > 0 && acc + Math.hypot(H[k][0] - H[k - 1][0], H[k][1] - H[k - 1][1]) < want) { acc += Math.hypot(H[k][0] - H[k - 1][0], H[k][1] - H[k - 1][1]); k--; }
+      if (k <= 0) break;
+      const A = H[k], B = H[k - 1], seg = Math.hypot(A[0] - B[0], A[1] - B[1]) || 1, t = Math.min(1, (want - acc) / seg), E = A[0] + (B[0] - A[0]) * t, N = A[1] + (B[1] - A[1]) * t;
+      const p0 = F(E, N), p1 = F(E + (A[0] - B[0]) / seg, N + (A[1] - B[1]) / seg), fx = p1[0] - p0[0], fz = -(p1[1] - p0[1]), h = revZugH(E, N);
+      q.setFromAxisAngle(up, Math.atan2(fx, fz)); pv.set(p0[0], h, -p0[1]); m4.compose(pv, q, sv); im.setMatrixAt(z.ubb ? nUb++ : nDb++, m4); gesetzt++;
+      if (wagen === 0 && li < Z.max) { const o = li * 12, ox = -fz * 0.9, oz = fx * 0.9; pa[o] = p0[0] + fx * 12.8 + ox; pa[o + 1] = h + 1.6; pa[o + 2] = -p0[1] + fz * 12.8 + oz; pa[o + 3] = p0[0] + fx * 12.8 - ox; pa[o + 4] = h + 1.6; pa[o + 5] = -p0[1] + fz * 12.8 - oz; }
+      if (wagen === Z.WAG - 1 && li < Z.max) { const o = li * 12 + 6, ox = -fz * 0.9, oz = fx * 0.9; pa[o] = p0[0] - fx * 12.8 + ox; pa[o + 1] = h + 1.4; pa[o + 2] = -p0[1] - fz * 12.8 + oz; pa[o + 3] = p0[0] - fx * 12.8 - ox; pa[o + 4] = h + 1.4; pa[o + 5] = -p0[1] - fz * 12.8 - oz; }
+    }
+    if (gesetzt) li++;
+  }
+  for (let i = li * 12; i < Z.max * 12; i++) pa[i] = i % 3 === 1 ? -9999 : 0;
+  Z.db.count = nDb; Z.ubb.count = nUb; Z.db.instanceMatrix.needsUpdate = Z.ubb.instanceMatrix.needsUpdate = true; Z.pp.geometry.attributes.position.needsUpdate = true;
 }
 
 /* Echte Fahrwassertonnen (OpenSeaMap) – gebündelt gezeichnet */
@@ -2281,6 +2841,9 @@ const CLASSES={
    pol:[0,0.03,0.32,0.62,0.81,0.9,0.96,1.0,1.02,1.02,0.98,0.92,0.85,0.8,0.78],
    spiA:[0,60,75,90,110,130,150,165,180],spiM:[0.5,0.55,0.8,1.04,1.15,1.22,1.25,1.22,1.18],
    turn:[8,10],acc:5,dec:8,trapAt:99,helmTrapAt:99,maxHeel:13},
+ gorchfock:{key:'gorchfock',name:'Gorch Fock (Bark)',len:82,beam:12,genua:false,spi:null,vRef:7.2,vExp:0.72,gross:true,
+   pol:[0,0,0,0,0.12,0.36,0.58,0.82,0.98,1.05,1.06,1.02,0.95,0.9,0.88],
+   turn:[1.1,1.5],acc:40,dec:55,trapAt:99,helmTrapAt:99,maxHeel:5},
  moth:{key:'moth',name:'Foiling Moth',len:3.355,beam:2.25,genua:false,spi:null,vRef:4.2,vExp:0.5,foils:true,
    pol:[0,0.05,0.4,0.72,0.86,0.93,0.97,1.0,1.0,0.98,0.95,0.9,0.84,0.78,0.75],
    foilPol:[0,0.05,0.3,0.82,0.95,1.0,1.06,1.18,1.28,1.36,1.4,1.36,1.12,0.6,0.42],
@@ -2494,6 +3057,7 @@ const RIGS={
    vaneY:6.75,sheet:[0,0.38,0.9],tiller:{type:'single',z:2.1,y:0.36,len:1.3},mastTrap:null,deck:true,k:1,
    seats:[{role:'helm',z:0.45,gx:1.0,sitY:0.6,footX:0.3,footY:0.42,gwX:1.12,gwY:0.55}]}
 };
+RIGS.gorchfock = RIGS.viking; HSHAPE.gorchfock = HSHAPE.viking;
 const RIG=()=>RIGS[CL.key];
 
 /* ================= Einstellungen ================= */
@@ -2524,7 +3088,7 @@ const SCHEMA=[
   {k:'wxCloud',label:'Bewölkung',min:0,max:100,step:5,unit:'%',hint:'0 % wolkenlos, 100 % bedeckt. Auch von Hand einstellbar'},
   {k:'wxPrecip',label:'Niederschlag',type:'select',options:[['none','keiner'],['r1','Regen leicht'],['r2','Regen mäßig'],['r3','Regen stark'],['snow','Schnee']],hint:'Regen und Schnee verschlechtern die Sicht, dunkeln den Himmel ab und nehmen den Sonnenglanz vom Wasser'}]},
  {group:'Bahn',items:[
-  {k:'legLength',label:'Kreuzlänge',min:200,max:1000,step:50,unit:'m'},
+  {k:'legLength',label:'Kreuzlänge',min:200,max:4000,step:50,unit:'m'},
   {k:'laps',label:'Runden',min:1,max:3,step:1,unit:''},
   {k:'startTime',label:'Startverfahren',type:'select',num:true,options:[[300,'5 min (5 – 4 – 1 – Start)'],[180,'3 min (3 – 2 – 1 – Start)'],[120,'2 min (2 – 1 – Start)'],[60,'1 min (1 – Start)'],[30,'30 s']],hint:'Signale mit Flaggen am Startschiff: Ankündigung mit Klassenflagge, Vorbereitung mit Flagge P, 1-Minuten-Signal'},
   {k:'count10',label:'Countdown in den letzten 10 s',type:'check'},
@@ -2537,6 +3101,8 @@ const SCHEMA=[
   {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
   {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
   {k:'bruecke',label:'Klappbrücken (Ziegelgraben, Wolgast)',type:'select',options:[['echt','Öffnen zu den echten Zeiten'],['offen','Immer offen']],hint:'Ziegelgrabenbrücke im Rügendamm: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 Uhr je 20 min. Peenebrücke Wolgast: 5:45, 7:45, 12:45, 17:45, 20:45 Uhr je 15 min, Juni–September auch 23:45 Uhr. Es zählt die Uhrzeit deines Geräts. Unter der Rügenbrücke passt du mit 42 m immer durch – die Klappe daneben musst du abwarten. Autos halten vor der offenen Klappe.'},
+  {k:'schiffsverkehr',label:'Schiffsverkehr',type:'select',options:[['an','Fähren, Ausflugsschiffe und Kutter fahren'],['aus','Alle bleiben im Hafen']],hint:'Hiddensee-Fähre Schaprode–Vitte, Ausflugsschiff Sassnitz–Königsstuhl, Bäderschiff Binz–Sellin und ein Fischkutter aus Sassnitz. Sie weichen Regattabahnen aus und warten vor Start und Ziel einer laufenden Regatta – nach den Ausweichregeln musst du ihnen aber trotzdem Platz lassen.'},
+  {k:'gorchfock',label:'Gorch Fock',type:'select',options:[['faehrt','Legt ab und segelt bis vor Hiddensee'],['liegt','Bleibt in Stralsund am Liegeplatz']],hint:'Die Gorch Fock (Modell aus der Werftkoje) legt in Stralsund ab, segelt bis vor Hiddensee, wendet und legt wieder an. Sie meidet Regattabahnen und wartet, solange Start oder Ziel einer laufenden Regatta vor ihr liegt.'},
   {k:'revEdit',label:'Eigene Strecken (Küstenrevier Rügen)',type:'button',btn:'Strecken-Editor öffnen',act:'revEdit',hint:'Start, Wegpunkte und Ziel auf der Karte antippen und speichern. Gespeicherte Strecken erscheinen oben unter „Kurs im Küstenrevier Rügen“. Start- und Ziellinie richten sich nach dem Wind.'},
   {k:'windFrom',label:'Windrichtung (See-Reviere)',type:'select',num:true,live:v=>v+'° (Live)',options:[[225,'Südwest'],[270,'West'],[315,'Nordwest'],[0,'Nord'],[45,'Nordost'],[90,'Ost'],[135,'Südost'],[180,'Süd']],hint:'Am See zählt, über welches Ufer der Wind kommt: Nordwind über den Auwald ist löchrig, Westwind über die Neue Harth drehig'},
   {k:'rowDist',label:'Ruderstrecke',type:'select',num:true,options:[[250,'250 m'],[500,'500 m'],[1000,'1000 m']],hint:'Für die Ruderregatta (Knopf „Rudern“)'},
@@ -2548,7 +3114,7 @@ const SCHEMA=[
   {k:'ghost',label:'Geisterboot: gegen deine Bestfahrt',type:'check'},
   {k:'touchMode',label:'Steuern am Handy',type:'select',options:[['slider','Ruder-Schieber'],['buttons','Pfeil-Knöpfe']]}]},
  {group:'Boot',items:[
-  {k:'boatClass',label:'Bootsklasse',type:'select',options:[['jolle','Zweimann-Jolle (470-ähnlich)'],['ixylon','Ixylon (Trapez-Jolle)'],['opti','Optimist'],['topcat','Topcat K2 (Katamaran)'],['zk10','Kutter ZK 10 (Seesport)'],['k6','Kutter K6 (LSC)'],['moth','Foiling Moth'],['imoca','IMOCA 60 (Hochsee-Foiler)'],['viking','Wikingerschiff Skuldelev 3 (Roskilde)']],hint:'Das ganze Feld segelt dieselbe Klasse. Moth foilt ab ca. 7 kn Wind, das Wikingerschiff kreuzt nur um 60° zum Wind'},
+  {k:'boatClass',label:'Bootsklasse',type:'select',options:[['jolle','Zweimann-Jolle (470-ähnlich)'],['ixylon','Ixylon (Trapez-Jolle)'],['opti','Optimist'],['topcat','Topcat K2 (Katamaran)'],['zk10','Kutter ZK 10 (Seesport)'],['k6','Kutter K6 (LSC)'],['moth','Foiling Moth'],['imoca','IMOCA 60 (Hochsee-Foiler)'],['viking','Wikingerschiff Skuldelev 3 (Roskilde)'],['gorchfock','Gorch Fock (Bark, Großschiff-Regatta, max. 10)']],hint:'Das ganze Feld segelt dieselbe Klasse. Die Gorch Fock segelt auf den Großschiffbahnen vor Sassnitz oder in der Tromper Wiek, höchstens 10 Schiffe. Moth foilt ab ca. 7 kn Wind, das Wikingerschiff kreuzt nur um 60° zum Wind'},
   {k:'sailNo',label:'Segelnummer',type:'text'},
   {k:'headsail',label:'Vorsegel (Jolle)',type:'select',options:[['fock','Fock'],['genua','Genua']],hint:'Genua: mehr Druck bei Leichtwind, überpowert ab ca. 14 kn'},
   {k:'autoTrim',label:'Autotrimm',type:'check'},
@@ -2581,6 +3147,7 @@ const SCHEMA=[
 const form=document.getElementById('setForm');
 function onSetting(k){if(k==='revier'&&S.wxSite&&(S.revier==='cospu'||S.revier==='rangs')&&wxSite().name!==S.wxSite&&!(G&&G.running&&!G.over))setTimeout(()=>loadLiveWx(),0);if(k==='season'){applyLight();buildShore();if(G&&!G.running)newRace(null);return;}if(k==='licht')S.sunLive=null;if(k==='licht'||k==='wxCloud'||k==='wxPrecip'||k==='windFrom'||k==='revier'||k==='gfx')applyLight();if(k==='gfx'&&(S.revier==='cospu'||isGL())&&G&&!G.running){buildShore();}if(!G)return;
   if((k==='tws'||k==='waveH')&&!G.running)setupWaves();
+  if(k==='boatClass')gfKlasseWechsel();
   if((k==='boatClass'||k==='courseType'||k==='finishUp'||k==='legLength'||k==='laps')&&!G.running){newRace(null);}
   if(k==='revier'||k==='windFrom'||k==='revKurs'){buildShore();if(!G.running)newRace(null);}
   if(k==='touchMode'||k==='autoTrim')updateTouch();
@@ -2622,7 +3189,7 @@ const WX_TXT={none:'kein Niederschlag',r1:'leichter Regen',r2:'mäßiger Regen',
 const WX_COMP=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 const LIGHT_TXT={mittag:'Mittag',nachmittag:'Nachmittag',gold:'Goldene Stunde',daemmerung:'Dämmerung',nacht:'Nacht'};
 let wxBusy=false;
-function wxSite(){revMigrate();if(REVIERE_K[S.revier])return {lat:54.42,lon:13.35,name:'Rügen'};return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
+function wxSite(){revMigrate();if(REVIERE_K[S.revier]){const k=S.revKurs||'bb';if(/bahn_gfs|bahn_pr/.test(k))return {lat:54.50,lon:13.66,name:'Sassnitz/Binz'};if(k==='bahn_gft')return {lat:54.62,lon:13.45,name:'Tromper Wiek'};if(k==='bahn_gb')return {lat:54.20,lon:13.55,name:'Greifswalder Bodden'};if(k==='bb'||k==='rund'||k==='bahn')return {lat:54.53,lon:13.10,name:'Hiddensee'};return {lat:54.42,lon:13.35,name:'Rügen'};}return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
 async function loadLiveWx(){if(wxBusy)return;wxBusy=true;const say=t=>{S.wxInfo=t;const st=document.getElementById('wxStatus');if(st)st.textContent=t;saveS();};
   try{say('Lade Live-Daten …');const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),9000);
     if(S.revier!=='rangs'&&S.revier!=='cospu'&&!REVIERE_K[S.revier]&&!(G&&G.running&&!G.over))S.revier='cospu';const site=wxSite();const r=await fetch(WX_URL.replace('latitude='+WX_LAT,'latitude='+site.lat).replace('longitude='+WX_LON,'longitude='+site.lon),{signal:ctl.signal,cache:'no-store'});clearTimeout(to);if(!r.ok)throw new Error('HTTP '+r.status);
@@ -4875,7 +5442,7 @@ function squareTex(color){const c=document.createElement('canvas');c.width=256;c
 function jibGeo(T,H,C){const f=new THREE.Vector3().subVectors(H,T).normalize();const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),f);const qi=q.clone().invert();
   return {q,geo:gridGeo(6,10,(u,v)=>{const lp=T.clone().lerp(H,v),lc=C.clone().lerp(H,v);const ch=lp.distanceTo(lc);const P=lp.clone().lerp(lc,u);P.x+=0.12*ch*Math.sin(Math.PI*u);P.sub(T).applyQuaternion(qi);return [P.x,P.y,P.z,u,v];})};}
 const CGEO={};
-function classGeo(key){if(CGEO[key])return CGEO[key];const R=RIGS[key];const o={hulls:[],decks:[]};
+function classGeo(key){if(key==='gorchfock')return classGeo('viking');if(CGEO[key])return CGEO[key];const R=RIGS[key];const o={hulls:[],decks:[]};
   o.masks=[];for(const h of R.hull){const sh=HSHAPE[h.shape];o.hulls.push({geo:loftHull(sh,h.x),sh,x:h.x});if(R.deck)o.decks.push(deckGeo(sh,h.x,0,1,1,0.004));o.masks.push(deckGeo(sh,h.x,0,1,1,0.0,undefined));}
   if(key==='jolle'){o.cockpit=deckGeo(HSHAPE.jolle,0,0.42,0.9,0.62,0.012);o.cb=new THREE.BoxGeometry(0.1,0.12,0.9);o.cb.translate(0,0.44,-0.05);}
   if(key==='ixylon')ixyGeo(o);
@@ -5243,6 +5810,7 @@ function buildBoat(b){
   if(CL.key==='topcat'){try{skuaApply(b,g,b.m);}catch(e){console.error('Skua V1',e);}}
   if(CL.key==='zk10'){try{zkApply(b,g,b.m);}catch(e){console.error('ZK 10 GFK',e);}}
   if(CL.key==='ixylon'&&!G.row){try{ixyApply(b,g,b.m);}catch(e){console.error('Ixylon',e);}}
+  if(CL.key==='gorchfock'){try{gfBoatApply(b,g);}catch(e){console.error('Gorch Fock',e);}}
   if(G.row&&ROWCFG[CL.key]){rowInit(b);rowGear(b);}
   labelCanvas(b);
 }
@@ -5271,7 +5839,7 @@ function newRace(lesson,opts){
   CL=CLASSES[S.boatClass]||CLASSES.jolle;L=CL.len;BEAM=CL.key==='topcat'?2.3:CL.beam*0.95;
   {const lake=S.revier==='cospu'||isGL();if(REVIERE_K[S.revier]){if(SHORE.key!==revKey())buildShore();}else if(lake&&SHORE.key!==cospuKey())buildShore();else if(!lake&&(SHORE.kind==='poly'||SHORE.kind==='revier'))buildShore();}
   const W0=0,U=dirv(W0),R=[U[1],-U[0]];
-  const n=lesson?2:(opts&&opts.mp?opts.mp.total:S.cpuCount+1);const lineLen=lesson?Math.max(60,(n+1)*Math.max(L,3.5)*1.9):lineLenFor(n,Math.max(L,3.5));
+  const n=lesson?2:(opts&&opts.mp?opts.mp.total:Math.min(S.cpuCount+1,CL.gross?10:99));const lineLen=lesson?Math.max(60,(n+1)*Math.max(L,3.5)*1.9):lineLenFor(n,Math.max(L,3.5));
   const C={W0,U,R,lineLen,lesson:!!lesson};
   C.pin={x:-R[0]*lineLen/2,y:-R[1]*lineLen/2};C.cb={x:R[0]*lineLen/2,y:R[1]*lineLen/2};
   const mk=(x,y,kind,name)=>({x,y,kind,name});
@@ -6597,8 +7165,8 @@ function updateCam(dt,now){
     _b.set(-Math.sin(cam.yaw)*12,1.0-(cam.pitch-0.22)*8,-Math.cos(cam.yaw)*12);g.localToWorld(_b);camera.up.set(0,1,0);camera.lookAt(_b);return;}
   if(cam.mode==='top'){const hgt=cam.dist*6;const u=G.course.U;camera.up.set(u[0],0,-u[1]);camera.position.lerp(_a.set(tx,hgt,ty+0.01),k);camera.lookAt(camera.position.x,0,camera.position.z-0.01);return;}
   camera.up.set(0,1,0);
-  const ang=(cam.mode==='chase'?cam.h*DEG:0)+cam.yaw;const hd=cam.dist*Math.cos(cam.pitch);
-  const px=tx-Math.sin(ang)*hd,pz=ty+Math.cos(ang)*hd;let py=cam.dist*Math.sin(cam.pitch)+2+HS*0.6;py=Math.max(py,waveH(px,pz,now)+1.2);
+  const ang=(cam.mode==='chase'?cam.h*DEG:0)+cam.yaw,cf=CL.gross?7:1;const hd=cam.dist*cf*Math.cos(cam.pitch);
+  const px=tx-Math.sin(ang)*hd,pz=ty+Math.cos(ang)*hd;let py=cam.dist*cf*Math.sin(cam.pitch)+2+HS*0.6+(CL.gross?14:0);py=Math.max(py,waveH(px,pz,now)+1.2);
   camera.position.lerp(_a.set(px,py,pz),k);camera.lookAt(tx,2.4+(pl.m?pl.m.g.position.y*0.5:0),ty);
 }
 const _rm=new THREE.Matrix4(),_rl=new THREE.Vector3(),_ru=new THREE.Vector3();
@@ -6616,7 +7184,7 @@ const _nv=new THREE.Vector3();
 function navUpdate(){if(!NIGHT||!G)return;for(const b of G.boats){const m=b.m;if(!m||!m.navL||b.gone)continue;_nv.copy(camera.position);m.g.worldToLocal(_nv);
     const th=Math.atan2(_nv.x,-_nv.z)/DEG,a=Math.abs(th);   // 0° voraus, positiv = Steuerbordseite
     for(const l of m.navL){const on=l.k==='port'?(th<=0&&a<=112.5):l.k==='stb'?(th>=0&&a<=112.5):l.k==='stern'?a>=112.5:true;l.sp.visible=on;l.ball.visible=on;}}}
-function render(dt,now){try{revTick();revFeuerTick();revNachtTick();revBrueckenTick();}catch(e){console.error('Revier',e);}
+function render(dt,now){try{revTick();revFeuerTick();revNachtTick();revBrueckenTick();revSchiffeTick();if(SHORE&&SHORE.kind==='revier'&&G&&G.boats&&G.boats[0]){const pq=SHORE.realOf(G.boats[0].x,G.boats[0].y);revNvTick(pq[0],pq[1]);try{revZugTick(pq[0],pq[1]);}catch(e){console.error('Zug',e);}}}catch(e){console.error('Revier',e);}
   waterMat.uniforms.uT.value=now;sky.material.uniforms.uT.value=now%1800;if(SHORE.anim)for(const fa of SHORE.anim)fa(now);
   const tow=dirv(G.wind.cur+180);waterMat.uniforms.uWind.value.set(tow[0],-tow[1]);
   for(let i=0;i<16;i++){const p=G.wind.puffs[i];if(p)puffU[i].set(p.x,-p.y,p.r,p.str*p.env);else puffU[i].set(0,0,1,0);}
