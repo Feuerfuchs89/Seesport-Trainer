@@ -383,6 +383,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
       <button class="tbtn" id="bCam" title="Kamera wechseln (C)">Kamera</button>
       <button class="tbtn" id="bSound" title="Ton an/aus">Ton an</button>
       <button class="tbtn" id="bFan" title="Kursfächer an/aus">Fächer</button>
+      <button class="tbtn" id="bHeli" title="Rundflug mit dem Hubschrauber (J)">Heli</button>
       <button class="tbtn" id="bTrack" title="Eigene Spur auf der Karte an/aus">Spur</button>
       <button class="tbtn" id="bChat" title="Chat (Enter)" hidden>Chat</button>
       <button class="tbtn" id="bPause" title="Pause (P)">Pause</button>
@@ -975,7 +976,7 @@ function revTick(force) {
   const X = REVX; if (!X || !SHORE || SHORE.kind !== 'revier' || typeof G === 'undefined' || !G || !G.boats) return;
   const now = performance.now(); if (!force && now - X.tick < 350) return; X.tick = now;
   const pl = G.boats[0]; if (!pl) return;
-  const [E, N] = SHORE.realOf(pl.x, pl.y), lo = S.gfx === 'niedrig', cs = X.cs, CH = REV_CH, chm = CH * cs;
+  const [E, N] = HELI.an ? SHORE.realOf(HELI.x, HELI.y) : SHORE.realOf(pl.x, pl.y), lo = S.gfx === 'niedrig', cs = X.cs, CH = REV_CH, chm = CH * cs;
   /* Daten: Kacheln um den Spieler (12 km) und um jedes Boot (1,5 km) */
   const want = new Set();
   for (const m of revTilesNear(E, N, 12000)) want.add(m);
@@ -3212,6 +3213,7 @@ function mapToWorld(sx, sy) { if (!MAPAFF) return null; const { o, m, det } = MA
 function beamToggle() { BEAMON = !BEAMON; const bt = document.getElementById('mapBeam'); if (bt) bt.classList.toggle('on', BEAMON); if (BEAMON) msg('Hinbeamen: Tippe in der Karte auf einen Punkt im Wasser. Mit „−“ zoomst du weiter heraus.', 'info'); }
 function beamTo(sx, sy) {
   BEAMON = false; const bt = document.getElementById('mapBeam'); if (bt) bt.classList.remove('on');
+  if (HELI.an) { const w = mapToWorld(sx, sy); if (!w) return; const d = Math.hypot(w[0] - HELI.x, w[1] - HELI.y); HELI.x = w[0]; HELI.y = w[1]; HELI.alt = Math.max(HELI.alt, heliBoden(w[0], w[1]) + 40); snapCam = true; if (SHORE.kind === 'revier' && REVX) revTick(true); msg('Hingeflogen (' + (d >= 1000 ? revFmt(d / 1000, 1) + ' km' : Math.round(d) + ' m') + ').', 'good'); return; }
   const w = mapToWorld(sx, sy); if (!w || !G || !G.free) return; const pl = P(), x = w[0], y = w[1];
   let ok = onWater(x, y); if (SHORE.kind === 'revier' && REVX) ok = revDepth(x, y) >= (pl.rib ? 0.6 : revDraft()) + 0.3;
   if (!ok) { msg('Dort ist kein ausreichend tiefes Wasser – such dir einen anderen Punkt.', 'warn'); return; }
@@ -3222,6 +3224,141 @@ function beamTo(sx, sy) {
   msg('Hingebeamt (' + (d >= 1000 ? revFmt(d / 1000, 1) + ' km' : Math.round(d) + ' m') + ').', 'good');
 }
 
+
+/* ================= Hubschrauber-Rundflug: frei über Revier und Land fliegen, Boot ruht solange ================= */
+var HELI = { an: false, x: 0, y: 0, alt: 80, hdg: 0, v: 0, vz: 0, yr: 0, turbo: false, cam: 0, grp: null, rotor: null, heck: null, stick: [0, 0], hoch: 0, keys: {}, ui: null, ziel: 0, bank: 0, nick: 0 };
+function heliModell() {
+  const g = new THREE.Group(), M = (c, o) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, o || {}));
+  const rot = '#d62d20', weiss = '#f4f4f2', dunkel = '#20262c';
+  /* Rumpf: Kabine (gestreckte Kugel), Glaskanzel, Heckausleger, Seitenleitwerk, Kufen */
+  const kab = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), M(rot)); kab.scale.set(1.25, 1.25, 3.0); kab.position.set(0, 1.9, 0); g.add(kab);
+  const bauch = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.45), M(weiss)); bauch.scale.set(1.27, 1.27, 3.02); bauch.position.copy(kab.position); g.add(bauch);
+  const glas = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), M('#1c2b38', { emissive: '#0a1218' })); glas.scale.set(1.15, 1.0, 1.6); glas.rotation.x = -Math.PI / 2 + 0.35; glas.position.set(0, 2.15, -1.65); g.add(glas);
+  const aus = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.5, 6.2, 12), M(rot)); aus.rotation.x = Math.PI / 2; aus.position.set(0, 2.35, 5.4); g.add(aus);
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.9, 1.1), M(rot)); fin.position.set(0, 3.1, 8.3); fin.rotation.x = -0.35; g.add(fin);
+  const hf = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 0.6), M(weiss)); hf.position.set(0, 2.4, 7.6); g.add(hf);
+  const tw = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.3, 14), M(dunkel)); tw.rotation.z = Math.PI / 2; tw.position.set(0.2, 3.0, 8.5); g.add(tw);
+  for (const s of [-1, 1]) { const k = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 4.4, 6), M(dunkel)); k.rotation.x = Math.PI / 2; k.position.set(s * 1.15, 0.12, -0.2); g.add(k);
+    for (const z of [-1.2, 0.9]) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.95, 6), M(dunkel)); st.position.set(s * 1.0, 0.55, z); st.rotation.z = s * 0.3; g.add(st); } }
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, 0.7, 10), M(dunkel)); mast.position.set(0, 3.35, 0.2); g.add(mast);
+  const tb = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 2.2), M(rot)); tb.position.set(0, 3.0, 0.6); g.add(tb);
+  /* Hauptrotor (4 Blätter) und Heckrotor */
+  const rotor = new THREE.Group(); rotor.position.set(0, 3.72, 0.2); g.add(rotor);
+  for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.05, 5.4), M('#2b2f33')); b.position.z = 2.75; const a = new THREE.Group(); a.rotation.y = i * Math.PI / 2; a.add(b); rotor.add(a); }
+  const scheibe = new THREE.Mesh(new THREE.CircleGeometry(5.5, 32), new THREE.MeshBasicMaterial({ color: '#2b2f33', transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })); scheibe.rotation.x = -Math.PI / 2; rotor.add(scheibe);
+  const heck = new THREE.Group(); heck.position.set(0.35, 3.0, 8.5); g.add(heck);
+  for (let i = 0; i < 2; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.5, 0.14), M('#2b2f33')); const a = new THREE.Group(); a.rotation.x = i * Math.PI / 2; a.add(b); heck.add(a); }
+  /* Kennung und Positionslichter */
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); x.fillStyle = weiss; x.font = 'bold 40px Arial,Helvetica,sans-serif'; x.textAlign = 'center'; x.fillText('D-HSEE', 128, 46);
+  const tx = new THREE.CanvasTexture(c); for (const s of [-1, 1]) { const pl = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.48), new THREE.MeshBasicMaterial({ map: tx, transparent: true })); pl.position.set(s * 1.27, 2.0, 1.4); pl.rotation.y = s * Math.PI / 2; g.add(pl); }
+  const lp = [-1.3, 1.9, -0.6, 1.3, 1.9, -0.6, 0, 3.5, 8.9, 0, 0.6, 0.5], lc = [1, 0.1, 0.05, 0.1, 1, 0.25, 1, 1, 1, 1, 0.15, 0.1];
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)); lg.setAttribute('col', new THREE.Float32BufferAttribute(lc, 3));
+  const pts = new THREE.Points(lg, revCarLightMat()); pts.frustumCulled = false; g.add(pts);
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return { g, rotor, heck };
+}
+function heliBoden(x, y) {           /* Höhe von Gelände bzw. Wasser unter dem Hubschrauber */
+  try { if (SHORE && SHORE.kind === 'revier' && REVX) { const [E, N] = SHORE.realOf(x, y); return Math.max(0, revZ(E, N)); } } catch (e) {}
+  return 0;
+}
+function heliUi() {
+  if (HELI.ui) return HELI.ui;
+  const st = document.createElement('style'); st.textContent = `
+#heliUi{position:fixed;inset:0;pointer-events:none;z-index:40;font-family:system-ui,sans-serif;color:#fff}
+#heliUi .hInfo{position:absolute;left:50%;top:calc(env(safe-area-inset-top) + 8px);transform:translateX(-50%);background:rgba(10,20,28,.72);border-radius:10px;padding:6px 12px;font-weight:600;font-size:14px;white-space:nowrap}
+#heliUi .hBtns{position:absolute;right:12px;bottom:calc(env(safe-area-inset-bottom) + 14px);display:flex;flex-direction:column;gap:8px;pointer-events:auto}
+#heliUi button{pointer-events:auto;border:0;border-radius:12px;background:rgba(10,20,28,.78);color:#fff;font:700 15px system-ui,sans-serif;min-width:64px;min-height:52px;padding:0 12px;touch-action:none}
+#heliUi button.on{background:#d62d20}
+#heliUi .hTop{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 44px);display:flex;gap:8px;pointer-events:auto}
+#heliUi .hTop button{min-height:40px;font-size:13px}
+#heliUi .hPad{position:absolute;left:18px;bottom:calc(env(safe-area-inset-bottom) + 18px);width:150px;height:150px;border-radius:50%;background:rgba(10,20,28,.45);border:2px solid rgba(255,255,255,.35);pointer-events:auto;touch-action:none}
+#heliUi .hKnob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;background:rgba(255,255,255,.85)}
+#heliUi .hHilfe{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 8px);transform:translateX(-50%);font-size:12px;opacity:.85;background:rgba(10,20,28,.55);padding:4px 10px;border-radius:8px;white-space:nowrap}
+@media (pointer:coarse){#heliUi .hHilfe{display:none}}
+@media (pointer:fine){#heliUi .hPad{display:none}}`;
+  document.head.appendChild(st);
+  const d = document.createElement('div'); d.id = 'heliUi'; d.hidden = true;
+  d.innerHTML = `<div class="hInfo" id="hInfo"></div>
+<div class="hTop"><button id="hCam" type="button">Kamera</button><button id="hHier" type="button">Boot hierher</button><button id="hAus" type="button">✕ Zurück zum Boot</button></div>
+<div class="hPad" id="hPad"><div class="hKnob" id="hKnob"></div></div>
+<div class="hBtns"><button id="hTurbo" type="button">Turbo</button><button id="hUp" type="button">▲ Steigen</button><button id="hDn" type="button">▼ Sinken</button></div>
+<div class="hHilfe">W/S oder ↑/↓ Fahrt · A/D oder ←/→ drehen · Leertaste/Q steigen · E/X sinken · T Turbo · C Kamera · Karte: Pin-Knopf = hinfliegen · J/Esc zurück</div>`;
+  document.body.appendChild(d);
+  const pad = d.querySelector('#hPad'), knob = d.querySelector('#hKnob'); let pid = null;
+  const setK = (e) => { const r = pad.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2; let dx = (e.clientX - cx) / (r.width / 2), dy = (e.clientY - cy) / (r.height / 2); const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; } HELI.stick = [dx, -dy]; knob.style.transform = `translate(${dx * r.width / 2 * 0.7}px,${dy * r.height / 2 * 0.7}px)`; };
+  pad.addEventListener('pointerdown', e => { e.preventDefault(); pid = e.pointerId; pad.setPointerCapture(pid); setK(e); });
+  pad.addEventListener('pointermove', e => { if (e.pointerId === pid) setK(e); });
+  const los = e => { if (e.pointerId !== pid) return; pid = null; HELI.stick = [0, 0]; knob.style.transform = ''; };
+  pad.addEventListener('pointerup', los); pad.addEventListener('pointercancel', los);
+  const halt = (id, v) => { const b = d.querySelector(id); b.addEventListener('pointerdown', e => { e.preventDefault(); HELI.hoch = v; }); for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, () => { if (HELI.hoch === v) HELI.hoch = 0; }); };
+  halt('#hUp', 1); halt('#hDn', -1);
+  d.querySelector('#hTurbo').addEventListener('click', () => { HELI.turbo = !HELI.turbo; d.querySelector('#hTurbo').classList.toggle('on', HELI.turbo); });
+  d.querySelector('#hCam').addEventListener('click', () => heliCamWechsel());
+  d.querySelector('#hAus').addEventListener('click', () => heliStop(false));
+  d.querySelector('#hHier').addEventListener('click', () => heliStop(true));
+  return (HELI.ui = d);
+}
+function heliCamWechsel() { HELI.cam = (HELI.cam + 1) % 3; msg('Kamera: ' + ['hinter dem Hubschrauber', 'Cockpit', 'weit oben'][HELI.cam], 'info'); }
+function heliStart() {
+  if (!G || !G.running || G.over || G.mp) { msg('Der Hubschrauber startet im laufenden Spiel (nicht im Mehrspieler).', 'warn'); return; }
+  if (HELI.an) { heliStop(false); return; }
+  const pl = P(); HELI.x = pl.x; HELI.y = pl.y; HELI.hdg = pl.h; HELI.v = 0; HELI.vz = 0; HELI.yr = 0; HELI.alt = heliBoden(pl.x, pl.y) + 60; HELI.cam = 0;
+  if (!HELI.grp) { const m = heliModell(); HELI.grp = m.g; HELI.rotor = m.rotor; HELI.heck = m.heck; }
+  scene.add(HELI.grp); HELI.an = true; HELI.warPause = G.paused; G.paused = true; pauseEl.hidden = true; for (const k in keys) keys[k] = false;
+  const ui = heliUi(); ui.hidden = false; document.getElementById('touch').hidden = true;
+  const bh = document.getElementById('bHeli'); if (bh) bh.classList.add('on');
+  msg('Rundflug: Dein Boot wartet hier. ' + (isTouch ? 'Links steuern, rechts steigen/sinken, Turbo für weite Strecken.' : 'W/S Fahrt, A/D drehen, Leertaste/E Höhe, T Turbo.'), 'info');
+}
+function heliStop(bootHier) {
+  if (!HELI.an) return;
+  if (bootHier) {
+    const pl = P(); let ok = G.free;
+    if (ok && SHORE.kind === 'revier' && REVX) ok = revDepth(HELI.x, HELI.y) >= (pl.rib ? 0.6 : revDraft()) + 0.3; else if (ok) ok = onWater(HELI.x, HELI.y);
+    if (!G.free) { msg('Das Boot kann nur im freien Training versetzt werden.', 'warn'); return; }
+    if (!ok) { msg('Unter dem Hubschrauber ist kein ausreichend tiefes Wasser – flieg über das Wasser.', 'warn'); return; }
+    for (const b of G.boats) if (b !== pl && b.cpuTrainer) { b.x = HELI.x + 10; b.y = HELI.y - 9; b.v = 0; }
+    pl.x = HELI.x; pl.y = HELI.y; pl.h = HELI.hdg; pl.v = 0;
+  }
+  HELI.an = false; scene.remove(HELI.grp); G.paused = false; if (HELI.ui) HELI.ui.hidden = true; document.getElementById('touch').hidden = !isTouch;
+  const bh = document.getElementById('bHeli'); if (bh) bh.classList.remove('on');
+  snapCam = true; HELI.stick = [0, 0]; HELI.hoch = 0; HELI.keys = {};
+  if (SHORE.kind === 'revier' && REVX) revTick(true);
+  msg(bootHier ? 'Gelandet – dein Boot liegt jetzt hier.' : 'Zurück an Bord.', 'good');
+}
+function heliStep(dt) {
+  const K = HELI.keys, tb = HELI.turbo, vmax = tb ? 250 : 65;
+  let fw = HELI.stick[1], tr = HELI.stick[0], hz = HELI.hoch;
+  if (K.w || K.arrowup) fw = 1; if (K.s || K.arrowdown) fw = -1; if (K.a || K.arrowleft) tr = -1; if (K.d || K.arrowright) tr = 1;
+  if (K[' '] || K.q || K.pageup) hz = 1; if (K.e || K.x || K.pagedown) hz = -1;
+  /* Fahrt: Knüppel gibt Zielgeschwindigkeit vor, weich beschleunigen */
+  const vz = fw >= 0 ? fw * vmax : fw * 20; HELI.v += (vz - HELI.v) * Math.min(1, dt * (tb ? 0.9 : 1.4));
+  const yrz = tr * (tb ? 35 : 55); HELI.yr += (yrz - HELI.yr) * Math.min(1, dt * 3); HELI.hdg = wrap360(HELI.hdg + HELI.yr * dt);
+  const cz = hz * (tb ? 45 : 14); HELI.vz += (cz - HELI.vz) * Math.min(1, dt * 2.5); HELI.alt += HELI.vz * dt;
+  const d = dirv(HELI.hdg); HELI.x += d[0] * HELI.v * dt; HELI.y += d[1] * HELI.v * dt;
+  const boden = heliBoden(HELI.x, HELI.y), bodenV = heliBoden(HELI.x + d[0] * Math.max(30, HELI.v * 2), HELI.y + d[1] * Math.max(30, HELI.v * 2));
+  const min = Math.max(boden, bodenV * 0.9) + 4; if (HELI.alt < min) { HELI.alt += (min - HELI.alt) * Math.min(1, dt * 4); if (HELI.vz < 0) HELI.vz = 0; }
+  HELI.alt = Math.min(HELI.alt, 2500);
+  /* Lage: Nick beim Beschleunigen, Querneigung beim Drehen */
+  HELI.nick += ((-(vz - HELI.v) / vmax) * 0.35 - HELI.v / vmax * 0.12 - HELI.nick) * Math.min(1, dt * 3);
+  HELI.bank += (-HELI.yr / 55 * Math.min(1, HELI.v / 25 + 0.25) * 0.4 - HELI.bank) * Math.min(1, dt * 3);
+  const g = HELI.grp; g.position.set(HELI.x, HELI.alt, -HELI.y); g.rotation.set(0, 0, 0); g.rotation.order = 'YXZ'; g.rotation.y = -HELI.hdg * DEG; g.rotation.x = HELI.nick; g.rotation.z = HELI.bank;
+  HELI.rotor.rotation.y += dt * 38; HELI.heck.rotation.x += dt * 70;
+  HELI.hT = (HELI.hT || 0) - dt; if (HELI.hT <= 0 && HELI.ui) { HELI.hT = 0.2; document.getElementById('hInfo').textContent = 'Höhe ' + Math.round(HELI.alt) + ' m · ' + Math.round(Math.abs(HELI.v) * 3.6) + ' km/h · Kurs ' + String(Math.round(revWahr(HELI.hdg))).padStart(3, '0') + '°' + (HELI.turbo ? ' · TURBO' : ''); }
+}
+function revWahr(h) {                /* Spielkurs → rechtweisender Kurs */
+  try { if (SHORE.realOf) { const a = SHORE.realOf(HELI.x, HELI.y), d = dirv(h), b = SHORE.realOf(HELI.x + d[0] * 100, HELI.y + d[1] * 100); return wrap360(Math.atan2(b[0] - a[0], b[1] - a[1]) / DEG); } } catch (e) {}
+  return wrap360(h);
+}
+function heliCam(dt) {
+  const d = dirv(HELI.hdg), k = 1 - Math.exp(-dt * 4), tx = HELI.x, ty = -HELI.y;
+  camera.up.set(0, 1, 0);
+  if (HELI.cam === 1) { camera.position.set(tx + d[0] * 1.6, HELI.alt + 2.3, ty - d[1] * 1.6); camera.lookAt(tx + d[0] * 60, HELI.alt - 6 - HELI.nick * 40, ty - d[1] * 60); HELI.grp.visible = false; return; }
+  HELI.grp.visible = true;
+  const back = HELI.cam === 2 ? 160 : 26 + Math.abs(HELI.v) * 0.12, up = HELI.cam === 2 ? 90 : 8 + Math.abs(HELI.v) * 0.03;
+  _a.set(tx - d[0] * back, Math.max(HELI.alt + up, heliBoden(tx - d[0] * back, HELI.y - d[1] * back) + 3), ty + d[1] * back);
+  if (snapCam) { camera.position.copy(_a); snapCam = false; } else camera.position.lerp(_a, k);
+  camera.lookAt(tx + d[0] * 20, HELI.alt + 1.5, ty - d[1] * 20);
+}
 
 /* ================= Grundlagen ================= */
 const DEG=Math.PI/180, KN=0.514444;
@@ -7065,6 +7202,8 @@ window.addEventListener('keydown',e=>{
   if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'))return;
   const k=e.key.toLowerCase();
   if(!inGame())return;
+  if(HELI.an){if(k==='escape'||k==='j'){heliStop(false);}else if(k==='t'&&!e.repeat){HELI.turbo=!HELI.turbo;const tb=document.getElementById('hTurbo');if(tb)tb.classList.toggle('on',HELI.turbo);}else if(k==='c'&&!e.repeat)heliCamWechsel();else HELI.keys[k]=true;e.preventDefault();return;}
+  if(k==='j'&&!e.repeat&&!CHAT.open){heliStart();e.preventDefault();return;}
   if(k==='enter'&&chatAvail()){if(!e.repeat)chatShow(!CHAT.open);e.preventDefault();return;}
   if(k==='p'||k==='escape'){if(k==='escape'&&CHAT.open){chatShow(false);e.preventDefault();return;}togglePause();e.preventDefault();return;}
   if(G.paused){if(k==='c')cycleCam();return;}
@@ -7085,7 +7224,7 @@ window.addEventListener('keydown',e=>{
   else if(k==='q')keys.q=true;else if(k==='e')keys.e=true;else if(k==='h'){if(!e.repeat){keys.h=true;EASEDN=performance.now();}}else if(k==='enter'){if(G&&G.hbm&&!e.repeat){if(!hbRelease())hbMoor();}}else if(k==='r'){if(!e.repeat){keys.r=true;FURLDN.r=performance.now();}}else if(k==='g'){if(!e.repeat){keys.g=true;FURLDN.g=performance.now();}}
   else if(k==='arrowup'||k==='w'){keys.up=true;if(G&&G.hbm&&!e.repeat)hbPadHint();e.preventDefault();}else if(k==='arrowdown'||k==='s'){keys.down=true;if(G&&G.hbm&&!e.repeat)hbPadHint();e.preventDefault();}
 });
-window.addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k==='arrowleft'||k==='a')keys.left=false;else if(k==='arrowright'||k==='d')keys.right=false;else if(k==='shift')keys.shift=false;else if(k==='q')keys.q=false;else if(k==='e')keys.e=false;else if(k==='h'){keys.h=false;easeTap();}else if(k==='r'){keys.r=false;furlTap('r',1);}else if(k===' ')ROWIN.key=false;else if(k==='g'){keys.g=false;furlTap('g',0);}else if(k==='arrowup'||k==='w')keys.up=false;else if(k==='arrowdown'||k==='s')keys.down=false;});
+window.addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(HELI.an){HELI.keys[k]=false;return;}if(k==='arrowleft'||k==='a')keys.left=false;else if(k==='arrowright'||k==='d')keys.right=false;else if(k==='shift')keys.shift=false;else if(k==='q')keys.q=false;else if(k==='e')keys.e=false;else if(k==='h'){keys.h=false;easeTap();}else if(k==='r'){keys.r=false;furlTap('r',1);}else if(k===' ')ROWIN.key=false;else if(k==='g'){keys.g=false;furlTap('g',0);}else if(k==='arrowup'||k==='w')keys.up=false;else if(k==='arrowdown'||k==='s')keys.down=false;});
 window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false;touchL=touchR=false;touchPad=0;});
 const FURLDN={};let EASEDN=null;
 function easeTap(){const t=EASEDN;EASEDN=null;if(t==null||performance.now()-t>=300||!G||!G.running)return;const b=P();if(!b||b.rib)return;b.easeLock=!b.easeLock;msg(b.easeLock?'Schoten los – Segel killen.':'Schoten dicht.','info');const te=document.getElementById('tEase');if(te)te.textContent=b.easeLock?'Dicht':'Killen';}
@@ -7472,7 +7611,7 @@ function drawMap(){
   const dpr=Math.min(2,window.devicePixelRatio||1);const W=mapCv.clientWidth,H=mapCv.clientHeight;if(!W)return;
   if(mapCv.width!==Math.round(W*dpr)||mapCv.height!==Math.round(H*dpr)){mapCv.width=Math.round(W*dpr);mapCv.height=Math.round(H*dpr);}
   const x=mctx;x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,W,H);
-  const C=G.course;const pl=P();let sc,mp;
+  const C=G.course;const pl=HELI.an?Object.assign(Object.create(P()),{x:HELI.x,y:HELI.y}):P();let sc,mp;
   if(C.lesson){const cx=pl.x*C.R[0]+pl.y*C.R[1],ca=pl.x*C.U[0]+pl.y*C.U[1];sc=Math.min(W,H)/140;mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+(lat-cx)*sc,H/2-(al-ca)*sc];};}
   else if(C.wps||SHORE.kind==='revier'){const RR=1500,s0=Math.min(W,H)/(2*RR);sc=s0;const cx=pl.x*C.R[0]+pl.y*C.R[1],ca=pl.x*C.U[0]+pl.y*C.U[1];mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+(lat-cx)*s0,H/2-(al-ca)*s0];};}
   else{const LW=Math.max(C.lineLen*1.1,S.legLength*0.5,C.wing||C.om?S.legLength*0.5+60:0);const aMin=-110,aMax=S.legLength+50;const pad=8;sc=Math.min((W-2*pad)/(2*LW),(H-2*pad)/(aMax-aMin));
@@ -7513,6 +7652,7 @@ function drawMap(){
     if(b.isPlayer){x.strokeStyle='#fff';x.lineWidth=1.5;x.stroke();}x.restore();x.globalAlpha=1;
     if(b.penalty>0){x.fillStyle='#ff4f5f';x.beginPath();x.arc(px+5,py-5,2.5,0,7);x.fill();}}
   const sh=wrap180(G.wind.cur-C.W0);x.save();x.translate(14,16);x.rotate(sh*DEG+MAPROT);x.strokeStyle='#fff';x.fillStyle='#fff';x.lineWidth=2;x.beginPath();x.moveTo(0,-8);x.lineTo(0,7);x.stroke();x.beginPath();x.moveTo(0,10);x.lineTo(-4,3);x.lineTo(4,3);x.closePath();x.fill();x.restore();
+  if(HELI.an){const [hx,hy]=mp(HELI.x,HELI.y);x.save();x.translate(hx,hy);x.rotate((HELI.hdg-C.W0)*DEG+MAPROT);x.fillStyle='#d62d20';x.strokeStyle='#fff';x.lineWidth=1.5;x.beginPath();x.ellipse(0,0,4,6,0,0,Math.PI*2);x.fill();x.stroke();x.beginPath();x.moveTo(0,5);x.lineTo(0,13);x.stroke();x.beginPath();x.moveTo(-9,-1);x.lineTo(9,-1);x.moveTo(0,-10);x.lineTo(0,8);x.stroke();x.restore();}
   if(MAPROT||(S.mapNord!=='wind'&&SHORE.realOf&&!C.lesson)){x.save();x.translate(14,44);x.fillStyle='#fff';x.font='bold 11px system-ui,sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('N',0,1);x.beginPath();x.moveTo(0,-11);x.lineTo(-3.5,-6);x.lineTo(3.5,-6);x.closePath();x.fill();x.restore();}
 }
 
@@ -7601,6 +7741,7 @@ function renderBoats(dt,now){
 }
 function updateCam(dt,now){
   if(BM.on){bmCam();return;}
+  if(HELI.an){heliCam(dt);return;}
   const pl=camBoat();const tx=pl.x,ty=-pl.y;
   if(!G.running){cam.orbit+=dt*0.05;const cx=G.course.U[0]*S.legLength*0.12,cz=-G.course.U[1]*S.legLength*0.12-20;camera.position.set(cx+Math.cos(cam.orbit)*95,18+HS*3,cz+Math.sin(cam.orbit)*95);camera.up.set(0,1,0);camera.lookAt(cx,2,cz);return;}
   cam.h+=wrap180(pl.h-cam.h)*Math.min(1,dt*2.2);
@@ -7628,7 +7769,7 @@ const _nv=new THREE.Vector3();
 function navUpdate(){if(!NIGHT||!G)return;for(const b of G.boats){const m=b.m;if(!m||!m.navL||b.gone)continue;_nv.copy(camera.position);m.g.worldToLocal(_nv);
     const th=Math.atan2(_nv.x,-_nv.z)/DEG,a=Math.abs(th);   // 0° voraus, positiv = Steuerbordseite
     for(const l of m.navL){const on=l.k==='port'?(th<=0&&a<=112.5):l.k==='stb'?(th>=0&&a<=112.5):l.k==='stern'?a>=112.5:true;l.sp.visible=on;l.ball.visible=on;}}}
-function render(dt,now){try{revTick();revFeuerTick();revNachtTick();revBrueckenTick();revSchiffeTick();if(SHORE&&SHORE.kind==='revier'&&G&&G.boats&&G.boats[0]){const pq=SHORE.realOf(G.boats[0].x,G.boats[0].y);revNvTick(pq[0],pq[1]);try{revZugTick(pq[0],pq[1]);}catch(e){console.error('Zug',e);}}}catch(e){console.error('Revier',e);}
+function render(dt,now){try{revTick();revFeuerTick();revNachtTick();revBrueckenTick();revSchiffeTick();if(SHORE&&SHORE.kind==='revier'&&G&&G.boats&&G.boats[0]){const pq=HELI.an?SHORE.realOf(HELI.x,HELI.y):SHORE.realOf(G.boats[0].x,G.boats[0].y);revNvTick(pq[0],pq[1]);try{revZugTick(pq[0],pq[1]);}catch(e){console.error('Zug',e);}}}catch(e){console.error('Revier',e);}
   waterMat.uniforms.uT.value=now;sky.material.uniforms.uT.value=now%1800;if(SHORE.anim)for(const fa of SHORE.anim)fa(now);
   const tow=dirv(G.wind.cur+180);waterMat.uniforms.uWind.value.set(tow[0],-tow[1]);
   for(let i=0;i<16;i++){const p=G.wind.puffs[i];if(p)puffU[i].set(p.x,-p.y,p.r,p.str*p.env);else puffU[i].set(0,0,1,0);}
@@ -7646,9 +7787,9 @@ function render(dt,now){try{revTick();revFeuerTick();revNachtTick();revBrueckenT
   C3.beacon.visible=!!(isMark(t)&&G.running&&!G.course.lesson);if(C3.beacon.visible)C3.beacon.position.set(t.x,12,-t.y);
   updateRoundArrow(now);updateVectors();updateFan(dt);updateLadder();
   updateCam(dt,now);
-  camera.getWorldDirection(_c);_c.y=0;if(_c.lengthSq()>1e-6)_c.normalize();const sx=camera.position.x+_c.x*14,sz=camera.position.z+_c.z*14;waterNear.position.set(sx,0,sz);waterFar.position.set(camera.position.x,-0.04,camera.position.z);
+  camera.getWorldDirection(_c);_c.y=0;if(_c.lengthSq()>1e-6)_c.normalize();const sx=camera.position.x+_c.x*14,sz=camera.position.z+_c.z*14;waterNear.position.set(sx,0,sz);waterFar.position.set(camera.position.x,-0.04,camera.position.z);{const wf=HELI.an?Math.max(1,Math.min(12,camera.position.y/22)):1;if(waterNear.scale.x!==wf){waterNear.scale.set(wf,1,wf);waterFar.scale.set(wf,1,wf);}}
   sky.position.copy(camera.position);astroTick(now);camera.updateMatrixWorld();wxUpdate(dt,now);navUpdate();glare.position.copy(camera.position).addScaledVector(SUN_DIR,5000);
-  const fx=G.running?pl.x:0,fz=G.running?-pl.y:20;sun.position.set(fx+SUN_DIR.x*160,SUN_DIR.y*160,fz+SUN_DIR.z*160);sun.target.position.set(fx,0,fz);sun.target.updateMatrixWorld();
+  const fx=HELI.an?HELI.x:G.running?pl.x:0,fz=HELI.an?-HELI.y:G.running?-pl.y:20;sun.position.set(fx+SUN_DIR.x*160,SUN_DIR.y*160,fz+SUN_DIR.z*160);sun.target.position.set(fx,0,fz);sun.target.updateMatrixWorld();
   if(S.gfx==='hoch'||S.gfx==='ultra'){renderReflection();waterMat.uniforms.uUseRefl.value=1;}else waterMat.uniforms.uUseRefl.value=0;
   renderer.shadowMap.needsUpdate=S.gfx!=='niedrig';
   if(S.gfx==='ultra'){ANISO_T-=dt;if(ANISO_T<=0){ANISO_T=3;gfxAniso();}ppRender();}else renderer.render(scene,camera);
@@ -8853,6 +8994,7 @@ $('objSnap').addEventListener('change',e=>{OB.snap=e.target.checked;});
 $('bmBtn').addEventListener('click',bmOpen);$('edTo3d').addEventListener('click',()=>{if(edApplyDoc()){edOv.hidden=true;bmOpen();}});
 
 $('csvBtn').addEventListener('click',exportCSV);$('gpxBtn').addEventListener('click',()=>$('gpxFile').click());$('gpxFile').addEventListener('change',importGPX);
+$('bHeli').addEventListener('click',()=>heliStart());
 $('bFan').addEventListener('click',()=>{if(G&&G.fanLock){msg('Der Kursfächer ist in dieser Wettfahrt gesperrt.','warn');return;}S.courseFan=!S.courseFan;if(S_main)S_main.courseFan=S.courseFan;saveS();wlUi();msg('Kursfächer '+(S.courseFan?'an':'aus'),'info');});
 $('bTrack').addEventListener('click',()=>{S.mapTrack=!S.mapTrack;if(S_main)S_main.mapTrack=S.mapTrack;saveS();wlUi();msg('Spur auf der Karte '+(S.mapTrack?'an':'aus'),'info');});
 $('specBar').addEventListener('click',e=>{const t=e.target.closest('[data-sp]');if(!t)return;if(t.dataset.sp==='m')trainerMark();else specNext(+t.dataset.sp);});
@@ -8864,6 +9006,7 @@ function loop(nowMs){
   const dtR=Math.min(0.1,Math.max(0,(nowMs-last)/1000));last=nowMs;WCLK=nowMs/1000;
   if(G.running&&!G.paused&&(!G.over||(G.mp&&MP.host))){const sim=dtR*S.gameSpeed;const n=Math.max(1,Math.ceil(sim/0.02));const h=sim/n;for(let i=0;i<n;i++)step(h);}
   else if(!G.running){G.wind.update(dtR);}
+  if(HELI.an)try{heliStep(dtR);}catch(e){console.error('Heli',e);}
   mpTick(dtR);render(dtR,nowMs/1000);soundUpdate(nowMs/1000);
 }
 /* ================= Ixylon ================= */
