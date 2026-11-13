@@ -753,7 +753,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
    Grundberührung nach Tiefgang der Bootsklasse. KEINE Navigationskarte.
    ===================================================================== */
 var REV_BASES = ['../See-Editor/', ''];           /* erst die See-Editor-Seite, dann der eigene Ordner */
-var REVIERE_K = { ruegen: { datei: 'ruegen-spiel.json', name: 'Rügen · Bodden · Peenestrom' }, usedom: { datei: 'usedom-spiel.json', name: 'Usedom · Haff · Peenestrom' } };
+var REVIERE_K = { ruegen: { datei: 'ruegen-spiel.json', name: 'Rügen · Bodden · Peenestrom' }, usedom: { datei: 'usedom-spiel.json', name: 'Usedom · Haff · Peenestrom' }, rostock: { datei: 'rostock-spiel.json', name: 'Rostock · Warnemünde' } };
 var REVX = null, REVH = null, REVH_LOAD = null, REVH_ERR = null;
 var REV_DRAFT = { gorchfock: 4.8, jolle: 1.0, opti: 0.75, topcat: 0.7, viking: 1.0, imoca: 4.5, zk10: 1.0, ixylon: 0.9, k6: 0.9, moth: 1.0 };
 var REV_ORIG_ALT = { hiddensee: [366520, 6016000] };  /* Strecken aus der ersten Hiddensee-Version umrechnen */
@@ -1024,6 +1024,9 @@ var REV_LT = [
   { re: /Dornbusch/i, s: { form: 12, h: 28, r0: 3.0, r1: 2.3, col: '#f2f0ea', galerie: 1, gcol: '#e8e4da', lat: '#f2f0ea', dach: '#b3362c' } },
   { re: /Oie/i, s: { form: 8, h: 39, r0: 3.8, r1: 2.8, col: '#a0523a', sockel: { form: 4, h: 6, r: 5.6, col: '#9a5640' }, galerie: 2, gcol: '#1f1f1f', lat: '#1f1f1f', dach: '#1f1f1f' } },
   { re: /Sassnitz Ost/i, s: { form: 8, h: 13, r0: 1.7, r1: 1.05, col: '#1f8a4c', bands: [[0.36, 0.74, '#f4f3ee']], galerie: 1, gcol: '#1f8a4c', lat: '#1f8a4c', dach: '#1f8a4c', fahne: true, plattform: { r: 9, h: 3.2, col: '#8b6a52' } } },
+  { re: /Warnemünde.*(West|Mole W)|West.*Warnemünde/i, s: { form: 12, h: 11, r0: 1.5, r1: 1.15, col: '#1f8a4c', bands: [[0.42, 0.56, '#f4f2ec']], galerie: 1, gcol: '#1f8a4c', lat: '#1f8a4c', dach: '#1f8a4c' } },
+  { re: /Warnemünde.*(Ost|Mole E)|Ost.*Warnemünde/i, s: { form: 12, h: 11, r0: 1.5, r1: 1.15, col: '#c62828', bands: [[0.42, 0.56, '#f4f2ec']], galerie: 1, gcol: '#c62828', lat: '#c62828', dach: '#c62828' } },
+  { re: /^Leuchtturm Warnemünde$|^Warnemünde$/i, s: { form: 16, h: 31, r0: 2.7, r1: 2.1, col: '#eee8da', galerie: 2, gcol: '#2f6b4f', lat: '#2f6b4f', dach: '#3f8566' } },
   { re: /Westmole/i, s: { typ: 'beine', h: 7, col: '#c62828' } },
   { re: /Mukran/i, s: { form: 8, h: 14, r0: 1.6, r1: 1.1, col: '#2e7d4f', bands: [[0.5, 0.62, '#f2f0ea']], galerie: 1, gcol: '#2e7d4f', lat: '#2e7d4f', dach: '#2e7d4f' } },
   { re: /^Peenemünde$/i, s: { form: 16, h: 11, r0: 1.8, r1: 1.5, col: '#c0392b', bands: [[0, 0.18, '#f2f0ea']], galerie: 1, gcol: '#c0392b', lat: '#f2f0ea', dach: '#f2f0ea', caisson: true } },
@@ -1332,7 +1335,7 @@ function revNacht() { return typeof NIGHT === 'number' && NIGHT > 0.5 ? 1 : S.li
 /* Hauswände mit Fenstern: Raster je nach Hausgröße, zufällig erleuchtet, warmes Licht */
 /* Hansestadt-Altstadt (Stralsund, Greifswald, Wolgast): Backstein, Ocker, rote Dächer */
 function revHanse(E, N) {
-  const X = REVX; if (!X.hanseOrte) X.hanseOrte = (X.idx.places || []).filter(p => /^(Stralsund|Greifswald|Wolgast|Anklam|Usedom|Ueckermünde|Lassan)$/.test(p[2])).map(p => [p[0], p[1], p[2] === 'Stralsund' ? 1500 : 1000]);
+  const X = REVX; if (!X.hanseOrte) X.hanseOrte = (X.idx.places || []).filter(p => /^(Stralsund|Greifswald|Wolgast|Anklam|Usedom|Ueckermünde|Lassan|Rostock)$/.test(p[2])).map(p => [p[0], p[1], p[2] === 'Stralsund' ? 1500 : 1000]);
   for (const b of X.hanseOrte) if (Math.hypot(b[0] - E, b[1] - N) < b[2]) return true;
   return false;
 }
@@ -1344,7 +1347,7 @@ function revReet(E, N) {
 }
 /* Seebäder mit weißer Bäderarchitektur */
 function revBad(E, N) {
-  const X = REVX; if (!X.badOrte) X.badOrte = (X.idx.places || []).filter(p => /Sassnitz|Binz|Sellin|Göhren|Baabe|Zinnowitz|Lohme|Glowe|Breege|Juliusruh|Thiessow|Lubmin|Zempin|Koserow|Trassenheide|Karlshagen|Vitte|Kloster|Neuendorf|Heringsdorf|Bansin|Ahlbeck|Ückeritz|Kölpinsee|Loddin|Świnoujście|Swinemünde/.test(p[2])).map(p => [p[0], p[1], /Sassnitz|Binz/.test(p[2]) ? 2200 : 1300]);
+  const X = REVX; if (!X.badOrte) X.badOrte = (X.idx.places || []).filter(p => /Sassnitz|Binz|Sellin|Göhren|Baabe|Zinnowitz|Lohme|Glowe|Breege|Juliusruh|Thiessow|Lubmin|Zempin|Koserow|Trassenheide|Karlshagen|Vitte|Kloster|Neuendorf|Heringsdorf|Bansin|Ahlbeck|Ückeritz|Kölpinsee|Loddin|Świnoujście|Swinemünde|Warnemünde|Markgrafenheide|Diedrichshagen|Nienhagen|Graal-Müritz/.test(p[2])).map(p => [p[0], p[1], /Sassnitz|Binz/.test(p[2]) ? 2200 : 1300]);
   for (const b of X.badOrte) if (Math.abs(b[0] - E) < b[2] && Math.abs(b[1] - N) < b[2] && Math.hypot(b[0] - E, b[1] - N) < b[2]) return true;
   return false;
 }
@@ -1453,7 +1456,7 @@ function revWzBuild(z) {
   const X = REVX, F = SHORE.fwd, w = z.w, P = z.P, grp = new THREE.Group(), mats = [];
   const M = (c, k) => { const m = new THREE.MeshLambertMaterial({ color: c }); mats.push([m, k == null ? 0.5 : k]); return m; };
   const G = (E, N) => { const q = F(E, N); return [q[0], -q[1]]; };     /* → Szene x/z */
-  let zmin = 1e9; for (const q of P) zmin = Math.min(zmin, revZ(q[0], q[1])); const wasser = /bark|uboot|schiff|yacht/.test(w.art);
+  let zmin = 1e9; for (const q of P) zmin = Math.min(zmin, revZ(q[0], q[1])); const wasser = /bark|uboot|schiff|yacht|kreuzfahrt/.test(w.art);
   const base = wasser ? 0 : Math.max(0.2, zmin + 0.35) - 0.6;
   const ob = revObb(P);
   /* Grundriss hochziehen */
@@ -1579,6 +1582,20 @@ function revWzBuild(z) {
         pos.forEach((q, i) => { const p = G(q[0], q[1]), s = 0.8 + Math.random() * 0.5; q4.setFromAxisAngle(up, Math.random() * Math.PI); sv.set(s * 1.6, s * (0.85 + Math.random() * 0.4), s * 1.6); pv.set(p[0], q[2] - 0.15, p[1]); m4.compose(pv, q4, sv); im.setMatrixAt(i, m4); c.setHSL(0.13 + Math.random() * 0.05, 0.35, 0.5 + Math.random() * 0.15); im.setColorAt(i, c); });
         im.frustumCulled = false; grp.add(im); } }
     const ll = revLampen(lat); if (ll) grp.add(ll);
+  } else if (w.art === 'teepott') {
+    const R = Math.max(12, Math.sqrt(ob.L * ob.B) * 0.5), c0 = G(w.x, w.y), y0 = base, hw = 4.2;
+    const gl = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.92, R * 0.92, hw, 36, 1, true), M('#2b3f4f', 1.2)); gl.material.side = THREE.DoubleSide; gl.position.set(c0[0], y0 + hw / 2, c0[1]); grp.add(gl);
+    const rg = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.93, R * 0.93, 0.5, 36), M('#e9e6de', 0.5)); rg.position.set(c0[0], y0 + 0.25, c0[1]); grp.add(rg);
+    const NR = 10, NT = 72, pv = [], ix = [];
+    for (let i = 0; i <= NR; i++) for (let j = 0; j <= NT; j++) { const r = R * i / NR, th = j / NT * Math.PI * 2, z = y0 + hw + 0.4 + (r / R) * (r / R) * (2.8 * Math.cos(3 * th) + 1.4) ; pv.push(c0[0] + Math.cos(th) * r, z, c0[1] + Math.sin(th) * r); }
+    for (let i = 0; i < NR; i++) for (let j = 0; j < NT; j++) { const a = i * (NT + 1) + j, b = a + NT + 1; ix.push(a, b, a + 1, a + 1, b, b + 1); }
+    const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.Float32BufferAttribute(pv, 3)); dg.setIndex(ix); dg.computeVertexNormals();
+    const dm = new THREE.Mesh(dg, new THREE.MeshLambertMaterial({ color: '#f4f2ec', side: THREE.DoubleSide })); mats.push([dm.material, 0.3]); grp.add(dm);
+  } else if (w.art === 'kreuzfahrt') {
+    /* Kreuzfahrtschiff am Liegeplatz (Bug in Richtung w.dir) */
+    const sp = revSchiffSpec(w.typ || 'aida'); if (sp) { const m = revSchiffBau(sp, w.schiff || ''), d = (w.dir || 0) * DEG, p0 = G(w.x, w.y), p1 = G(w.x + Math.sin(d) * 10, w.y + Math.cos(d) * 10);
+      m.position.set(p0[0], 0, p0[1]); m.rotation.y = Math.atan2(p1[0] - p0[0], p1[1] - p0[1]) + Math.PI; grp.add(m); (X.nachtSchiffe = X.nachtSchiffe || []).push(m.userData.nachtMats);
+      if (!X.stegSolid) X.stegSolid = new Set(); const ux = Math.sin(d), uy = Math.cos(d); for (let a = -sp.L / 2; a <= sp.L / 2; a += 1.5) for (let b = -sp.B / 2; b <= sp.B / 2; b += 1.5) X.stegSolid.add(Math.floor((w.x + ux * a + uy * b) / 2) + ',' + Math.floor((w.y + uy * a - ux * b) / 2)); }
   } else if (w.art === 'werfthalle') {
     /* Peene-Werft: blaue Hallen mit hellem Dach, Schriftzug zur Peene */
     const h = w.h || 18; extr(h, '#2f6fc4', 0.35); extr(0.5, '#d4d8dc', 0.25, base + h);
@@ -2358,7 +2375,209 @@ function revTexName(txt, farbe, bg) {
   if (bg) { x.fillStyle = bg; x.fillRect(0, 0, 512, 64); } x.fillStyle = farbe; x.font = 'bold 44px Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, 256, 34);
   return new THREE.CanvasTexture(c);
 }
+/* ---------- Schiffsbaukasten: Rumpf aus Spanten (Sprung, Kimm, ausfallender Bug, Spiegelheck), Aufbauten mit Fensterreihen,
+   Brücke mit Nocken, Schornstein in Reedereifarben, Rettungsboote, Reling, Rotorsegel. Bug zeigt nach −Z, Wasserlinie y = 0. ---------- */
+var REV_SCHIFFSTYPEN = {
+  /* Scandlines-Hybridfähren Rostock–Gedser: 169,5 × 24,8 m, Tiefgang 5,5 m, ca. 19 kn */
+  scandlines: { L: 169.5, B: 24.8, T: 5.5, fb: 13.5, bug: 'faehre', heck: 'roro', livery: 'scandlines', heimat: 'ROSTOCK',
+    deck: [{ t0: 0.16, t1: 0.86, h: 3.0, w: 0.97, f: 'band' }, { t0: 0.24, t1: 0.84, h: 2.9, w: 0.93, f: 'band' }, { t0: 0.5, t1: 0.82, h: 2.8, w: 0.82, f: 'reihe' }],
+    bruecke: { t: 0.8, w: 0.74, nock: 1.03 }, schorn: [{ t: 0.26, x: 0, w: 4.2, l: 9, h: 9, farben: ['#ffffff', '#ffffff', '#1d1d1d'], logo: 'scandlines' }],
+    boote: { t0: 0.36, t1: 0.66, n: 4, deck: 1 }, mast: { t: 0.74, h: 12 } },
+  scandlines_rotor: { basis: 'scandlines', rotor: [{ t: 0.6, r: 2.5, h: 30 }] },
+  /* Stena Line Rostock–Trelleborg (Eisenbahn-/RoPax-Fähre, ca. 200 × 29 m) */
+  stena: { L: 200, B: 29.5, T: 6.3, fb: 14.5, bug: 'faehre', heck: 'roro', livery: 'stena', heimat: 'TRELLEBORG',
+    deck: [{ t0: 0.5, t1: 0.9, h: 3.0, w: 0.97, f: 'band' }, { t0: 0.52, t1: 0.89, h: 2.9, w: 0.95, f: 'band' }, { t0: 0.56, t1: 0.88, h: 2.9, w: 0.9, f: 'reihe' }, { t0: 0.62, t1: 0.86, h: 2.7, w: 0.8, f: 'reihe' }],
+    bruecke: { t: 0.87, w: 0.78, nock: 1.03 }, schorn: [{ t: 0.3, x: -6.5, w: 3.2, l: 7, h: 10, farben: ['#1b3f86', '#d22630', '#1b3f86'], logo: 'stena' }, { t: 0.3, x: 6.5, w: 3.2, l: 7, h: 10, farben: ['#1b3f86', '#d22630', '#1b3f86'], logo: 'stena' }],
+    boote: { t0: 0.58, t1: 0.8, n: 4, deck: 2 }, mast: { t: 0.8, h: 13 } },
+  /* Kreuzfahrtschiff der AIDA-Flotte (Sphinx-Klasse, ca. 252 × 32 m) mit Kussmund am Bug */
+  aida: { L: 252, B: 32.2, T: 7.3, fb: 13, bug: 'kreuzfahrt', heck: 'kreuzfahrt', livery: 'aida', heimat: 'GENOVA',
+    deck: [{ t0: 0.06, t1: 0.9, h: 3.0, w: 0.98, f: 'balkon' }, { t0: 0.07, t1: 0.89, h: 3.0, w: 0.98, f: 'balkon' }, { t0: 0.08, t1: 0.88, h: 3.0, w: 0.98, f: 'balkon' },
+      { t0: 0.09, t1: 0.87, h: 3.0, w: 0.98, f: 'balkon' }, { t0: 0.1, t1: 0.86, h: 3.0, w: 0.97, f: 'balkon' }, { t0: 0.12, t1: 0.85, h: 3.0, w: 0.95, f: 'balkon' },
+      { t0: 0.2, t1: 0.84, h: 3.0, w: 0.9, f: 'reihe' }, { t0: 0.45, t1: 0.82, h: 3.2, w: 0.8, f: 'band' }],
+    bruecke: { t: 0.875, w: 0.8, nock: 1.03, ebene: 4 }, schorn: [{ t: 0.24, x: 0, w: 6, l: 14, h: 9, farben: ['#ffffff', '#ffffff', '#ffffff'], logo: 'aida' }],
+    boote: { t0: 0.2, t1: 0.82, n: 12, deck: 0, unter: true }, mast: { t: 0.83, h: 9 } },
+  /* Warnowfähre Warnemünde–Hohe Düne: Doppelender mit offenem Autodeck, seitlichem Aufbau */
+  warnow: { L: 62, B: 15.5, T: 2.6, fb: 2.8, bug: 'doppel', heck: 'doppel', livery: 'warnow', heimat: 'ROSTOCK', autodeck: true,
+    deck: [{ t0: 0.25, t1: 0.75, h: 2.8, w: 0.18, x: 0.4, f: 'reihe' }, { t0: 0.3, t1: 0.7, h: 2.6, w: 0.18, x: 0.4, f: 'reihe' }],
+    bruecke: { t: 0.5, w: 0.3, x: 0.33, nock: 0, quer: true }, schorn: [{ t: 0.5, x: 6.2, w: 1.4, l: 2.2, h: 3.2, farben: ['#ffffff', '#1f4e9a', '#1d1d1d'] }], mast: { t: 0.5, h: 6, x: 5 } },
+};
+var REV_SCHIFFTEX = {};
+function revSchiffSpec(typ) { let s = REV_SCHIFFSTYPEN[typ]; if (!s) return null; if (s.basis) s = Object.assign({}, REV_SCHIFFSTYPEN[s.basis], s); return s; }
+/* Rumpf-Textur: linke Hälfte Steuerbord (Heck links → Bug rechts), rechte Hälfte Backbord (Bug links → Heck rechts) */
+function revRumpfTex(sp, name) {
+  const key = sp.livery + '|' + name; if (REV_SCHIFFTEX[key]) return REV_SCHIFFTEX[key];
+  const W = 2048, H = 256, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  const hh = sp.fb + sp.T, Y = y => H * (1 - (y + sp.T) / hh);             /* Höhe über WL → Pixel */
+  const lv = sp.livery;
+  for (const side of [0, 1]) {
+    const x0 = side * W / 2, w = W / 2, X = t => x0 + (side ? (1 - t) : t) * w;   /* t: 0 Heck … 1 Bug */
+    const rumpf = lv === 'warnow' ? '#f2f2ee' : '#fbfbf9';
+    x.fillStyle = rumpf; x.fillRect(x0, 0, w, H);
+    /* Unterwasser rot, Wasserpass dunkel */
+    x.fillStyle = '#8f2c24'; x.fillRect(x0, Y(-0.4), w, H - Y(-0.4));
+    const pass = { scandlines: '#16285a', stena: '#1b3f86', aida: '#24324a', warnow: '#1f4e9a' }[lv] || '#1d1d1d';
+    x.fillStyle = pass; x.fillRect(x0, Y(lv === 'aida' ? 1.4 : 2.6), w, Y(-0.4) - Y(lv === 'aida' ? 1.4 : 2.6));
+    x.save(); x.beginPath(); x.rect(x0, 0, w, H); x.clip();
+    if (lv === 'scandlines') {
+      /* großer Schriftzug, grünes Band, „hybrid ferry“ */
+      x.fillStyle = '#6cb33f'; x.fillRect(x0, Y(3.4), w, Y(2.6) - Y(3.4));
+      x.fillStyle = '#16285a'; x.font = 'bold ' + Math.round(Y(4.5) - Y(10.5)) + 'px Arial,Helvetica,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'alphabetic'; x.fillText('SCANDLINES', X(0.5), Y(4.6));
+      x.fillStyle = '#6cb33f'; x.font = 'bold ' + Math.round(Y(9.5) - Y(12)) + 'px Arial,Helvetica,sans-serif'; x.fillText('hybrid ferry', X(0.24), Y(9.6));
+    } else if (lv === 'stena') {
+      x.fillStyle = '#1b3f86'; x.font = 'bold ' + Math.round(Y(4) - Y(11)) + 'px Arial,Helvetica,sans-serif'; x.textAlign = 'center'; x.fillText('STENA LINE', X(0.47), Y(4.2));
+      /* rot-blaue Streifen am Bug */
+      for (const [c0, o] of [['#d22630', 0], ['#1b3f86', 1]]) { x.fillStyle = c0; x.beginPath(); const a = X(0.82 + o * 0.035), b = X(0.86 + o * 0.035); x.moveTo(a, Y(sp.fb)); x.lineTo(b, Y(sp.fb)); x.lineTo(b + (side ? 1 : -1) * 60, Y(3)); x.lineTo(a + (side ? 1 : -1) * 60, Y(3)); x.fill(); }
+    } else if (lv === 'aida') {
+      /* Bullaugenreihen, Kussmund und Augen am Bug, Wellenlinien */
+      x.fillStyle = '#2b3a4d'; for (const yy of [5, 8.5]) for (let t = 0.08; t < 0.9; t += 0.0065) { x.beginPath(); x.arc(X(t), Y(yy), 2.2, 0, 7); x.fill(); }
+      const bx = X(0.9), r = (Y(1.5) - Y(9)) / 2, dir = side ? 1 : -1;
+      x.fillStyle = '#d4202f'; x.beginPath(); x.ellipse(bx, Y(4.2), r * 1.9, r * 0.55, 0, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#fbfbf9'; x.beginPath(); x.ellipse(bx, Y(4.15), r * 1.5, r * 0.07, 0, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#ffffff'; x.strokeStyle = '#2061a8'; x.lineWidth = 6; x.beginPath(); x.ellipse(bx - dir * r * 0.4, Y(10.3), r * 0.7, r * 0.36, 0, 0, Math.PI * 2); x.fill(); x.stroke();
+      x.fillStyle = '#2061a8'; x.beginPath(); x.arc(bx - dir * r * 0.25, Y(10.2), r * 0.24, 0, 7); x.fill();
+      x.strokeStyle = '#2061a8'; x.lineWidth = 9; x.beginPath(); x.moveTo(X(0.92) + dir * 10, Y(4)); x.bezierCurveTo(X(0.98), Y(2.5), X(0.99), Y(8), X(1.0), Y(11)); x.stroke();
+      x.fillStyle = '#2061a8'; x.font = 'bold ' + Math.round(Y(6) - Y(10)) + 'px Arial,Helvetica,sans-serif'; x.textAlign = 'center'; x.fillText('AIDA', X(0.5), Y(6.6));
+    } else if (lv === 'warnow') {
+      x.fillStyle = '#1f4e9a'; x.fillRect(x0, Y(sp.fb - 0.2), w, Y(sp.fb - 0.9) - Y(sp.fb - 0.2));
+    }
+    /* Name am Bug, Heimathafen am Heck */
+    x.fillStyle = lv === 'aida' ? '#2061a8' : '#1d1d1d'; const fs = Math.round(Math.max(14, (Y(0) - Y(Math.min(2.2, sp.fb * 0.5))) * 0.9));
+    x.font = 'bold ' + fs + 'px Arial,Helvetica,sans-serif'; x.textAlign = 'center';
+    if (name && lv !== 'aida') x.fillText(name, X(0.9), Y(sp.fb - 1.1) + fs);
+    if (name && lv === 'aida') x.fillText(name, X(0.84), Y(sp.fb - 0.6) + fs);
+    if (sp.heimat) { x.font = 'bold ' + Math.round(fs * 0.7) + 'px Arial,Helvetica,sans-serif'; x.fillText(sp.heimat, X(0.06), Y(sp.fb - 1.2) + fs * 0.7); }
+    x.restore();
+  }
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return (REV_SCHIFFTEX[key] = t);
+}
+/* Fenster-Textur für Aufbauten (wiederholbar), dazu eine Leuchtkarte für die Nacht */
+function revAufbauTex(art) {
+  if (REV_SCHIFFTEX['a|' + art]) return REV_SCHIFFTEX['a|' + art];
+  const mk = (nacht) => { const c = document.createElement('canvas'); c.width = 128; c.height = 64; const x = c.getContext('2d'); x.fillStyle = nacht ? '#000' : '#fbfbf9'; x.fillRect(0, 0, 128, 64);
+    const gl = nacht ? '#ffd890' : '#24303b';
+    if (art === 'band') { x.fillStyle = gl; x.fillRect(0, 20, 128, 22); if (!nacht) { x.fillStyle = '#e8e8e4'; for (let i = 0; i < 128; i += 16) x.fillRect(i, 20, 2, 22); } }
+    else if (art === 'reihe') { x.fillStyle = gl; for (let i = 4; i < 128; i += 16) x.fillRect(i, 22, 10, 18); }
+    else if (art === 'balkon') { x.fillStyle = gl; x.fillRect(0, 16, 128, 30); if (!nacht) { x.fillStyle = '#d8dde2'; for (let i = 0; i < 128; i += 16) x.fillRect(i, 16, 2, 30); x.fillStyle = '#9fb4c4'; x.fillRect(0, 36, 128, 10); } }
+    else if (art === 'bruecke') { x.fillStyle = gl; x.fillRect(0, 14, 128, 30); if (!nacht) { x.fillStyle = '#fbfbf9'; for (let i = 0; i < 128; i += 21) x.fillRect(i, 14, 3, 30); } }
+    const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t; };
+  return (REV_SCHIFFTEX['a|' + art] = [mk(false), mk(true)]);
+}
+function revSchiffBau(sp, name) {
+  const g = new THREE.Group(), nachtMats = [], L = sp.L, B = sp.B, hb = B / 2, T = sp.T, fb = sp.fb;
+  const MAT = (c, o) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, o || {}));
+  const weiss = '#fbfbf9';
+  /* --- Rumpf: Spanten von Heck (t=0) bis Bug (t=1) --- */
+  const NS = 48, dop = sp.bug === 'doppel';
+  const plan = (t, y) => {              /* halbe Breite (0…1) in Höhe y */
+    const u = dop ? 1 - Math.abs(2 * t - 1) : t, deckF = Math.max(0, Math.min(1, y / fb));
+    let wl;
+    if (dop) wl = u > 0.3 ? 1 : Math.sqrt(Math.max(0, 1 - Math.pow((0.3 - u) / 0.3, 2)));
+    else if (t > 0.6) { const q = (t - 0.6) / 0.4; wl = Math.sqrt(Math.max(0, 1 - Math.pow(q, sp.bug === 'kreuzfahrt' ? 1.6 : 1.8))); }
+    else if (t < 0.1) wl = 0.9 + t;   /* Spiegelheck etwas schmaler */
+    else wl = 1;
+    let dk = wl;                        /* Deckslinie: Ausfall am Bug */
+    if (!dop && t > 0.6) { const q = (t - 0.6) / 0.42; dk = Math.sqrt(Math.max(0, 1 - Math.pow(q, 2.6))); }
+    if (dop && u < 0.3) dk = Math.sqrt(Math.max(0, 1 - Math.pow((0.3 - u) / 0.34, 2.4)));
+    return y <= 0 ? wl : wl + (dk - wl) * Math.pow(deckF, 0.8);
+  };
+  const zOf = (t, y) => {                /* Längsposition, Bug ausfallend (über WL weiter vorn), Heck leicht überhängend */
+    let z = -(t - 0.5) * L;
+    if (!dop && t > 0.9) z -= Math.max(0, y) / fb * (t - 0.9) / 0.1 * L * 0.035;
+    if (!dop && t < 0.04) z += Math.max(0, y) / fb * (0.04 - t) / 0.04 * L * 0.01;
+    return z;
+  };
+  const kiel = t => { let k = T; if (dop) { const u = 1 - Math.abs(2 * t - 1); if (u < 0.12) k = T * (0.35 + 0.65 * u / 0.12); } else { if (t > 0.92) k = T * Math.max(0.15, 1 - (t - 0.92) / 0.08 * 0.85); if (t < 0.05) k = T * (0.45 + 0.55 * t / 0.05); } return k; };
+  const sprung = t => dop ? 0 : (t > 0.75 ? Math.pow((t - 0.75) / 0.25, 2) * fb * 0.12 : 0);
+  /* Spantform: Boden flach, Kimmrundung, senkrechte Seite */
+  const SEC = [[-1, 0], [-1, 0.55], [-0.96, 0.82], [-0.82, 0.95], [-0.55, 1], [0, 1], [0.5, 1], [1, 1]];   /* [y-Anteil (−1 = Kiel, 0 = WL, 1 = Deck), Breitenanteil] */
+  const pos = [], uv = [], idx = [], nS = SEC.length;
+  for (let i = 0; i <= NS; i++) {
+    const t = i / NS, k = kiel(t), dS = fb + sprung(t);
+    for (const side of [1, -1]) for (let j = 0; j < nS; j++) {
+      const [fy, fw] = SEC[j], y = fy < 0 ? fy * k : fy * dS, wPl = fy <= 0 ? plan(t, 0) * hb * fw : plan(t, y) * hb;
+      pos.push(side * wPl, y, zOf(t, y));
+      const v = (y + T) / (fb + T); uv.push(side > 0 ? t * 0.5 : 0.5 + (1 - t) * 0.5, v);
+    }
+  }
+  const per = 2 * nS, vi = (i, side, j) => i * per + (side > 0 ? 0 : nS) + j;
+  for (let i = 0; i < NS; i++) for (let j = 0; j < nS - 1; j++) {
+    const a = vi(i, 1, j), b = vi(i + 1, 1, j), c2 = vi(i + 1, 1, j + 1), d = vi(i, 1, j + 1); idx.push(a, d, b, b, d, c2);
+    const a2 = vi(i, -1, j), b2 = vi(i + 1, -1, j), c3 = vi(i + 1, -1, j + 1), d2 = vi(i, -1, j + 1); idx.push(a2, b2, d2, b2, c3, d2);
+  }
+  const hg = new THREE.BufferGeometry(); hg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); hg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); hg.setIndex(idx); hg.computeVertexNormals();
+  const hm = new THREE.Mesh(hg, MAT('#ffffff', { map: revRumpfTex(sp, name), side: THREE.DoubleSide })); g.add(hm);
+  /* Deck und Spiegel */
+  { const dp = [], di = []; for (let i = 0; i <= NS; i++) { const t = i / NS, y = fb + sprung(t) - 0.05, w = plan(t, y) * hb; dp.push(w, y, zOf(t, y), -w, y, zOf(t, y)); if (i < NS) { const a = i * 2; di.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } }
+    const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.Float32BufferAttribute(dp, 3)); dg.setIndex(di); dg.computeVertexNormals(); g.add(new THREE.Mesh(dg, MAT(sp.autodeck ? '#5a5d61' : '#8f969c', { side: THREE.DoubleSide }))); }
+  if (!dop) { const k = kiel(0), sh = new THREE.Shape(), w0 = plan(0, 0) * hb, w1 = plan(0, fb) * hb; sh.moveTo(-w0 * 0.8, -k * 0.3); sh.lineTo(w0 * 0.8, -k * 0.3); sh.lineTo(w1, fb); sh.lineTo(-w1, fb); sh.closePath();
+    const sm = new THREE.Mesh(new THREE.ShapeGeometry(sh), MAT(weiss, { side: THREE.DoubleSide })); sm.position.z = zOf(0, 0) + 0.02; g.add(sm);
+    if (sp.heck === 'roro') { const tor = new THREE.Mesh(new THREE.PlaneGeometry(w1 * 1.2, fb * 0.45), MAT('#3a3f45', { side: THREE.DoubleSide })); tor.position.set(0, fb * 0.32 + 0.6, zOf(0, 0) + 0.06); g.add(tor);
+      const hk = new THREE.Mesh(new THREE.PlaneGeometry(w1 * 1.6, 0.5), MAT('#1d1d1d', { side: THREE.DoubleSide })); hk.position.set(0, 0.2, zOf(0, 0) + 0.05); g.add(hk); } }
+  /* --- Aufbauten --- */
+  const zT = t => -(t - 0.5) * L;
+  const deckBox = (t0, t1, y0, h, wf, art, xOff, farbe) => {
+    const len = (t1 - t0) * L, w = Math.min(plan((t0 + t1) / 2, fb), 1) * B * wf, z = (zT(t0) + zT(t1)) / 2, [tx, tn] = revAufbauTex(art || 'reihe');
+    const sideT = tx.clone(), sideN = tn.clone(); sideT.needsUpdate = sideN.needsUpdate = true; sideT.repeat.set(len / 8, 1); sideN.repeat.set(len / 8, 1);
+    const ms = MAT(weiss, { map: sideT, emissive: '#ffffff', emissiveMap: sideN, emissiveIntensity: 0 }); nachtMats.push(ms);
+    const fT = tx.clone(), fN = tn.clone(); fT.needsUpdate = fN.needsUpdate = true; fT.repeat.set(w / 8, 1); fN.repeat.set(w / 8, 1);
+    const mf = MAT(weiss, { map: fT, emissive: '#ffffff', emissiveMap: fN, emissiveIntensity: 0 }); nachtMats.push(mf);
+    const top = MAT(farbe || '#d9dcdf');
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, len), [ms, ms, top, top, mf, mf]); m.position.set((xOff || 0) * B, y0 + h / 2, z); g.add(m);
+    /* abgerundete Front */
+    if (!xOff && !dop && wf > 0.6) { const cf = new THREE.Mesh(new THREE.CylinderGeometry(w / 2, w / 2, h, 20, 1, false, Math.PI / 2, Math.PI), [ms, top, top]); cf.scale.set(1, 1, 0.35); cf.position.set(0, y0 + h / 2, zT(t1)); g.add(cf); }
+    return { w, len, z, y1: y0 + h };
+  };
+  let y = fb + sprung(0.5); const ebenen = [];
+  for (const d of sp.deck || []) { const r = deckBox(d.t0, d.t1, y, d.h, d.w, d.f, d.x, d.farbe); ebenen.push({ y0: y, y1: r.y1, d, w: r.w }); y = r.y1; }
+  /* Reling um jedes Deck */
+  const rl = [];
+  const reling = (t0, t1, yy, w) => { const z0 = zT(t0), z1 = zT(t1); for (const s of [-1, 1]) { rl.push(s * w / 2, yy + 1.1, z0, s * w / 2, yy + 1.1, z1); for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z += 2) rl.push(s * w / 2, yy, z, s * w / 2, yy + 1.1, z); } };
+  if (!sp.autodeck) reling(0.02, 0.96, fb + 0.05, B * 0.97);
+  for (const e of ebenen) reling(e.d.t0, e.d.t1, e.y1, e.w);
+  /* Brücke mit Nocken */
+  if (sp.bruecke) {
+    const br = sp.bruecke, e = ebenen[br.ebene != null ? Math.min(br.ebene, ebenen.length - 1) : ebenen.length - 1] || { y1: fb }, yb = br.ebene != null ? e.y0 : e.y1, [tx, tn] = revAufbauTex('bruecke');
+    const wB = B * br.w, lB = br.quer ? 6 : 7, zB = zT(br.t);
+    const t1 = tx.clone(); t1.needsUpdate = true; t1.repeat.set((wB + 2 * (br.nock ? B * (br.nock - br.w) / 2 : 0)) / 10, 1); const mb = MAT(weiss, { map: t1 });
+    const m = new THREE.Mesh(new THREE.BoxGeometry(br.quer ? lB : wB, 3, br.quer ? wB * 1.5 : lB), [MAT(weiss), MAT(weiss), MAT('#cfd3d6'), MAT('#cfd3d6'), mb, mb]); m.position.set((br.x || 0) * B, yb + 1.5 + (br.ebene != null ? 0 : 0), zB); g.add(m);
+    if (br.nock) for (const s of [-1, 1]) { const nk = new THREE.Mesh(new THREE.BoxGeometry(B * (br.nock - br.w) / 2 + 0.4, 2.6, 4), [MAT(weiss), MAT(weiss), MAT('#cfd3d6'), MAT('#cfd3d6'), mb, MAT(weiss)]); nk.position.set(s * (wB / 2 + B * (br.nock - br.w) / 4), yb + 1.7, zB - lB / 2 + 2); g.add(nk); }
+    if (br.ebene == null) y = Math.max(y, yb + 3);
+  }
+  /* Schornsteine: abgerundet, nach achtern geneigt, Reedereifarben */
+  for (const s of sp.schorn || []) {
+    const sh = new THREE.Shape(), a = s.w / 2, b = s.l / 2; sh.absellipse(0, 0, a, b, 0, Math.PI * 2, false, 0);
+    const z0 = zT(s.t), hs = s.h, cols = s.farben, parts = [[0, 0.62], [0.62, 0.85], [0.85, 1]];
+    parts.forEach(([p0, p1], k) => { const geo = new THREE.ExtrudeGeometry(sh, { depth: hs * (p1 - p0), bevelEnabled: false, curveSegments: 18 }); geo.rotateX(-Math.PI / 2);
+      const pa = geo.attributes.position; for (let v = 0; v < pa.count; v++) { const yy = pa.getY(v) + hs * p0, f = 1 - 0.18 * (yy / hs); pa.setX(v, pa.getX(v) * f); pa.setZ(v, pa.getZ(v) * f + yy * 0.25); pa.setY(v, yy); } geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, MAT(cols[k])); m.position.set(s.x || 0, y - 0.3, z0); g.add(m); });
+    if (s.logo) { const c = document.createElement('canvas'); c.width = 128; c.height = 128; const x = c.getContext('2d');
+      if (s.logo === 'stena') { x.fillStyle = '#ffffff'; x.font = 'bold 110px Arial,Helvetica,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('S', 64, 70); }
+      else if (s.logo === 'scandlines') { x.fillStyle = '#6cb33f'; x.beginPath(); x.moveTo(10, 90); x.quadraticCurveTo(64, 20, 118, 60); x.lineTo(118, 80); x.quadraticCurveTo(64, 45, 10, 110); x.fill(); x.fillStyle = '#16285a'; x.beginPath(); x.moveTo(10, 60); x.quadraticCurveTo(64, 0, 118, 30); x.lineTo(118, 48); x.quadraticCurveTo(64, 22, 10, 80); x.fill(); }
+      else if (s.logo === 'aida') { x.fillStyle = '#2061a8'; x.font = 'bold 54px Arial,Helvetica,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('AIDA', 64, 64); }
+      const tx = new THREE.CanvasTexture(c);
+      for (const sd of [-1, 1]) { const pl = new THREE.Mesh(new THREE.PlaneGeometry(s.l * 0.6, s.l * 0.6), new THREE.MeshBasicMaterial({ map: tx, transparent: true })); pl.position.set((s.x || 0) + sd * (a * 0.88 + 0.05), y - 0.3 + hs * 0.42, z0 + hs * 0.42 * 0.25); pl.rotation.y = sd * Math.PI / 2; g.add(pl); } }
+  }
+  /* Mast mit Radar */
+  if (sp.mast) { const ms = sp.mast, zm = zT(ms.t), xm = ms.x || 0; const p = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.4, ms.h, 8), MAT(weiss)); p.position.set(xm, y + ms.h / 2, zm); g.add(p);
+    const ra = new THREE.Mesh(new THREE.BoxGeometry(5, 0.25, 0.6), MAT('#2b2b2b')); ra.position.set(xm, y + ms.h * 0.7, zm); g.add(ra); const rq = new THREE.Mesh(new THREE.BoxGeometry(B * 0.35, 0.3, 0.3), MAT(weiss)); rq.position.set(xm, y + ms.h * 0.5, zm); g.add(rq); }
+  /* Rettungsboote (orange, weißes Dach) */
+  if (sp.boote) { const bt = sp.boote, e = ebenen[Math.min(bt.deck, ebenen.length - 1)], yb = e ? (bt.unter ? e.y0 - 0.2 : e.y0 + 0.4) : fb + 0.5, wb = e ? e.w / 2 + 1.2 : hb;
+    const bg = new THREE.SphereGeometry(1, 12, 8); bg.scale(1.6, 1.3, 4.6);
+    for (let k = 0; k < bt.n / 2; k++) { const t = bt.t0 + (bt.t1 - bt.t0) * (k + 0.5) / (bt.n / 2); for (const s of [-1, 1]) { const m = new THREE.Mesh(bg, MAT('#f26b1d')); m.position.set(s * (bt.unter ? hb + 0.5 : wb), yb + 1.2, zT(t)); g.add(m); const d = new THREE.Mesh(bg, MAT(weiss)); d.scale.set(0.96, 0.6, 0.96); d.position.copy(m.position); d.position.y += 0.6; g.add(d); } } }
+  /* Rotorsegel */
+  for (const r of sp.rotor || []) { const cy = new THREE.Mesh(new THREE.CylinderGeometry(r.r, r.r, r.h, 24), MAT('#f2f2ef')); cy.position.set(0, fb + r.h / 2, zT(r.t)); g.add(cy); const dk = new THREE.Mesh(new THREE.CylinderGeometry(r.r * 1.5, r.r * 1.5, 0.4, 24), MAT('#e2e2df')); dk.position.set(0, fb + r.h, zT(r.t)); g.add(dk); }
+  /* Autodeck: ein paar Autos */
+  if (sp.autodeck) { const FA = ['#c9c9c6', '#1f2226', '#b3261e', '#23417a', '#d7d2c4']; for (let k = 0; k < 10; k++) { const m = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.45, 4.4), MAT(FA[k % 5])); m.position.set(-4 + (k % 3) * 2.8 - 1.5, fb + 0.75, -16 + Math.floor(k / 3) * 6); g.add(m); } }
+  if (rl.length) { const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(rl, 3)); g.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#e9ecef' }))); }
+  /* Positionslichter: rot Backbord, grün Steuerbord, Topplicht, Hecklicht */
+  const top = y + (sp.mast ? sp.mast.h : 6), lp = [-hb, fb + 2, zT(sp.bruecke ? sp.bruecke.t : 0.8), hb, fb + 2, zT(sp.bruecke ? sp.bruecke.t : 0.8), 0, top, zT(sp.mast ? sp.mast.t : 0.8), 0, fb + 1.5, zT(0)], lc = [1, 0.1, 0.05, 0.1, 1, 0.25, 1, 0.95, 0.85, 1, 0.95, 0.85];
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)); lg.setAttribute('col', new THREE.Float32BufferAttribute(lc, 3));
+  const pts = new THREE.Points(lg, revCarLightMat()); pts.frustumCulled = false; g.add(pts);
+  g.traverse(o => { o.userData.sznSkip = 1; }); g.userData.segel = null; g.userData.LB = [L / 2, hb]; g.userData.nachtMats = nachtMats;
+  return g;
+}
 function revSchiffModell(typ, farbe, name) {
+  { const sp = revSchiffSpec(typ); if (sp) return revSchiffBau(sp, name); }
   const g = new THREE.Group(), M = (c, o) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, o || {}));
   const D = { faehre: [40.25, 7.58, 2.4, '#1c3f78'], ausflug: [39.6, 7.5, 2.3, '#1e3d73'], baeder: [32.9, 7.6, 2.2, '#1e3d73'], kutter: [20.5, 6.4, 2.0, '#1d3557'] }[typ] || [30, 7, 2, farbe];
   const [L, B, fb] = D, blau = farbe || D[3], hb = B / 2, Lh = L / 2, weiss = '#f5f5f2';
@@ -2448,7 +2667,9 @@ function revSchiffWartet(E, N) {
   return false;
 }
 function revSchiffeTick(E0, N0) {
-  const X = REVX; if (!X || !X.schiffe || !X.schiffe.length) return;
+  const X = REVX; if (!X) return;
+  { const nf = revNacht() * 0.95; for (const sc of X.schiffe || []) { const nm = sc.grp && sc.grp.userData.nachtMats; if (nm) for (const m of nm) m.emissiveIntensity = nf; } for (const nm of X.nachtSchiffe || []) for (const m of nm) m.emissiveIntensity = nf; }
+  if (!X.schiffe || !X.schiffe.length) return;
   if (!REV_GF.modell && X.schiffe.some(sc => !sc.typ || sc.typ === 'gorchfock')) { revGfLaden(); if (!REV_GF.modell) return; }
   const now = performance.now() / 1000, F = SHORE.fwd, wf = (Number(S.windFrom) || 0) * DEG;
   for (const sch of X.schiffe) {
@@ -2494,7 +2715,7 @@ function revSchiffeTick(E0, N0) {
 /* Rumpf als Hindernis für die Physik (ca. 70 × 11 m) */
 function revSchiffHit(E, N) {
   const X = REVX; if (!X || !X.schiffe) return false;
-  for (const sch of X.schiffe) { const h = sch.hit; if (!h) continue; const dx = E - h.E, dy = N - h.N; if (Math.abs(dx) > 50 || Math.abs(dy) > 50) continue;
+  for (const sch of X.schiffe) { const h = sch.hit; if (!h) continue; const dx = E - h.E, dy = N - h.N, rr = Math.max(50, (sch.hl || 36) + 10); if (Math.abs(dx) > rr || Math.abs(dy) > rr) continue;
     const a = dx * Math.sin(h.h) + dy * Math.cos(h.h), b = dx * Math.cos(h.h) - dy * Math.sin(h.h); if (Math.abs(a) < (sch.hl || 36) && Math.abs(b) < (sch.hb || 5.8)) return true; }
   return false;
 }
@@ -2820,6 +3041,7 @@ function revStrecken() {
 }
 function revLenSm(p) { let L = 0; for (let k = 1; k < p.length; k++) L += Math.hypot(p[k][0] - p[k - 1][0], p[k][1] - p[k - 1][1]); return L / 1852; }
 function revKursOptions() {
+  if (!REVX && S.revier === 'rostock') return [['warnow', 'Warnow-Regatta (Stadthafen → Warnemünde → Ostsee)'], ['heide', 'Warnemünde → Markgrafenheide'], ['bahn_warnemuende', 'Regattabahn vor Warnemünde']];
   if (!REVX && S.revier === 'usedom') return [['haff', 'Wolgast → Ueckermünde übers Haff'], ['ruden', 'Ruden → Wolgast'], ['bahn_haff', 'Regattabahn Stettiner Haff']];
   if (!REVX) return [['bb', 'Blaues Band vom Strelasund'], ['rund', 'Rund Hiddensee'], ['bahn', 'Regattabahn vor Hiddensee (Westseite)']];
   const o = [];
@@ -3313,7 +3535,7 @@ const SCHEMA=[
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
-  {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
   {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
   {k:'bruecke',label:'Klappbrücken (Ziegelgraben, Wolgast)',type:'select',options:[['echt','Öffnen zu den echten Zeiten'],['offen','Immer offen']],hint:'Ziegelgrabenbrücke im Rügendamm: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 Uhr je 20 min. Peenebrücke Wolgast: 5:45, 7:45, 12:45, 17:45, 20:45 Uhr je 15 min, Juni–September auch 23:45 Uhr. Es zählt die Uhrzeit deines Geräts. Unter der Rügenbrücke passt du mit 42 m immer durch – die Klappe daneben musst du abwarten. Autos halten vor der offenen Klappe.'},
   {k:'schiffsverkehr',label:'Schiffsverkehr',type:'select',options:[['an','Fähren, Ausflugsschiffe und Kutter fahren'],['aus','Alle bleiben im Hafen']],hint:'Hiddensee-Fähre Schaprode–Vitte, Ausflugsschiff Sassnitz–Königsstuhl, Bäderschiff Binz–Sellin und ein Fischkutter aus Sassnitz. Sie weichen Regattabahnen aus und warten vor Start und Ziel einer laufenden Regatta – nach den Ausweichregeln musst du ihnen aber trotzdem Platz lassen.'},
@@ -3405,7 +3627,7 @@ const WX_TXT={none:'kein Niederschlag',r1:'leichter Regen',r2:'mäßiger Regen',
 const WX_COMP=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 const LIGHT_TXT={mittag:'Mittag',nachmittag:'Nachmittag',gold:'Goldene Stunde',daemmerung:'Dämmerung',nacht:'Nacht'};
 let wxBusy=false;
-function wxSite(){revMigrate();if(S.revier==='usedom'){const k=S.revKurs||'';if(/haff/.test(k))return {lat:53.78,lon:14.02,name:'Stettiner Haff'};if(/heringsdorf|gfu/.test(k))return {lat:53.98,lon:14.17,name:'Heringsdorf'};if(/achter/.test(k))return {lat:54.0,lon:13.97,name:'Achterwasser'};return {lat:54.1,lon:13.8,name:'Peenestrom'};}if(REVIERE_K[S.revier]){const k=S.revKurs||'bb';if(/bahn_gfs|bahn_pr/.test(k))return {lat:54.50,lon:13.66,name:'Sassnitz/Binz'};if(k==='bahn_gft')return {lat:54.62,lon:13.45,name:'Tromper Wiek'};if(k==='bahn_gb')return {lat:54.20,lon:13.55,name:'Greifswalder Bodden'};if(k==='bb'||k==='rund'||k==='bahn')return {lat:54.53,lon:13.10,name:'Hiddensee'};return {lat:54.42,lon:13.35,name:'Rügen'};}return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
+function wxSite(){revMigrate();if(S.revier==='rostock')return {lat:54.18,lon:12.08,name:'Warnemünde'};if(S.revier==='usedom'){const k=S.revKurs||'';if(/haff/.test(k))return {lat:53.78,lon:14.02,name:'Stettiner Haff'};if(/heringsdorf|gfu/.test(k))return {lat:53.98,lon:14.17,name:'Heringsdorf'};if(/achter/.test(k))return {lat:54.0,lon:13.97,name:'Achterwasser'};return {lat:54.1,lon:13.8,name:'Peenestrom'};}if(REVIERE_K[S.revier]){const k=S.revKurs||'bb';if(/bahn_gfs|bahn_pr/.test(k))return {lat:54.50,lon:13.66,name:'Sassnitz/Binz'};if(k==='bahn_gft')return {lat:54.62,lon:13.45,name:'Tromper Wiek'};if(k==='bahn_gb')return {lat:54.20,lon:13.55,name:'Greifswalder Bodden'};if(k==='bb'||k==='rund'||k==='bahn')return {lat:54.53,lon:13.10,name:'Hiddensee'};return {lat:54.42,lon:13.35,name:'Rügen'};}return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
 async function loadLiveWx(){if(wxBusy)return;wxBusy=true;const say=t=>{S.wxInfo=t;const st=document.getElementById('wxStatus');if(st)st.textContent=t;saveS();};
   try{say('Lade Live-Daten …');const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),9000);
     if(S.revier!=='rangs'&&S.revier!=='cospu'&&!REVIERE_K[S.revier]&&!(G&&G.running&&!G.over))S.revier='cospu';const site=wxSite();const r=await fetch(WX_URL.replace('latitude='+WX_LAT,'latitude='+site.lat).replace('longitude='+WX_LON,'longitude='+site.lon),{signal:ctl.signal,cache:'no-store'});clearTimeout(to);if(!r.ok)throw new Error('HTTP '+r.status);
