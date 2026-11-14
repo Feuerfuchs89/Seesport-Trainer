@@ -4200,6 +4200,83 @@ const waterNear=(function(){const g=new THREE.PlaneGeometry(2,2,280,280).rotateX
 const waterFar=new THREE.Mesh(new THREE.RingGeometry(240,9000,96,1).rotateX(-Math.PI/2),waterMat);waterFar.position.y=-0.04;waterFar.frustumCulled=false;waterFar.renderOrder=10;scene.add(waterFar);
 // Ufer: Hügel, Wiese, Strand, Wald, Häuser – je nach Revier
 let shoreG=null,SHORE={c:[0,0],R:1700,kind:'open'};
+/* ================= Umland Cospudener See: echtes Gelände, Landnutzung und alle Gebäude =================
+   Daten: cospu-umland.json aus der Action „Revier bauen“ (Revier cospu) – OpenStreetMap + Geländemodell.
+   Ohne die Datei bleibt alles wie bisher (gezeichnetes Ufergelände). */
+var UMLAND=null,UMLAND_ST=0;
+function umB64(s){const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
+function umlandSetzen(o){const hb=umB64(o.h.dm),h16=new Int16Array(hb.buffer,0,hb.length>>1),H=new Float32Array(h16.length);for(let i=0;i<H.length;i++)H[i]=h16[i]/10;
+  const rb=umB64(o.lc.rle),L=new Uint8Array(o.lc.w*o.lc.h);let q=0;for(let i=0;i+1<rb.length;i+=2){L.fill(rb[i],q,q+rb[i+1]);q+=rb[i+1];}
+  UMLAND={o,H,hg:o.h,L,lg:o.lc,geb:o.geb||[],namen:o.namen||[],pkt:o.pkt||[],ver:(o.erzeugt||'')+'/'+(o.geb||[]).length};}
+async function umlandLoad(){if(UMLAND_ST)return;UMLAND_ST=1;
+  for(const b of REV_BASES){try{const o=await revFetch(b,'cospu-umland.json','json');umlandSetzen(o);UMLAND_ST=2;
+      if(S.revier==='cospu'&&SHORE&&SHORE.kind==='poly'&&SHORE.key!==cospuKey()){try{buildShore();}catch(e){console.error('Umland',e);}}return;}catch(e){}}
+  UMLAND_ST=3;}
+function umAn(rev){return !!UMLAND&&(rev||S.revier)==='cospu'&&!isGL();}
+function umH(E,N){const g=UMLAND.hg,fx=(E-g.x0)/g.cs,fy=(N-g.y0)/g.cs;if(fx<0||fy<0||fx>g.nx-1.001||fy>g.ny-1.001)return null;
+  const i=Math.floor(fx),j=Math.floor(fy),tx=fx-i,ty=fy-j,k=j*g.nx+i,A=UMLAND.H;return (A[k]*(1-tx)+A[k+1]*tx)*(1-ty)+(A[k+g.nx]*(1-tx)+A[k+g.nx+1]*tx)*ty;}
+function umLc(E,N){const g=UMLAND.lg,c=Math.floor((E-g.x0)/g.cs),r=Math.floor((g.y1-N)/g.cs);if(c<0||r<0||c>=g.w||r>=g.h)return 0;return UMLAND.L[r*g.w+c];}
+function umWasser(E,N){for(const [a,b] of [[0,0],[14,0],[-14,0],[0,14],[0,-14]])if(umLc(E+a,N+b)!==8)return false;return true;}
+/* echtes Gelände ins Editor-Höhenfeld: am Ufer bleibt das gezeichnete Profil, ab ca. 100 m gilt das Geländemodell; gesperrte Zonen (LSC, Hafen) bleiben */
+function umBlend(base,grid,lockF){const {x0,y0,cs,nx,ny}=grid,D=base.D,H=base.H;
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const c=j*nx+i,d=D[c];if(d<=0)continue;const E=x0+i*cs,N=y0+j*cs;let t=umH(E,N);if(t===null)continue;
+    t=(umLc(E,N)===8&&d>40&&umWasser(E,N))?-0.8:Math.max(t,0.3);const w=smooth(20,110,d)*(1-lockF[c]);H[c]=H[c]*(1-w)+t*w;}}
+function umPal(){const r=h=>{const c=new THREE.Color(h);return [c.r,c.g,c.b];};return [null,r('#3b5530'),r('#56703f'),r('#6c8a48'),r('#8f9058'),r('#6b7359'),r('#7d7d78'),r('#d8c99a'),r('#4f6f78'),r('#5f8448'),null,r('#667a4c')];}
+/* Bäume aus der Landnutzung (Wald, Gebüsch, Gärten, Straßenbäume); weit vom See lichter, damit es flüssig bleibt */
+function umBaeume(pl,P,MOD,T1,T2,skip){const U=UMLAND,g=U.lg,cap=S.gfx==='niedrig'?9000:S.gfx==='ultra'?52000:32000;
+  const dicht=[0,1.25,0.5,0.012,0,0.04,0.006,0,0,0.12,0,0.15];const realD=(E,N)=>MOD?edSample(MOD.grid,MOD.base.D,E,N):500;
+  const fern=d=>d<650?1:d<1500?0.5:0.22;let sum=0;
+  for(let r=0;r<g.h;r+=2)for(let c=0;c<g.w;c+=2){const k=U.L[r*g.w+c];if(dicht[k])sum+=dicht[k]*4*fern(realD(g.x0+(c+1)*g.cs,g.y1-(r+1)*g.cs));}
+  const f=Math.min(1,cap/Math.max(1,sum));let n=0;
+  for(let r=0;r<g.h;r++)for(let c=0;c<g.w;c++){const k=U.L[r*g.w+c],dd=dicht[k];if(!dd)continue;const E0=g.x0+c*g.cs,N0=g.y1-(r+1)*g.cs;let m=dd*f*fern(realD(E0+5,N0+5));
+    while(m>0){if(Math.random()>=m)break;m-=1;const E=E0+Math.random()*g.cs,N=N0+Math.random()*g.cs,d=realD(E,N);if(d<4)continue;const q=pl.fwd(E,N);if(skip&&skip(q[0],q[1]))continue;
+      const y0=TGM?TGM.h(q[0],q[1]):0.5;if(y0<0)continue;const z=Math.random();n++;
+      if(k===1){if(z<0.5)T2.push([q[0],y0,q[1],rnd(15,26),'o']);else if(z<0.78)T1.push([q[0],y0,q[1],rnd(14,23)]);else T2.push([q[0],y0,q[1],rnd(12,19),'b']);}
+      else if(k===2||k===11){T2.push([q[0],y0,q[1],rnd(4,8),z<0.3?'b':'o']);}
+      else{if(z<0.65)T2.push([q[0],y0,q[1],rnd(7,13),'o']);else if(z<0.85)T2.push([q[0],y0,q[1],rnd(8,14),'b']);else T1.push([q[0],y0,q[1],rnd(7,12)]);}}}
+  return n;}
+/* alle Gebäude aus OSM: Wände mit Fenstern, Sattel-/Walm- oder Flachdach, zu 600-m-Stücken zusammengefasst */
+function umHaeuser(pl,P,skip){const U=UMLAND;if(!U.geb.length||!TGM)return 0;const F=facadeTex(),near=S.gfx==='niedrig';
+  const mW=new THREE.MeshLambertMaterial({vertexColors:true,map:F.map,emissive:0xffffff,emissiveMap:F.em,emissiveIntensity:NIGHT*0.95,side:THREE.DoubleSide});NIGHT_MATS.push(mW);
+  const mR=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide});
+  const WALL=[['#efe9dc','#e8dfcc','#f2efe6','#e3d6bd','#ddd5c5','#efe3c9','#e9d9b8'],['#e9e4da','#dcd8cf','#efe6d4','#d8cfbf','#c9c3b5','#e2d2b0'],['#b9b7b0','#a8a69f','#c4c0b6'],['#c6c8c8','#b4b8bb','#d3d3cf','#9ea7ad','#d9d6cc'],['#d8c6a8','#b98a6a','#cfc2ad','#e6dccb','#a5634a'],['#a7684b','#9c7a5c','#b5a58b']].map(a=>a.map(h=>new THREE.Color(h)));
+  const ROOF=['#9c4a3a','#8a3d30','#a85a40','#5d5f63','#4a4c50','#7a4a35','#6b6e70','#93402f'].map(h=>new THREE.Color(h)),FLAT=['#6f6f6c','#7c7b76','#5f605e','#8a8983'].map(h=>new THREE.Color(h));
+  const CH=600,chunks=new Map(),hsh=i=>{const v=Math.sin(i*12.9898)*43758.5453;return v-Math.floor(v);};let cnt=0;
+  const nearD=near?(E,N)=>edSample(EDCACHE.grid,EDCACHE.base.D,E,N)<1000:null;
+  for(let bi=0;bi<U.geb.length;bi++){const b=U.geb[bi],typ=b[0],h=b[1]/10,dach=b[2];const R=[];let ex=b[3]/10,ny=b[4]/10;R.push([ex,ny]);for(let k=5;k+1<b.length;k+=2){ex+=b[k]/10;ny+=b[k+1]/10;R.push([ex,ny]);}
+    if(R.length<3)continue;let cE=0,cN=0;for(const p of R){cE+=p[0];cN+=p[1];}cE/=R.length;cN/=R.length;if(nearD&&!nearD(cE,cN))continue;
+    const Q=R.map(p=>pl.fwd(p[0],p[1]));let cx=0,cy=0;for(const q of Q){cx+=q[0];cy+=q[1];}cx/=Q.length;cy/=Q.length;
+    if(polyInside(P,cx,cy)||(skip&&skip(cx,cy)))continue;
+    let g0=1e9;for(const q of Q)g0=Math.min(g0,TGM.h(q[0],q[1]));g0=Math.max(g0,0.25);
+    const key=Math.floor(cx/CH)+','+Math.floor(cy/CH);let C=chunks.get(key);if(!C){C={wp:[],wc:[],wu:[],rp:[],rc:[]};chunks.set(key,C);}
+    const r1=hsh(bi),r2=hsh(bi+77.7),wc=WALL[typ]||WALL[0],col=wc[Math.floor(r1*wc.length)],rc=(dach?ROOF[Math.floor(r2*ROOF.length)]:FLAT[Math.floor(r2*FLAT.length)]);
+    /* Dachform über dem kleinsten umschließenden Rechteck */
+    let A=0;for(let i=0;i<Q.length;i++){const a=Q[i],c=Q[(i+1)%Q.length];A+=a[0]*c[1]-c[0]*a[1];}A=Math.abs(A)/2;
+    let best=null;if(dach){for(let i=0;i<Q.length;i++){const a=Q[i],c=Q[(i+1)%Q.length],L=Math.hypot(c[0]-a[0],c[1]-a[1]);if(L<0.5)continue;const ux=(c[0]-a[0])/L,uy=(c[1]-a[1])/L;
+        let u0=1e9,u1=-1e9,v0=1e9,v1=-1e9;for(const q of Q){const u=q[0]*ux+q[1]*uy,v=-q[0]*uy+q[1]*ux;u0=Math.min(u0,u);u1=Math.max(u1,u);v0=Math.min(v0,v);v1=Math.max(v1,v);}
+        const ar=(u1-u0)*(v1-v0);if(!best||ar<best.ar)best={ar,ux,uy,u0,u1,v0,v1};}
+      if(best){if(best.u1-best.u0<best.v1-best.v0){const o=best;best={ar:o.ar,ux:-o.uy,uy:o.ux,u0:o.v0,u1:o.v1,v0:-o.u1,v1:-o.u0};}if(A/best.ar<0.72)best=null;}}
+    let eave=h,rH=0;if(best){const B=best.v1-best.v0;rH=Math.min(B*0.42,h*0.5,7);eave=h-rH;if(eave<2.3){eave=2.3;rH=h-2.3;}if(rH<0.9){best=null;eave=h;}}
+    const top=g0+eave,bot=g0-0.8,blank=typ===2,uo=Math.floor(r1*8)/8,vo=Math.floor(r2*4)/4;let ucum=0;
+    for(let i=0;i<Q.length;i++){const a=Q[i],c=Q[(i+1)%Q.length],L=Math.hypot(c[0]-a[0],c[1]-a[1]);if(L<0.05)continue;
+      const ua=ucum/3.2/8+uo,ub=(ucum+L)/3.2/8+uo;ucum+=L;
+      C.wp.push(a[0],bot,-a[1],c[0],bot,-c[1],c[0],top,-c[1],a[0],bot,-a[1],c[0],top,-c[1],a[0],top,-a[1]);
+      const vb=-0.8/12+vo,vt=eave/12+vo;if(blank)for(let k=0;k<6;k++)C.wu.push(0.004,0.995);else C.wu.push(ua,vb,ub,vb,ub,vt,ua,vb,ub,vt,ua,vt);
+      for(let k=0;k<6;k++)C.wc.push(col.r,col.g,col.b);}
+    const tri=(arr,carr,c,...pts)=>{for(const p of pts)arr.push(p[0],p[1],-p[2]);for(let k=0;k<pts.length;k++)carr.push(c.r,c.g,c.b);};
+    if(best){const o=best,P2=(u,v,y)=>[u*o.ux-v*o.uy,y,u*o.uy+v*o.ux],ov=0.45,vm=(o.v0+o.v1)/2,yR=top+rH,ye=top-0.25;
+      const c00=P2(o.u0-ov,o.v0-ov,ye),c10=P2(o.u1+ov,o.v0-ov,ye),c11=P2(o.u1+ov,o.v1+ov,ye),c01=P2(o.u0-ov,o.v1+ov,ye);
+      if(dach===2){const B=o.v1-o.v0,uA=Math.min(o.u0+B/2,(o.u0+o.u1)/2),uB=Math.max(o.u1-B/2,(o.u0+o.u1)/2),r0=P2(uA,vm,yR),r1=P2(uB,vm,yR);
+        tri(C.rp,C.rc,rc,c00,c10,r1,c00,r1,r0,c01,r0,r1,c01,r1,c11,c00,r0,c01,c10,c11,r1);}
+      else{const r0=P2(o.u0-ov,vm,yR),r1=P2(o.u1+ov,vm,yR);tri(C.rp,C.rc,rc,c00,c10,r1,c00,r1,r0,c01,r0,r1,c01,r1,c11);
+        const g1=P2(o.u0,o.v0,top),g2=P2(o.u0,o.v1,top),g3=P2(o.u0,vm,yR),g4=P2(o.u1,o.v0,top),g5=P2(o.u1,o.v1,top),g6=P2(o.u1,vm,yR);
+        tri(C.wp,C.wc,col,g1,g2,g3,g4,g5,g6);for(let k=0;k<6;k++)C.wu.push(0.004,0.995);}}
+    else{const sh=Q.map(q=>new THREE.Vector2(q[0],q[1]));let ids;try{ids=THREE.ShapeUtils.triangulateShape(sh,[]);}catch(e){ids=[];}
+      const yt=g0+h;for(const t of ids)tri(C.rp,C.rc,rc,[Q[t[0]][0],yt,Q[t[0]][1]],[Q[t[1]][0],yt,Q[t[1]][1]],[Q[t[2]][0],yt,Q[t[2]][1]]);}
+    cnt++;}
+  for(const C of chunks.values()){if(C.wp.length){const gW=new THREE.BufferGeometry();gW.setAttribute('position',new THREE.Float32BufferAttribute(C.wp,3));gW.setAttribute('color',new THREE.Float32BufferAttribute(C.wc,3));gW.setAttribute('uv',new THREE.Float32BufferAttribute(C.wu,2));gW.computeVertexNormals();shoreG.add(new THREE.Mesh(gW,mW));}
+    if(C.rp.length){const gR=new THREE.BufferGeometry();gR.setAttribute('position',new THREE.Float32BufferAttribute(C.rp,3));gR.setAttribute('color',new THREE.Float32BufferAttribute(C.rc,3));gR.computeVertexNormals();const mr=new THREE.Mesh(gR,mR);mr.userData.szn='roof';shoreG.add(mr);}}
+  return cnt;}
 /* ================= Revier Cospudener See ================= */
 // Uferlinie: OpenStreetMap-Relation 285950 (ODbL), 4,39 km², auf 176 Punkte vereinfacht (±3,5 m). Stege/Hafen nach Aufmaß (GeoJSON/GPX).
 const HOFF=()=>(S.revier==='cospu'||isGL())?(Number(S.windFrom)||0):0;
@@ -4354,12 +4431,12 @@ function edDocFor(rev){return rev==='rangs'?rangsLake().ed:rev==='gpx'?((GPXLAKE
 function edSig(){const d=edDocFor(S.revier);return (d?d.ver+'/'+(d.pts?d.pts.length:0):'')+(EXFORCE?'F':'')+(objHasCat()?'C':'');}
 function edReviveLake(L){if(L&&L.ed&&!(L.ed instanceof EdDoc))L.ed=new EdDoc(L.ed);return L;}
 function edNarrow(RP){let A=0,Pm=0;const n=RP.length;for(let i=0;i<n;i++){const a=RP[i],b=RP[(i+1)%n];A+=a.E*b.N-b.E*a.N;Pm+=Math.hypot(b.E-a.E,b.N-a.N);}A=Math.abs(A)/2;return Pm>0&&4*A/Pm<400;}
-function edUseGrid(doc,RP,rev){return EXFORCE||objHasCat()||!!(doc&&(doc.hasH()||doc.hasObj()))||(rev==='gpx'&&edNarrow(RP));}
+function edUseGrid(doc,RP,rev){return EXFORCE||umAn(rev)||objHasCat()||!!(doc&&(doc.hasH()||doc.hasObj()))||(rev==='gpx'&&edNarrow(RP));}
 function edModelFor(RP,rev,doc){
   const pts=RP.map(p=>[p.E,p.N]),grid=(doc&&doc.grid)||edMakeGrid(pts);
-  const sig=rev+'|'+(doc?doc.ver:'x')+'|'+RP.length+'|'+RP.reduce((a,p,i)=>a+p.E*(1+i%7)+p.N*(2+i%5),0).toFixed(1)+'|'+grid.nx+'x'+grid.ny;
+  const sig=rev+'|'+(umAn(rev)?'U'+UMLAND.ver+'|':'')+(doc?doc.ver:'x')+'|'+RP.length+'|'+RP.reduce((a,p,i)=>a+p.E*(1+i%7)+p.N*(2+i%5),0).toFixed(1)+'|'+grid.nx+'x'+grid.ny;
   if(EDCACHE&&EDCACHE.sig===sig)return EDCACHE;
-  const base=edBaseField(RP,grid,rev),locks=edLocks(RP,rev),lockF=edLockRaster(grid,locks),ed=doc&&doc.ed&&doc.ed.length===grid.nx*grid.ny?doc.ed:null;
+  const base=edBaseField(RP,grid,rev),locks=edLocks(RP,rev),lockF=edLockRaster(grid,locks);if(umAn(rev))umBlend(base,grid,lockF);const ed=doc&&doc.ed&&doc.ed.length===grid.nx*grid.ny?doc.ed:null;
   EDCACHE={sig,grid,base,locks,lockF,ed,Hf:edHfAll(base,ed,lockF),RP,rev};return EDCACHE;}
 /* Wassermaske: weiß = Wasser; das Gelände wird dort verworfen, so bleiben auch schmale Flüsse und enge Buchten exakt */
 function edWaterMask(P){const M=S.gfx==='niedrig'?1024:2048;let a=1e9,b=1e9,c=-1e9,d=-1e9;for(const p of P){a=Math.min(a,p.x);c=Math.max(c,p.x);b=Math.min(b,-p.y);d=Math.max(d,-p.y);}
@@ -4370,14 +4447,14 @@ function edTerrainMesh(MOD,pl,P,haze){
   const {x0,y0,cs,nx,ny}=MOD.grid,nv=nx*ny,Hf=MOD.Hf,D=MOD.base.D,I=MOD.base.I,RP=MOD.RP,rev=MOD.rev;
   const rgb=h=>{const c=new THREE.Color(h);return [c.r,c.g,c.b];};
   const cWet=rgb('#a89a72'),cS=rgb('#d8c99a'),cG=rgb('#5d7b44'),cF=rgb('#3f5a33'),cD=rgb('#4a5f45'),cR=rgb('#8b8a7f'),fg=[FOG.r,FOG.g,FOG.b];
-  const pos=new Float32Array(nv*3),col=new Float32Array(nv*3),mix=(a,b,t)=>a+(b-a)*t;
+  const pos=new Float32Array(nv*3),col=new Float32Array(nv*3),mix=(a,b,t)=>a+(b-a)*t,UMC=umAn(rev)?umPal():null;
   for(let iy=0;iy<ny;iy++)for(let ix=0;ix<nx;ix++){const i=iy*nx+ix,E=x0+ix*cs,N=y0+iy*cs,q=pl.fwd(E,N);pos[i*3]=q[0];pos[i*3+1]=Hf[i];pos[i*3+2]=-q[1];
     const d=D[i];let c0=cWet,c1=cWet,t=0;
     if(d>0){const bw=edBeachW(RP[I[i]]||{s:0,side:0},rev);
       const gx=(Hf[iy*nx+Math.min(ix+1,nx-1)]-Hf[iy*nx+Math.max(ix-1,0)])/(2*cs),gy=(Hf[Math.min(iy+1,ny-1)*nx+ix]-Hf[Math.max(iy-1,0)*nx+ix])/(2*cs),sl=Math.hypot(gx,gy);
       const a=smooth(60,90,d),b=smooth(300,340,d),beach=bw>0?1-smooth(bw*0.8,bw*1.1,d):0,rock=smooth(0.35,0.8,sl)*smooth(4,12,d)*0.85,wet=1-smooth(0,5,d)*1;
-      const hs=Math.sin(ix*12.9898+iy*78.233)*43758.5453,v=d>30?0.86+0.26*(hs-Math.floor(hs)):1,hz=interp(T_OFFS,T_HAZE,d);
-      for(let k=0;k<3;k++){let u=mix(mix(cG[k],cF[k],a),cD[k],b);u=mix(u,cS[k],beach);u=mix(u,cR[k],rock);if(wet>0)u=mix(u,cWet[k],wet*(beach>0?1:0.5));u*=Math.min(1.12,Math.max(0.86,v));col[i*3+k]=u*(1-hz)+fg[k]*hz;}}
+      const hs=Math.sin(ix*12.9898+iy*78.233)*43758.5453,v=d>30?0.86+0.26*(hs-Math.floor(hs)):1,hz=interp(T_OFFS,T_HAZE,d);const uc=UMC&&d>25?UMC[umLc(E,N)]:null,uw=uc?smooth(25,70,d)*(1-beach):0;
+      for(let k=0;k<3;k++){let u=mix(mix(cG[k],cF[k],a),cD[k],b);u=mix(u,cS[k],beach);if(uc)u=mix(u,uc[k],uw);u=mix(u,cR[k],rock*(uc?0.5:1));if(wet>0)u=mix(u,cWet[k],wet*(beach>0?1:0.5));u*=Math.min(1.12,Math.max(0.86,v));col[i*3+k]=u*(1-hz)+fg[k]*hz;}}
     else{col[i*3]=cWet[0];col[i*3+1]=cWet[1];col[i*3+2]=cWet[2];}}
   const idx=[];for(let iy=0;iy<ny-1;iy++)for(let ix=0;ix<nx-1;ix++){const a=iy*nx+ix,b=a+1,c=a+nx,d=c+1;if(D[a]<-35&&D[b]<-35&&D[c]<-35&&D[d]<-35)continue;idx.push(a,b,c,b,d,c);}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();
@@ -4418,7 +4495,7 @@ function edAddIslands(doc,pl,shoreGrp,SH){if(!doc||!doc.isl.length)return;const 
 function cospuReal(){if(isGL()&&GL()&&GL().pts)return GL().pts.map(p=>({E:p[0],N:p[1],s:0,side:0}));
   const cu=EDC&&EDC.pts;return (cu||COSPU_PTS).map((p,i)=>({E:p[0],N:p[1],s:p[2],side:p[3],harb:cu?p[4]===1:i===COSPU_HARB,lsc:cu?p[4]===2:i===COSPU_LSC}));}
 function cospuSectorH(s,side){if(s>0.62)return 25;if(s<-0.72)return side>0?14:9;return side<0?14:16;}
-function cospuKey(){return [S._mpN||0,(isGL()&&GL()?GL().name+GL().pts.length:'')+'~'+edSig(),S.revier,S.windFrom,S.legLength,S.lineScale,S.courseType,S.finishUp?1:0,S.cpuCount,S.boatClass,HBMODE?'hb':'',S.gfx==='niedrig'?'lo':'hi',seasonNow()].join('|');}
+function cospuKey(){return [(S.revier==='cospu'&&UMLAND?'U'+UMLAND.ver:''),S._mpN||0,(isGL()&&GL()?GL().name+GL().pts.length:'')+'~'+edSig(),S.revier,S.windFrom,S.legLength,S.lineScale,S.courseType,S.finishUp?1:0,S.cpuCount,S.boatClass,HBMODE?'hb':'',S.gfx==='niedrig'?'lo':'hi',seasonNow()].join('|');}
 function polyInside(P,x,y){let c=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const a=P[i],b=P[j];if(((a.y>y)!==(b.y>y))&&(x<(b.x-a.x)*(y-a.y)/(b.y-a.y)+a.x))c=!c;}return c;}
 function polyDist(P,x,y){let d=1e9,bi=0;for(let i=0,j=P.length-1;i<P.length;j=i++){const e=ptSeg(x,y,P[j].x,P[j].y,P[i].x,P[i].y);if(e<d){d=e;bi=i;}}return [d,bi];}
 function lineLenFor(n,LL){return Math.max(25,(n+1)*LL*1.9*(Number(S.lineScale)||100)/100,LL*6);}
@@ -4457,7 +4534,7 @@ function shoreKeepIn(b,dt){if(SHORE.kind==='revier'){revKeepIn(b);return;}if(SHO
   let t=((b.x-a.x)*ex+(b.y-a.y)*ey)/(el*el);t=clamp(t,0,1);const nx=-ey/el,ny=ex/el;const cx=a.x+ex*t,cy=a.y+ey*t;
   const sg=polyInside(P,cx+nx*2,cy+ny*2)?1:-1;b.x=cx+nx*sg*2;b.y=cy+ny*sg*2;b.v*=0.3;
   if(b.isPlayer&&(!b.groundT||G.t-b.groundT>5)){b.groundT=G.t;msg('Auf Grund gelaufen – Ufer!','bad');beep(150,0.4,'square',0.05);}}
-function buildCospu(){const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,key:cospuKey(),fit:pl.fit,fwd:pl.fwd,realOf:pl.realOf,piersX:objArr([],'pier'),c:[0,0],R:2000};
+function buildCospu(){if(S.revier==='cospu'&&!UMLAND_ST)umlandLoad();const UMW=umAn();const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,key:cospuKey(),fit:pl.fit,fwd:pl.fwd,realOf:pl.realOf,piersX:objArr([],'pier'),c:[0,0],R:2000};
   const RPe=cospuReal(),EDDOC=edDocFor(S.revier),GM=edUseGrid(EDDOC,RPe,S.revier),MOD=GM?edModelFor(RPe,S.revier,EDDOC):null;TGM=MOD?{h:(x,y)=>{const q=pl.realOf(x,y);return edSample(MOD.grid,MOD.Hf,q[0],q[1]);}}:null;const EDCLR=GM?edClearTester(pl,EDDOC):null;const CPT=(S.revier==='cospu'&&EDC&&EDC.pts)?EDC.pts:COSPU_PTS;
   const n=P.length;const nrm=P.map((p,i)=>{const a=P[(i-1+n)%n],b=P[(i+1)%n];let nx=-(b.y-a.y),ny=b.x-a.x;const l=Math.hypot(nx,ny)||1;nx/=l;ny/=l;if(polyInside(P,p.x+nx*5,p.y+ny*5)){nx=-nx;ny=-ny;}return [nx,ny];});
   const beachW=p=>(S.revier==='cospu'&&Math.abs(p.s-COSPU_LSCS)<0.07)?0:p.s>0.8?70:(p.side>0&&Math.abs(p.s+0.12)<0.07)?30:(p.side<0&&Math.abs(p.s-0.15)<0.12)?18:0;
@@ -4495,14 +4572,14 @@ function buildCospu(){const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,ke
   const HBI=P.findIndex(p=>p.harb);
   const dens=i=>{const p=P[i];if(!cospuR)return 0.7;if(p.s>0.8){const E=CPT[i][0];return E<nbMin+(nbMax-nbMin)/3?0.9:0.7;}
     if(p.side>0){if(p.s<-0.26)return 1;if(p.s<-0.15)return 0.12+0.88*(-0.15-p.s)/0.11;return 0.12;}return 1;};
-  for(let k=0;k<8000;k++){const i=Math.floor(Math.random()*n),p=P[i];if(Math.random()>dens(i))continue;
+  for(let k=0;k<(UMW?0:8000);k++){const i=Math.floor(Math.random()*n),p=P[i];if(Math.random()>dens(i))continue;
     const dmin=beachW(p)+6;const d=Math.random()<0.5?dmin+Math.random()*70:dmin+70+Math.pow(Math.random(),1.5)*650;
     if(LSCI>=0&&Math.abs(i-LSCI)<=1&&d<110)continue;if(HBI>=0&&d<100&&Math.hypot(p.x-P[HBI].x,p.y-P[HBI].y)<110)continue;const [x,y]=at(i,d);if(polyInside(P,x,y))continue;const y0=hAt(i,d);
     const pAu=clamp((d-50)/50,0,1);
     if(Math.random()<pAu){if(Math.random()<0.12)T2.push([x,y0,y,rnd(10,16),'b']);else T2.push([x,y0,y,rnd(16,27),'o']);}
     else{const r=Math.random();if(r<0.55)T2.push([x,y0,y,rnd(8,15),'b']);else if(r<0.8)T1.push([x,y0,y,rnd(8,14)]);else T2.push([x,y0,y,rnd(5,9),'o']);}}
   // Westufer-Auffüllung: Bäume nach Uferlänge statt nach Stützpunkt. Lange Uferabschnitte ohne Zwischenpunkte (nördlich/südlich vom LSC-Hafen) blieben sonst leer.
-  if(cospuR){const lscP=LSCI>=0?P[LSCI]:null,lo=S.gfx==='niedrig'?0.6:1;
+  if(cospuR&&!UMW){const lscP=LSCI>=0?P[LSCI]:null,lo=S.gfx==='niedrig'?0.6:1;
     for(let i=0;i<n;i++){const j=(i+1)%n,a=P[i],b=P[j];if(a.side>0||b.side>0||a.s>0.8||b.s>0.8)continue;if(CPT[i][0]>-300&&CPT[j][0]>-300)continue;
       const L=segL[i];if(L<25)continue;const cnt=Math.round(L*1.1*lo);
       for(let k=0;k<cnt;k++){const t=Math.random(),d=Math.random()<0.55?4+Math.random()*70:74+Math.pow(Math.random(),1.5)*480;
@@ -4514,7 +4591,7 @@ function buildCospu(){const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,ke
         if(Math.random()<pAu){if(Math.random()<0.12)T2.push([x,y0,y,rnd(10,16),'b']);else T2.push([x,y0,y,rnd(16,27),'o']);}
         else{const r=Math.random();if(r<0.55)T2.push([x,y0,y,rnd(8,15),'b']);else if(r<0.8)T1.push([x,y0,y,rnd(8,14)]);else T2.push([x,y0,y,rnd(5,9),'o']);}}}}
   // Nordufer-Auffüllung: dichter Wald hinter dem Nordstrand (nach Uferlänge)
-  if(cospuR){const lo=S.gfx==='niedrig'?0.6:1;
+  if(cospuR&&!UMW){const lo=S.gfx==='niedrig'?0.6:1;
     for(let i=0;i<n;i++){const j=(i+1)%n,a=P[i],b=P[j];if(!(a.s>0.8&&b.s>0.8))continue;
       const L=segL[i];if(L<25)continue;const cnt=Math.round(L*0.9*lo);
       for(let k=0;k<cnt;k++){const t=Math.random(),d=Math.random()<0.4?beachW(a)+8+Math.random()*60:beachW(a)+68+Math.pow(Math.random(),1.4)*520;
@@ -4528,7 +4605,7 @@ function buildCospu(){const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,ke
       const y0=-o<75?0.8:hAt(LSCI,Math.max(0,-o));const tall=rnd(8,17);if(-o<80){const r=Math.random();if(r<0.5)T2.push([x,y0,y,rnd(8,14),'b']);else if(r<0.85)T1.push([x,y0,y,rnd(8,14)]);else T2.push([x,y0,y,rnd(5,9),'o']);}else if(Math.random()<0.15)T2.push([x,y0,y,rnd(10,16),'b']);else T2.push([x,y0,y,rnd(15,24),'o']);added++;}}
   const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),sc=new THREE.Vector3(),pp=new THREE.Vector3(),c=new THREE.Color();
   // Ostufer ab der Seemitte nordwärts: dichter Wald direkt am Ufer (nach Uferlänge)
-  if(cospuR){const lo=S.gfx==='niedrig'?0.6:1;
+  if(cospuR&&!UMW){const lo=S.gfx==='niedrig'?0.6:1;
     for(let i=0;i<n;i++){const j=(i+1)%n,a=P[i],b=P[j];if(!(a.side>0&&b.side>0&&a.s>0&&b.s>0)||(a.s>0.8&&b.s>0.8))continue;
       const L=segL[i];if(L<6)continue;const cnt=Math.round(L*1.0*lo);
       for(let k=0;k<cnt;k++){const t=Math.random(),d=Math.random()<0.6?3+Math.random()*45:48+Math.pow(Math.random(),1.5)*420;
@@ -4537,6 +4614,7 @@ function buildCospu(){const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,ke
         const y0=hAt(i,d)*(1-t)+hAt(j,d)*t,pAu=clamp((d-40)/60,0,1);
         if(Math.random()<pAu){if(Math.random()<0.12)T2.push([x,y0,y,rnd(10,16),'b']);else T2.push([x,y0,y,rnd(16,27),'o']);}
         else{const r=Math.random();if(r<0.55)T2.push([x,y0,y,rnd(8,15),'b']);else if(r<0.8)T1.push([x,y0,y,rnd(8,14)]);else T2.push([x,y0,y,rnd(5,9),'o']);}}}}
+  if(UMW){try{const lscP=LSCI>=0?P[LSCI]:null,hb=HBI>=0?P[HBI]:null;umBaeume(pl,P,MOD,T1,T2,(x,y)=>(lscP&&Math.hypot(x-lscP.x,y-lscP.y)<175)||(hb&&Math.hypot(x-hb.x,y-hb.y)<110));}catch(e){console.error('Umland-Bäume',e);}}
   if(cospuR&&SHORE.fwd){try{cospuRundweg(P,n,pos,idx,offs,HBI,T1,T2,ringPt);}catch(e){console.error('Rundweg',e);}}
   if(GM){try{edForestEdits(EDDOC,pl,P,T1,T2,EDCLR);}catch(e){console.error('Wald-Editor',e);}}
   if(S.revier==='rangs'){try{rangsDecor(pl,P,T1,T2);}catch(e){console.error('Rangsdorf',e);}}
@@ -4592,9 +4670,10 @@ function buildCospu(){const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,ke
   const wall=facadeMat('#ece6da'),wall2=facadeMat('#d9d2c4'),roof=new THREE.MeshLambertMaterial({color:'#9c4a3a'}),roof2=new THREE.MeshLambertMaterial({color:'#5d5f63'});
   const house=(i,d)=>{const [x,y]=at(i,d);if(EDCLR&&EDCLR(x,y))return;const w=rnd(8,14),dd=rnd(8,12);let h=(Math.random()<0.35?9:6)+0.4;let y0=hAt(i,d);const ang=Math.atan2(nrm[i][0],nrm[i][1]);if(GM){const g=edFoot(x,y,ang,w,dd);y0=g[0];h+=g[1];}const hb=new THREE.Mesh(facadeGeo(w,h,dd),Math.random()<0.5?wall:wall2);hb.position.set(x,y0+h/2-0.3,-y);hb.rotation.y=ang;shoreG.add(hb);
     const rf=new THREE.Mesh(new THREE.ConeGeometry(Math.max(w,dd)*0.74,h*0.55,4),Math.random()<0.6?roof:roof2);rf.userData.szn='roof';rf.position.set(x,y0+h-0.3+h*0.27,-y);rf.rotation.y=ang+Math.PI/4;shoreG.add(rf);};
-  if(S.revier==='cospu')for(let k=0;k<70;k++){const i=Math.floor(Math.random()*n),p=P[i];if(!(p.side>0&&p.s>-0.6&&p.s<0.45))continue;house(i,rnd(110,700));}
-  if(S.revier==='cospu')for(let k=0;k<12;k++){const i=Math.floor(Math.random()*n),p=P[i];if(p.s<0.85)continue;house(i,rnd(130,260));}
+  if(S.revier==='cospu'&&!UMW)for(let k=0;k<70;k++){const i=Math.floor(Math.random()*n),p=P[i];if(!(p.side>0&&p.s>-0.6&&p.s<0.45))continue;house(i,rnd(110,700));}
+  if(S.revier==='cospu'&&!UMW)for(let k=0;k<12;k++){const i=Math.floor(Math.random()*n),p=P[i];if(p.s<0.85)continue;house(i,rnd(130,260));}
   if(GM){edAddHouses(EDDOC,pl,shoreG,wall,wall2,roof,roof2);edAddIslands(EDDOC,pl,shoreG,SHORE);}
+  if(UMW){try{objSec('umland:haeuser','Häuser aus OpenStreetMap','Umland');umHaeuser(pl,P,(x,y)=>lscF(x,y)>0);objSec(null);}catch(e){console.error('Umland-Häuser',e);objSec(null);}}
   // Hafen Zöbigker mit Steg, Liegeplätzen und "Pier 1"-Gebäude
   let hi=P.findIndex(p=>p.harb);if(hi<0){let hb=1e9;for(let i=0;i<n;i++){const p=P[i];if(p.side>0){const e=Math.abs(p.s+0.05);if(e<hb){hb=e;hi=i;}}}}if(S.revier!=='cospu')hi=-99;
   if(S.revier==='cospu'){const [x,y]=at(hi,0),nx=nrm[hi][0],ny=nrm[hi][1];const ang=Math.atan2(nx,ny);const dk=new THREE.MeshLambertMaterial({color:'#8a7a63'});
@@ -4614,8 +4693,8 @@ function buildCospu(){const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,ke
          if(ms){const mh=rnd(t.mast[0],t.mast[1]);const fw=new THREE.Vector3(Math.sin(h[2]),0,Math.cos(h[2]));V.set(h[0]-fw.x*t.L*0.12,mh/2+0.9,-h[1]-fw.z*t.L*0.12);Q.identity();SC.set(1,mh,1);M.compose(V,Q,SC);ms.setMatrixAt(k,M);}
          if(cab){const fw=[Math.sin(h[2]),Math.cos(h[2])];Q.setFromAxisAngle(YA,h[2]);V.set(h[0]-fw[0]*t.L*0.1,1.35,-h[1]-fw[1]*t.L*0.1);SC.set(1,1,1);M.compose(V,Q,SC);cab.setMatrixAt(k,M);}});
        shoreG.add(hull);if(ms)shoreG.add(ms);if(cab)shoreG.add(cab);});}
-    objSec('zoeb:pier1','Pier 1 (Glasbau)','Hafen Zöbigker');const [gx,gy]=at(hi,35);const glass=new THREE.Mesh(new THREE.BoxGeometry(26,7,14),new THREE.MeshPhongMaterial({color:'#9fb7c4',shininess:90,specular:0x667788}));glass.position.set(gx,hAt(hi,35)+3.2,-gy);glass.rotation.y=ang;shoreG.add(glass);
-    const rf=new THREE.Mesh(new THREE.BoxGeometry(28,0.6,16),new THREE.MeshLambertMaterial({color:'#e8e8e4'}));rf.position.set(gx,hAt(hi,35)+7,-gy);rf.rotation.y=ang;shoreG.add(rf);objSec(null);}
+    if(!UMW){objSec('zoeb:pier1','Pier 1 (Glasbau)','Hafen Zöbigker');const [gx,gy]=at(hi,35);const glass=new THREE.Mesh(new THREE.BoxGeometry(26,7,14),new THREE.MeshPhongMaterial({color:'#9fb7c4',shininess:90,specular:0x667788}));glass.position.set(gx,hAt(hi,35)+3.2,-gy);glass.rotation.y=ang;shoreG.add(glass);
+    const rf=new THREE.Mesh(new THREE.BoxGeometry(28,0.6,16),new THREE.MeshLambertMaterial({color:'#e8e8e4'}));rf.position.set(gx,hAt(hi,35)+7,-gy);rf.rotation.y=ang;shoreG.add(rf);objSec(null);}}
   if(S.revier==='cospu'){objSec('n22','Steg am Nordufer','Steganlagen');const F=SHORE.fwd,dk2=new THREE.MeshLambertMaterial({color:'#8a7a63'});const [a0,b0]=F(COSPU_N22[0],COSPU_N22[1]),[a1,b1]=F(COSPU_N22[2],COSPU_N22[3]);const L=Math.hypot(a1-a0,b1-b0),pr=new THREE.Mesh(new THREE.BoxGeometry(2,0.35,L),dk2);pr.position.set((a0+a1)/2,1.2,-(b0+b1)/2);pr.rotation.y=Math.atan2((a1-a0)/L,-(b1-b0)/L);shoreG.add(pr);SHORE.piersX.push([a0,b0,a1,b1,2,'#c9b48f']);objSec(null);}
   if(S.revier==='cospu'){SHORE.buoysX=objArr([],'pt');const tagL=SHORE.tagL=[];(SHORE.anim||(SHORE.anim=[])).push(now=>{for(const lb of tagL){const d=camera.position.distanceTo(lb.sp.position.set(lb.x,lb.y0,lb.z)||lb.sp.position),ls=clamp(d*0.022,0.45,7);lb.sp.visible=d>12;lb.sp.position.y=lb.y0+ls*0.4;lb.sp.scale.set(lb.w*ls,0.9*ls,1);}});const F=SHORE.fwd,yel=new THREE.MeshLambertMaterial({color:'#fdd835'}),rd=new THREE.MeshLambertMaterial({color:'#e53935'}),wh=new THREE.MeshLambertMaterial({color:'#f4f4f0'}),pl=new THREE.MeshLambertMaterial({color:'#333b40'});
     for(const t of COSPU_TONNEN){objSec('tonne:'+COSPU_TONNEN.indexOf(t),'Tonne „'+t[3]+'“','Tonnen');const [x,y]=F(t[0],t[1]);SHORE.buoysX.push([x,y]);const g=new THREE.Group();let body;
@@ -4633,7 +4712,7 @@ function buildCospu(){const pl=cospuPlace();const P=pl.P;SHORE={kind:'poly',P,ke
   try{highwayA38(P);}catch(e){console.error('A38',e);}
   // Aussichtsturm Bistumshöhe (SO)
   let ti=0,tb=1e9;for(let i=0;i<n;i++){const p=P[i];if(p.side>0){const e=Math.abs(p.s+0.75);if(e<tb){tb=e;ti=i;}}}
-  if(S.revier==='cospu'){const [x,y]=at(ti,450);const y0=hAt(ti,450);objSec('turm','Aussichtsturm Bistumshöhe','Landschaft');const tw=new THREE.Group();const st=new THREE.MeshLambertMaterial({color:'#6b6f73'});
+  if(S.revier==='cospu'){const tp=UMW?UMLAND.pkt.find(p=>/Bistum|Aussichtsturm/i.test(p[2])):null;const [x,y]=tp?pl.fwd(tp[0],tp[1]):at(ti,450);const y0=tp&&TGM?TGM.h(x,y):hAt(ti,450);objSec('turm','Aussichtsturm Bistumshöhe','Landschaft');const tw=new THREE.Group();const st=new THREE.MeshLambertMaterial({color:'#6b6f73'});
     for(const [a,b] of [[1,1],[1,-1],[-1,1],[-1,-1]]){const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.35,30,6),st);leg.position.set(a*2.2,15,b*2.2);leg.rotation.set(b*0.05,0,-a*0.05);tw.add(leg);}
     for(let k=1;k<=6;k++){const ring=new THREE.Mesh(new THREE.TorusGeometry(2.6-k*0.12,0.12,4,16),st);ring.rotation.x=Math.PI/2;ring.position.y=k*4.6;tw.add(ring);}
     const top=new THREE.Mesh(new THREE.CylinderGeometry(3.2,3.2,0.5,16),st);top.position.y=30;tw.add(top);tw.position.set(x,y0-0.5,-y);shoreG.add(tw);objSec(null);}
