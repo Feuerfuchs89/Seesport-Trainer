@@ -754,7 +754,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
    Grundberührung nach Tiefgang der Bootsklasse. KEINE Navigationskarte.
    ===================================================================== */
 var REV_BASES = ['../See-Editor/', ''];           /* erst die See-Editor-Seite, dann der eigene Ordner */
-var REVIERE_K = { ruegen: { datei: 'ruegen-spiel.json', name: 'Rügen · Bodden · Peenestrom' }, usedom: { datei: 'usedom-spiel.json', name: 'Usedom · Haff · Peenestrom' }, rostock: { datei: 'rostock-spiel.json', name: 'Rostock · Warnemünde' } };
+var REVIERE_K = { ruegen: { datei: 'ruegen-spiel.json', name: 'Rügen · Bodden · Peenestrom' }, usedom: { datei: 'usedom-spiel.json', name: 'Usedom · Haff · Peenestrom' }, rostock: { datei: 'rostock-spiel.json', name: 'Rostock · Warnemünde' }, cospu_neu: { datei: 'cospu-spiel.json', lage: 'cospu-lage.json', name: 'Cospudener See · echte Daten (neu)' } };
 var REVX = null, REVH = null, REVH_LOAD = null, REVH_ERR = null;
 var REV_DRAFT = { gorchfock: 4.8, jolle: 1.0, opti: 0.75, topcat: 0.7, viking: 1.0, imoca: 4.5, zk10: 1.0, ixylon: 0.9, k6: 0.9, moth: 1.0 };
 var REV_ORIG_ALT = { hiddensee: [366520, 6016000] };  /* Strecken aus der ersten Hiddensee-Version umrechnen */
@@ -790,6 +790,7 @@ function revLoad() {
     if (idx.courses && !idx.courses[S.revKurs] && !String(S.revKurs || '').startsWith('u:')) { const ks = Object.keys(idx.courses); if (ks.length) { S.revKurs = ks.find(k => !idx.courses[k].bahn) || ks[0]; try { saveS(); } catch (e) {} } }
     for (const t of idx.grid.tiles) X.meta.set(t[0] + ',' + t[1], { ti: t[0], tj: t[1], file: t[2], kx: t[3], ky: t[4], nh: t[5] });
     if (X.rev !== S.revier) return; /* inzwischen anderes Revier gewählt */
+    if (def.lage) { try { X.lage = await revFetch(base, def.lage, 'json'); } catch (e) { console.warn('Lage', e); } if (X.rev !== S.revier) return; }
     REVX = REVH = X;
     if (REVIERE_K[S.revier]) {
       /* Kacheln rund um den Start vorab laden, dann bauen */
@@ -888,7 +889,58 @@ function revBuild() {
   SHORE.binnenMap = (X.idx.binnen || []).map(f => { const p = []; for (let k = 0; k < f.length; k += 2) p.push(fwd(f[k], f[k + 1])); return p; });
   SHORE.places = X.idx.places.map(p => { const q = fwd(p[0], p[1]); return [q[0], q[1], p[2], p[3]]; });
   X.built = false;
+  if (X.lage) { objStart(); try { revCospuObjekte(X); } catch (e) { console.error('Cospu-Objekte', e); } finally { objFinish(); } }
   try { seasonApply(shoreG); } catch (e) { console.error('Jahreszeit', e); }
+}
+
+/* ---------- Cospudener See (echte Daten): LSC-Hafen, Stege, Tonnen aus cospu-lage.json ---------- */
+function revCospuObjekte(X) {
+  const L = X.lage; if (!L || !L.lsc || !L.revier_aus_alt) return;
+  const F = SHORE.fwd, Mx = L.revier_aus_alt.M, t0 = L.revier_aus_alt.t;
+  const alt2rev = (a, b) => [Mx[0][0] * a + Mx[0][1] * b + t0[0], Mx[1][0] * a + Mx[1][1] * b + t0[1]];
+  const dirF = (dx, dy) => { const o = F(0, 0), q = F(dx, dy); return [q[0] - o[0], q[1] - o[1]]; };
+  /* Uferring des Sees (OSM) im Spielsystem; Hafenpunkt als eigener Eckpunkt einfügen */
+  const ring = (L.alt_system.osm_ufer || []).map(q => { const r = alt2rev(q[0], q[1]), f = F(r[0], r[1]); return { x: f[0], y: f[1] }; });
+  if (ring.length > 3 && Math.hypot(ring[0].x - ring[ring.length - 1].x, ring[0].y - ring[ring.length - 1].y) < 1) ring.pop();
+  const uf = F(L.lsc.ufer[0], L.lsc.ufer[1]); let bi = 0, bd = 1e9;
+  for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length], d = ptSeg(uf[0], uf[1], a.x, a.y, b.x, b.y); if (d < bd) { bd = d; bi = i; } }
+  ring.splice(bi + 1, 0, { x: uf[0], y: uf[1] }); const li = bi + 1;
+  const w = dirF(L.lsc.wasser[0], L.lsc.wasser[1]), wl = Math.hypot(w[0], w[1]) || 1;
+  const nrm = ring.map(() => [0, 0]); nrm[li] = [-w[0] / wl, -w[1] / wl];
+  /* Ausrichtung der Stege wie im Original (od im alten System) → ins Revier-System drehen */
+  const od0 = LSC_REAL.od, odr = [Mx[0][0] * od0[0] + Mx[0][1] * od0[1], Mx[1][0] * od0[0] + Mx[1][1] * od0[1]], ol = Math.hypot(odr[0], odr[1]) || 1;
+  const odS = LSC_REAL.od.slice(); LSC_REAL.od = [odr[0] / ol, odr[1] / ol];
+  try { lscBuild(ring, nrm, null, null, li); } finally { LSC_REAL.od = odS; }
+  SHORE.lscRev = { ring, li, wasser: [w[0] / wl, w[1] / wl] };
+  /* Hafen Zöbigker + Steg Nordufer nach Aufmaß */
+  const O = L.objekte || {}, dk = new THREE.MeshLambertMaterial({ color: '#8a7a63' }), hull = new THREE.MeshLambertMaterial({ color: '#e8e8e4' });
+  SHORE.piersX = objArr([], 'pier'); SHORE.zobst = objArr([], 'obst');
+  objSec('zoeb:stege', 'Hafen Zöbigker: Stege & Boote', 'Hafen Zöbigker');
+  (O.stege || []).forEach((e, k) => { if (k === (O.stege.length - 1) && O.n22) return;
+    const a0 = F(e[0], e[1]), a1 = F(e[2], e[3]), Ln = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]); if (Ln < 1) return;
+    const ux = (a1[0] - a0[0]) / Ln, uy = (a1[1] - a0[1]) / Ln, wd = e[4];
+    const p = new THREE.Mesh(new THREE.BoxGeometry(wd, 0.35, Ln), dk); p.position.set((a0[0] + a1[0]) / 2, 1.2, -(a0[1] + a1[1]) / 2); p.rotation.y = Math.atan2(ux, -uy); shoreG.add(p);
+    SHORE.piersX.push([a0[0], a0[1], a1[0], a1[1], wd, '#c9b48f']);
+    if (e[5]) for (let t = e[5]; t < Ln - 3; t += 4.4) { if (Math.random() < 0.15) continue; for (const sd of [1, -1]) { const dx = -uy * sd, dy = ux * sd, bl = rnd(4.6, 8.5), o = wd / 2 + bl / 2 + 0.3, cx = a0[0] + ux * t + dx * o, cy = a0[1] + uy * t + dy * o;
+        const h = new THREE.Mesh(new THREE.BoxGeometry(bl * 0.34, 0.8, bl), hull); h.position.set(cx, 0.4, -cy); h.rotation.y = Math.atan2(dx, -dy); shoreG.add(h);
+        SHORE.zobst.push({ ax: cx - dx * bl * 0.42, ay: cy - dy * bl * 0.42, bx: cx + dx * bl * 0.42, by: cy + dy * bl * 0.42, r: bl * 0.17, name: 'Liegeboot', pier: true, boat: true }); } } });
+  objSec(null);
+  if (O.n22) { objSec('n22', 'Steg am Nordufer', 'Steganlagen'); const a0 = F(O.n22[0], O.n22[1]), a1 = F(O.n22[2], O.n22[3]), Ln = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]);
+    const p = new THREE.Mesh(new THREE.BoxGeometry(2, 0.35, Ln), dk); p.position.set((a0[0] + a1[0]) / 2, 1.2, -(a0[1] + a1[1]) / 2); p.rotation.y = Math.atan2((a1[0] - a0[0]) / Ln, -(a1[1] - a0[1]) / Ln); shoreG.add(p);
+    SHORE.piersX.push([a0[0], a0[1], a1[0], a1[1], 2, '#c9b48f']); objSec(null); }
+  /* Tonnen */
+  SHORE.buoysX = objArr([], 'pt'); const tagL = SHORE.tagL = [];
+  (SHORE.anim || (SHORE.anim = [])).push(now => { for (const lb of tagL) { const d = camera.position.distanceTo(lb.sp.position.set(lb.x, lb.y0, lb.z)), ls = clamp(d * 0.022, 0.45, 7); lb.sp.visible = d > 12; lb.sp.position.y = lb.y0 + ls * 0.4; lb.sp.scale.set(lb.w * ls, 0.9 * ls, 1); } });
+  const yel = new THREE.MeshLambertMaterial({ color: '#fdd835' }), rd = new THREE.MeshLambertMaterial({ color: '#e53935' }), wh = new THREE.MeshLambertMaterial({ color: '#f4f4f0' }), pm = new THREE.MeshLambertMaterial({ color: '#3b3b3b' });
+  (O.tonnen || []).forEach((t, k) => { objSec('tonne:' + k, 'Tonne „' + t[3] + '“', 'Tonnen'); const [x, y] = F(t[0], t[1]); SHORE.buoysX.push([x, y]); const g = new THREE.Group(); let body;
+    if (t[2] === 'spherical') { body = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8), yel); body.position.y = 0.35; }
+    else if (t[2] === 'conical') { body = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.4, 10), yel); body.position.y = 0.5; }
+    else if (t[2] === 'can') { body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.2, 10), yel); body.position.y = 0.4; }
+    else { body = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.5, 1.2, 10), yel); body.position.y = 0.4; }
+    g.add(body); const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.6, 5), pm); pole.position.y = 1.5; g.add(pole);
+    if (t[3] === 'Sondertonne') [[rd, 2.55], [wh, 2.3], [rd, 2.05]].forEach(([m, h]) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.25, 8), m); c.position.y = h; g.add(c); });
+    else { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.3, 8), yel); c.position.y = 2.4; g.add(c); }
+    g.scale.setScalar(2.6); g.position.set(x, 0, -y); shoreG.add(g); const T = tagSprite(t[3], '#fdd835'); shoreG.add(T.sp); tagL.push({ sp: T.sp, w: T.w, x, y0: 7.2, z: -y }); objSec(null); });
 }
 
 /* Gelände-Stücke (64×64 Zellen = 2,56 km) mit Detailstufe nach Entfernung */
@@ -3835,7 +3887,7 @@ const SCHEMA=[
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
-  {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revier',label:'Revier',type:'select',options:[['cospu','Cospudener See (Leipzig)'],['cospu_neu','Cospudener See · echte Daten (neu, Test)'],['rangs','Rangsdorfer See (Brandenburg)'],['gpx','Eigenes Ufer (GPX-Datei)'],['open','Großer Binnensee'],['small','Kleiner See mit Uferabdeckung'],['coast','Küste, offener Horizont'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
   {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
   {k:'bruecke',label:'Klappbrücken (Ziegelgraben, Wolgast)',type:'select',options:[['echt','Öffnen zu den echten Zeiten'],['offen','Immer offen']],hint:'Ziegelgrabenbrücke im Rügendamm: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 Uhr je 20 min. Peenebrücke Wolgast: 5:45, 7:45, 12:45, 17:45, 20:45 Uhr je 15 min, Juni–September auch 23:45 Uhr. Es zählt die Uhrzeit deines Geräts. Unter der Rügenbrücke passt du mit 42 m immer durch – die Klappe daneben musst du abwarten. Autos halten vor der offenen Klappe.'},
   {k:'schiffsverkehr',label:'Schiffsverkehr',type:'select',options:[['an','Fähren, Ausflugsschiffe und Kutter fahren'],['aus','Alle bleiben im Hafen']],hint:'Hiddensee-Fähre Schaprode–Vitte, Ausflugsschiff Sassnitz–Königsstuhl, Bäderschiff Binz–Sellin und ein Fischkutter aus Sassnitz. Sie weichen Regattabahnen aus und warten vor Start und Ziel einer laufenden Regatta – nach den Ausweichregeln musst du ihnen aber trotzdem Platz lassen.'},
@@ -3927,7 +3979,7 @@ const WX_TXT={none:'kein Niederschlag',r1:'leichter Regen',r2:'mäßiger Regen',
 const WX_COMP=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 const LIGHT_TXT={mittag:'Mittag',nachmittag:'Nachmittag',gold:'Goldene Stunde',daemmerung:'Dämmerung',nacht:'Nacht'};
 let wxBusy=false;
-function wxSite(){revMigrate();if(S.revier==='rostock')return {lat:54.18,lon:12.08,name:'Warnemünde'};if(S.revier==='usedom'){const k=S.revKurs||'';if(/haff/.test(k))return {lat:53.78,lon:14.02,name:'Stettiner Haff'};if(/heringsdorf|gfu/.test(k))return {lat:53.98,lon:14.17,name:'Heringsdorf'};if(/achter/.test(k))return {lat:54.0,lon:13.97,name:'Achterwasser'};return {lat:54.1,lon:13.8,name:'Peenestrom'};}if(REVIERE_K[S.revier]){const k=S.revKurs||'bb';if(/bahn_gfs|bahn_pr/.test(k))return {lat:54.50,lon:13.66,name:'Sassnitz/Binz'};if(k==='bahn_gft')return {lat:54.62,lon:13.45,name:'Tromper Wiek'};if(k==='bahn_gb')return {lat:54.20,lon:13.55,name:'Greifswalder Bodden'};if(k==='bb'||k==='rund'||k==='bahn')return {lat:54.53,lon:13.10,name:'Hiddensee'};return {lat:54.42,lon:13.35,name:'Rügen'};}return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
+function wxSite(){revMigrate();if(S.revier==='cospu_neu')return {lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};if(S.revier==='rostock')return {lat:54.18,lon:12.08,name:'Warnemünde'};if(S.revier==='usedom'){const k=S.revKurs||'';if(/haff/.test(k))return {lat:53.78,lon:14.02,name:'Stettiner Haff'};if(/heringsdorf|gfu/.test(k))return {lat:53.98,lon:14.17,name:'Heringsdorf'};if(/achter/.test(k))return {lat:54.0,lon:13.97,name:'Achterwasser'};return {lat:54.1,lon:13.8,name:'Peenestrom'};}if(REVIERE_K[S.revier]){const k=S.revKurs||'bb';if(/bahn_gfs|bahn_pr/.test(k))return {lat:54.50,lon:13.66,name:'Sassnitz/Binz'};if(k==='bahn_gft')return {lat:54.62,lon:13.45,name:'Tromper Wiek'};if(k==='bahn_gb')return {lat:54.20,lon:13.55,name:'Greifswalder Bodden'};if(k==='bb'||k==='rund'||k==='bahn')return {lat:54.53,lon:13.10,name:'Hiddensee'};return {lat:54.42,lon:13.35,name:'Rügen'};}return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
 async function loadLiveWx(){if(wxBusy)return;wxBusy=true;const say=t=>{S.wxInfo=t;const st=document.getElementById('wxStatus');if(st)st.textContent=t;saveS();};
   try{say('Lade Live-Daten …');const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),9000);
     if(S.revier!=='rangs'&&S.revier!=='cospu'&&!REVIERE_K[S.revier]&&!(G&&G.running&&!G.over))S.revier='cospu';const site=wxSite();const r=await fetch(WX_URL.replace('latitude='+WX_LAT,'latitude='+site.lat).replace('longitude='+WX_LON,'longitude='+site.lon),{signal:ctl.signal,cache:'no-store'});clearTimeout(to);if(!r.ok)throw new Error('HTTP '+r.status);
@@ -4742,7 +4794,7 @@ const OBJK='regattakoje.objs';
 let OBJS=(()=>{try{const o=JSON.parse(localStorage.getItem(OBJK)||'{}');return o&&typeof o==='object'?o:{};}catch(e){return {};}})();
 let OBJ_REG=new Map(),OBJ_SEC=null,OBJ_ON=false,OBJ_HOOK=null,OBJ_HIDDEN=new Set(),OBJ_MP=null;
 const OBJ_GADD=THREE.Object3D.prototype.add;
-function objKey(){return S.revier==='rangs'?'rangs':S.revier==='gpx'?'gpx:'+((GPXLAKE&&GPXLAKE.name)||''):'cospu';}
+function objKey(){return S.revier==='cospu_neu'?'cospu_neu':S.revier==='rangs'?'rangs':S.revier==='gpx'?'gpx:'+((GPXLAKE&&GPXLAKE.name)||''):'cospu';}
 function objState(){if(OBJ_MP)return OBJ_MP;const k=objKey();let st=OBJS[k];if(!st||typeof st!=='object'){st=OBJS[k]={ov:{},cp:[]};}if(!st.ov)st.ov={};if(!Array.isArray(st.cp))st.cp=[];return st;}
 function objStore(){try{localStorage.setItem(OBJK,JSON.stringify(OBJS));}catch(e){}}
 function objSec(id,label,cat){if(!OBJ_ON||!id){OBJ_SEC=null;return;}let e=OBJ_REG.get(id);if(!e){e={id,label:label||id,cat:cat||'Sonstiges',kids:[],coll:[],grp:null};OBJ_REG.set(id,e);}OBJ_SEC=e;}
