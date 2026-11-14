@@ -1301,12 +1301,12 @@ function revStege(h) {
     const L = byK[k], wood = k === 'pier';
     const holz = wood ? L.filter(sg => sg[4] <= 4) : [], fest = wood ? L.filter(sg => sg[4] > 4) : L;
     if (fest.length) { const im = new THREE.InstancedMesh(box, revM(wood ? '#9a978f' : COL[k] || '#8d8a84'), fest.length);
-      fest.forEach((sg, i) => { const [ax, ay, bx, by, w] = sg, len = Math.hypot(bx - ax, by - ay) + w * 0.3; q.setFromAxisAngle(up, Math.atan2(bx - ax, by - ay)); sc.set(w, (H[k] || 1.4) + 1.5, len); p.set((ax + bx) / 2, -1.5, -(ay + by) / 2); m4.compose(p, q, sc); im.setMatrixAt(i, m4); });
+      fest.forEach((sg, i) => { const [ax, ay, bx, by, w] = sg, len = Math.hypot(bx - ax, by - ay) + w * 0.3; q.setFromAxisAngle(up, Math.atan2(bx - ax, -(by - ay))); sc.set(w, (H[k] || 1.4) + 1.5, len); p.set((ax + bx) / 2, -1.5, -(ay + by) / 2); m4.compose(p, q, sc); im.setMatrixAt(i, m4); });
       grp.add(im); }
     if (holz.length) {
       /* Holzsteg: 0,35 m dicke Planke 1 m über Wasser, Breite höchstens 2,4 m, Pfähle alle 4 m an beiden Seiten */
       const im = new THREE.InstancedMesh(box, revM('#8a6e50'), holz.length), pf = [];
-      holz.forEach((sg, i) => { const [ax, ay, bx, by, w] = sg, br = Math.min(w, 2.4), l0 = Math.hypot(bx - ax, by - ay), len = l0 + br * 0.5, ang = Math.atan2(bx - ax, by - ay);
+      holz.forEach((sg, i) => { const [ax, ay, bx, by, w] = sg, br = Math.min(w, 2.4), l0 = Math.hypot(bx - ax, by - ay), len = l0 + br * 0.5, ang = Math.atan2(bx - ax, -(by - ay));   /* Szene: z = −Nord */
         q.setFromAxisAngle(up, ang); sc.set(br, 0.35, len); p.set((ax + bx) / 2, 0.75, -(ay + by) / 2); m4.compose(p, q, sc); im.setMatrixAt(i, m4);
         const ux = (bx - ax) / (l0 || 1), uy = (by - ay) / (l0 || 1); for (let d = 0; d <= l0; d += 4) for (const sd of [-1, 1]) pf.push([ax + ux * d - uy * sd * (br / 2 - 0.1), ay + uy * d + ux * sd * (br / 2 - 0.1)]); });
       grp.add(im);
