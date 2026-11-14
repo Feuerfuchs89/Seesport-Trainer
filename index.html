@@ -1008,6 +1008,54 @@ function revTick(force) {
   }
   try { revHafenTick(E, N); revTurmGrund(); revWzTick(E, N); } catch (e) { console.error('Hafen', e); }
   try { revStrTick(E, N); } catch (e) { console.error('Straßen', e); }
+  try { revSchilfTick(E, N); } catch (e) { console.error('Schilf', e); }
+}
+/* ---------- Schilfgürtel an flachen, geschützten Ufern (Bodden, Haff, Peenestrom, Warnow) ----------
+   1-km-Stücke rund um Boot/Hubschrauber. Schilf wächst im Band von 0,7 m Wassertiefe bis 0,5 m über Wasser,
+   nicht an Stränden, Orten, Steilufern, in Häfen oder an Wahrzeichen; an offenen, schnell tiefen Ufern nur bei
+   OSM-Feuchtgebiet (Röhricht). Lückenhaft über ein grobes Rauschen, damit es wie echte Bestände aussieht. */
+function revSchilfStueck(ci, cj) {
+  const X = REVX, cs = X.cs, KM = 1000, E0 = ci * KM, N0 = cj * KM, ultra = S.gfx === 'ultra', MAX = ultra ? 16000 : 10000;
+  const hash = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+  const rausch = (E, N) => { const g = 140, x = E / g, y = N / g, i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const a = hash(i, j), b = hash(i + 1, j), c = hash(i, j + 1), d = hash(i + 1, j + 1); return (a * (1 - sx) + b * sx) * (1 - sy) + (c * (1 - sx) + d * sx) * sy; };
+  const pos = [], gi0 = Math.floor(E0 / cs), gi1 = Math.ceil((E0 + KM) / cs), gj0 = Math.floor((X.H - N0 - KM) / cs), gj1 = Math.ceil((X.H - N0) / cs);
+  for (let gj = gj0; gj < gj1 && pos.length < MAX; gj++) for (let gi = gi0; gi < gi1 && pos.length < MAX; gi++) {
+    const z00 = revCellZ(gi, gj), z10 = revCellZ(gi + 1, gj), z01 = revCellZ(gi, gj + 1), z11 = revCellZ(gi + 1, gj + 1);
+    const lo = Math.min(z00, z10, z01, z11), hi = Math.max(z00, z10, z01, z11); if (lo > 0 || hi <= 0 || lo < -400) continue;   /* echte Uferzelle (Wasserlinie läuft hindurch), keine Sandbank draußen, nicht an Abbruchkante */
+    let feucht = false, verbot = false; const nb = [[gi, gj], [gi + 1, gj], [gi, gj + 1], [gi + 1, gj + 1], [gi - 1, gj], [gi + 2, gj], [gi, gj - 1], [gi, gj + 2]];
+    for (const [a, b] of nb) { const z = revCellZ(a, b); if (z <= 0) continue; const lu = revCellLu(a, b); if (lu === 5) feucht = true; if (lu === 2 || lu === 4) verbot = true; if (z > 450) verbot = true; }
+    if (verbot && !feucht) continue;
+    const Ec = (gi + 0.5) * cs, Nc = X.H - (gj + 0.5) * cs;
+    if (!feucht) { let tief = false; for (let k = 0; k < 12 && !tief; k++) { const w = k * Math.PI / 6; if (revZ(Ec + Math.cos(w) * 220, Nc + Math.sin(w) * 220) < -3.5) tief = true; } if (tief) continue; }
+    if (revHafenAt(Ec, Nc) || revInWz(Ec, Nc)) continue;
+    const dicht = feucht ? 0.8 : 0.62, n = Math.round(cs * cs / 7);
+    for (let k = 0; k < n; k++) {
+      const E = gi * cs + Math.random() * cs, N = X.H - (gj + Math.random()) * cs; if (E < E0 || E >= E0 + KM || N < N0 || N >= N0 + KM) continue;
+      const z = revZ(E, N); if (z < -0.65 || z > 0.45) continue; if (Math.random() < Math.abs(z + 0.1) * 1.1) continue;   /* am dichtesten an der Wasserlinie */
+      const r = rausch(E, N); if (r < 1 - dicht) continue;
+      if (revHafenAt(E, N)) continue;
+      pos.push([E, N, z, r]);
+    }
+  }
+  if (!pos.length) return null;
+  const F = SHORE.fwd, im = new THREE.InstancedMesh(revSchilfGeo(), revSchilfMat(), pos.length), m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), c = new THREE.Color(), up = new THREE.Vector3(0, 1, 0), sv = new THREE.Vector3(), pv = new THREE.Vector3();
+  pos.forEach((q, i) => { const p = F(q[0], q[1]), rand = Math.min(1, (q[3] - 0.25) * 2.2), s = (0.85 + Math.random() * 0.45) * (0.75 + 0.3 * rand); q4.setFromAxisAngle(up, Math.random() * Math.PI);
+    sv.set(s * 2.0, s * (0.95 + Math.random() * 0.5), s * 2.0); pv.set(p[0], Math.max(q[2], 0) - 0.2, -p[1]); m4.compose(pv, q4, sv); im.setMatrixAt(i, m4);
+    c.setHSL(0.11 + Math.random() * 0.11, 0.24 + Math.random() * 0.14, 0.66 + Math.random() * 0.2); im.setColorAt(i, c); });
+  im.frustumCulled = false; im.userData.sznSkip = 1; shoreG.add(im); return im;
+}
+function revSchilfTick(E, N) {
+  const X = REVX; if (S.gfx === 'niedrig') return; if (!X.schilf) X.schilf = new Map();
+  const R = S.gfx === 'ultra' ? 2600 : 1800, KM = 1000, seen = new Set(); let bud = 1;
+  for (let cj = Math.floor((N - R) / KM); cj <= Math.floor((N + R) / KM); cj++) for (let ci = Math.floor((E - R) / KM); ci <= Math.floor((E + R) / KM); ci++) {
+    const d = revRectDist(E, N, ci * KM, cj * KM, KM); if (d > R) continue; const k = ci + ',' + cj; seen.add(k);
+    if (X.schilf.has(k) || bud <= 0) continue;
+    const ti = Math.floor(ci * KM / X.cs / X.T), tj = Math.floor((X.H - cj * KM - KM / 2) / X.cs / X.T), t = X.tiles.get(ti + ',' + tj);
+    if (!t || t.st !== 'da') continue;   /* erst mit feinem Gelände bauen */
+    X.schilf.set(k, revSchilfStueck(ci, cj)); bud--;
+  }
+  for (const [k, m] of X.schilf) { const [ci, cj] = k.split(',').map(Number); if (seen.has(k) || revRectDist(E, N, ci * KM, cj * KM, KM) < R + 800) continue; if (m) { shoreG.remove(m); m.dispose && m.dispose(); } X.schilf.delete(k); }
 }
 function revRectDist(E, N, x0, y0, size) { const dx = Math.max(x0 - E, 0, E - (x0 + size)), dy = Math.max(y0 - N, 0, N - (y0 + size)); return Math.hypot(dx, dy); }
 
@@ -1287,6 +1335,81 @@ function revHafenTeil(h, ci, cj, step) {
   t = { step, mesh: new THREE.Mesh(g, REVX.matT) }; shoreG.add(t.mesh); h.teile.set(key, t);
 }
 /* Molen, Wellenbrecher, Buhnen und Stege als Körper */
+/* ---------- Liegeboote: Segel- und Motorboote in den Boxen an allen Holzstegen, Kutter ZK 10 an den Seesport-Stegen ---------- */
+var REV_BOOTGEO = {};
+function revBootGeo(art) {
+  if (REV_BOOTGEO[art]) return REV_BOOTGEO[art];
+  const teile = [], col = new THREE.Color();
+  const add = (g, c) => { g = g.index ? g.toNonIndexed() : g; g.computeVertexNormals(); col.set(c); const n = g.attributes.position.count, ca = new Float32Array(n * 3); for (let i = 0; i < n; i++) { ca[i * 3] = col.r; ca[i * 3 + 1] = col.g; ca[i * 3 + 2] = col.b; } g.setAttribute('color', new THREE.BufferAttribute(ca, 3)); if (g.attributes.uv) g.deleteAttribute('uv'); teile.push(g); };
+  const rumpf = (B, y0, h, k) => { const s = new THREE.Shape(), hb = B / 2 * k, L2 = 5 * k; s.moveTo(-hb * 0.82, -L2); s.lineTo(hb * 0.82, -L2); s.quadraticCurveTo(hb * 1.05, L2 * 0.15, hb * 0.55, L2 * 0.72); s.quadraticCurveTo(hb * 0.2, L2 * 0.97, 0, L2); s.quadraticCurveTo(-hb * 0.2, L2 * 0.97, -hb * 0.55, L2 * 0.72); s.quadraticCurveTo(-hb * 1.05, L2 * 0.15, -hb * 0.82, -L2);
+    const g = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: false, curveSegments: 6 }); g.rotateX(-Math.PI / 2); g.translate(0, y0, 0); return g; };   /* Bug bei −z */
+  const box = (sx, sy, sz, x, y, z) => { const g = new THREE.BoxGeometry(sx, sy, sz); g.translate(x, y, z); return g; };
+  const cyl = (r, h, x, y, z, rx) => { const g = new THREE.CylinderGeometry(r, r, h, 6); if (rx) g.rotateX(Math.PI / 2); g.translate(x, y, z); return g; };
+  if (art === 'segel' || art === 'segel_blau') {
+    const hull = art === 'segel_blau' ? '#1f3556' : '#f4f4f1';
+    add(rumpf(3.3, -0.45, 1.25, 1), hull); add(rumpf(3.34, -0.05, 0.16, 1.004), art === 'segel_blau' ? '#f4f4f1' : '#1f3556');
+    add(rumpf(3.1, 0.8, 0.05, 0.96), '#d9d5cb');
+    add(box(2.2, 0.62, 3.4, 0, 1.1, -0.2), '#f4f4f1'); add(box(2.24, 0.2, 2.6, 0, 1.18, -0.3), '#26323d');
+    add(cyl(0.07, 13, 0, 7.3, -1.3), '#c9ccd0'); add(cyl(0.06, 4.0, 0, 2.05, 0.7, true), '#b8bcc0'); add(box(0.4, 0.42, 3.6, 0, 2.3, 0.8), '#1f3a68');
+    add(box(0.05, 0.05, 0.05, 0, 13.8, -1.3), '#ffffff');
+  } else {
+    add(rumpf(3.4, -0.4, 1.6, 1), '#f6f6f3'); add(rumpf(3.44, 0.15, 0.18, 1.004), '#2a3b55');
+    add(rumpf(3.2, 1.2, 0.05, 0.96), '#e2ded6');
+    add(box(2.6, 1.25, 4.2, 0, 1.85, -0.2), '#f6f6f3'); add(box(2.64, 0.5, 3.6, 0, 2.05, -0.3), '#202a33');
+    add(box(2.4, 0.08, 2.6, 0, 2.55, 0.6), '#f6f6f3'); add(box(2.4, 0.5, 0.06, 0, 2.85, 1.9), '#c9ccd0');
+    add(cyl(0.05, 1.6, 0, 3.3, -0.8), '#c9ccd0');
+  }
+  let n = 0; for (const g of teile) n += g.attributes.position.count;
+  const P = new Float32Array(n * 3), N = new Float32Array(n * 3), C = new Float32Array(n * 3); let o = 0;
+  for (const g of teile) { P.set(g.attributes.position.array, o); N.set(g.attributes.normal.array, o); C.set(g.attributes.color.array, o); o += g.attributes.position.count * 3; }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(P, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(N, 3)); geo.setAttribute('color', new THREE.BufferAttribute(C, 3));
+  return (REV_BOOTGEO[art] = geo);
+}
+var REV_BOOTMAT = null;
+function revBootMat() { return REV_BOOTMAT || (REV_BOOTMAT = new THREE.MeshLambertMaterial({ vertexColors: true })); }
+/* Boote in die Boxen an langen Holzstegen legen (Bug zum Steg), nur wo Wasser ist und kein anderer Steg im Weg */
+function revLiegeboote(h, grp) {
+  if (S.gfx === 'niedrig') return;
+  const F = SHORE.fwd, rnd = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return v - Math.floor(v); };
+  const frei = new Set(), key = (E, N) => Math.floor(E / 2.5) + ',' + Math.floor(N / 2.5);
+  const wasser = (E, N) => revHafenMaske(E, N) === 0 && revHafenZ(h, E, N) < -0.8;
+  const L = { segel: [], segel_blau: [], motor: [] }, MAX = S.gfx === 'ultra' ? 2500 : 1400; let anz = 0;
+  for (const s of h.stege || []) {
+    if (s.t !== 'L' || s.k !== 'pier' || s.w > 4) continue; const g = s.g, br = Math.min(s.w, 2.4);
+    for (let k = 2; k < g.length && anz < MAX; k += 2) {
+      const ax = g[k - 2], ay = g[k - 1], bx = g[k], by = g[k + 1], l = Math.hypot(bx - ax, by - ay); if (l < 16) continue;
+      const ux = (bx - ax) / l, uy = (by - ay) / l, nx = -uy, ny = ux;
+      for (let d = 3; d < l - 2.5; d += 3.9) for (const sd of [-1, 1]) {
+        const E0 = ax + ux * d, N0 = ay + uy * d, r = rnd(E0 + sd * 7.1, N0); if (r > 0.82) continue;
+        const art = r < 0.5 ? 'segel' : r < 0.56 ? 'segel_blau' : 'motor', Lb = 7.2 + rnd(N0, E0 + sd) * 4.2;
+        const off = br / 2 + 0.5 + Lb / 2, cE = E0 + nx * sd * off, cN = N0 + ny * sd * off;
+        const tests = [[cE, cN], [cE - nx * sd * (Lb / 2 - 0.6), cN - ny * sd * (Lb / 2 - 0.6)], [cE + nx * sd * (Lb / 2 - 0.3), cN + ny * sd * (Lb / 2 - 0.3)]];
+        if (!tests.every(q => wasser(q[0], q[1]))) continue;
+        if (tests.some(q => frei.has(key(q[0], q[1])))) continue;
+        for (const q of tests) frei.add(key(q[0], q[1]));
+        L[art].push([cE, cN, -nx * sd, -ny * sd, Lb / 10]); anz++;
+      }
+    }
+  }
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  for (const art in L) {
+    const A = L[art]; if (!A.length) continue; const im = new THREE.InstancedMesh(revBootGeo(art), revBootMat(), A.length);
+    A.forEach((b, i) => { const p0 = F(b[0], b[1]), p1 = F(b[0] + b[2], b[1] + b[3]), hx = p1[0] - p0[0], hy = p1[1] - p0[1]; q.setFromAxisAngle(up, Math.atan2(-hx, hy)); sv.set(b[4], b[4], b[4]); pv.set(p0[0], 0.02, -p0[1]); m4.compose(pv, q, sv); im.setMatrixAt(i, m4); });
+    im.frustumCulled = false; grp.add(im);
+  }
+  /* Liegeboote sind fest */
+  const X = REVX; if (!X.stegSolid) X.stegSolid = new Set();
+  for (const art in L) for (const b of L[art]) { const lh = b[4] * 5; for (let a = -lh; a <= lh; a += 1.5) for (let c = -1.4; c <= 1.4; c += 1.4) X.stegSolid.add(Math.floor((b[0] + b[2] * a - b[3] * c) / 2) + ',' + Math.floor((b[1] + b[3] * a + b[2] * c) / 2)); }
+}
+/* Kutter ZK 10 aus der Werftkoje: liegend ohne Segel (Masten stehen), einmal gebaut und für jeden Liegeplatz geklont */
+var REV_ZK_LIEGE = null;
+function revZkLiegend() {
+  if (REV_ZK_LIEGE) return Promise.resolve(REV_ZK_LIEGE);
+  return modelLoad('zk').then(T => { if (!T) return null; if (REV_ZK_LIEGE) return REV_ZK_LIEGE; const g = new THREE.Group();
+    for (const nd of T.nodes) { if (/segel|^Besan$|^Fock$|Schwert$|Ruder|Pinne/.test(nd.name) && !/mast/i.test(nd.name)) continue; for (const p of nd.prims) { const m = new THREE.Mesh(p.g, p.mat); g.add(m); } }
+    g.position.y = 0; const w = new THREE.Group(); w.add(g);
+    try { const mg = ixyMaske(T); if (mg) { const mk = new THREE.Mesh(mg, MASK); mk.renderOrder = 5; mk.userData.mask = true; w.add(mk); } } catch (e) { }   /* Wassermaske: das offene Boot steht sonst innen unter Wasser */ w.traverse(o => { o.userData.sznSkip = 1; }); return (REV_ZK_LIEGE = w); });
+}
 function revStege(h) {
   const F = SHORE.fwd, grp = new THREE.Group(), box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0);
   const H = { pier: 1.9, breakwater: 2.6, groyne: 1.2, quay: 2.2 }, COL = { pier: '#7a6248', breakwater: '#8a857c', groyne: '#5c4a38', quay: '#8d8a84' };
@@ -1325,6 +1448,7 @@ function revStege(h) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.setIndex(ix); g.computeVertexNormals();
     const mm = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: COL[s.k] || '#8d8a84', side: THREE.DoubleSide })); grp.add(mm);
   }
+  try { revLiegeboote(h, grp); } catch (e) { console.warn('Liegeboote', e); }
   shoreG.add(grp); h.grp = grp;
 }
 function revHafenTick(E, N) {
@@ -1464,7 +1588,10 @@ function revSchilfGeo() { if (REV_SCHILF && REV_SCHILF.g) return REV_SCHILF.g; c
 function revSchilfMat() { if (REV_SCHILF && REV_SCHILF.m) return REV_SCHILF.m; const c = document.createElement('canvas'); c.width = 128; c.height = 128; const x = c.getContext('2d');
   for (let i = 0; i < 70; i++) { const x0 = 4 + Math.random() * 120, h = 60 + Math.random() * 66, lean = (Math.random() - 0.5) * 18; x.strokeStyle = Math.random() < 0.5 ? '#d8cf9a' : '#b9c27a'; x.lineWidth = 1 + Math.random() * 1.4; x.beginPath(); x.moveTo(x0, 128); x.quadraticCurveTo(x0 + lean * 0.3, 128 - h * 0.6, x0 + lean, 128 - h); x.stroke();
     if (Math.random() < 0.35) { x.fillStyle = '#8a6d4a'; x.beginPath(); x.ellipse(x0 + lean, 128 - h, 2.2, 6, lean * 0.02, 0, Math.PI * 2); x.fill(); } }
-  const t = new THREE.CanvasTexture(c); const m = new THREE.MeshLambertMaterial({ map: t, alphaTest: 0.4, side: THREE.DoubleSide, transparent: false });
+  /* durchsichtige Pixel bekommen Halmfarbe statt Schwarz – sonst werden die Bestände mit Abstand (Mipmaps) dunkel */
+  const id = x.getImageData(0, 0, 128, 128), D = id.data; for (let i = 0; i < D.length; i += 4) if (D[i + 3] < 128) { D[i] = 196; D[i + 1] = 186; D[i + 2] = 128; }
+  const t = new THREE.DataTexture(new Uint8Array(D.buffer.slice(0)), 128, 128, THREE.RGBAFormat); t.flipY = true; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.needsUpdate = true;
+  const m = new THREE.MeshLambertMaterial({ map: t, alphaTest: 0.4, side: THREE.DoubleSide, transparent: false });
   REV_SCHILF = REV_SCHILF || {}; return (REV_SCHILF.m = m); }
 function revWzBuild(z) {
   const X = REVX, F = SHORE.fwd, w = z.w, P = z.P, grp = new THREE.Group(), mats = [];
@@ -1565,7 +1692,7 @@ function revWzBuild(z) {
     if (!X.stegSolid) X.stegSolid = new Set();
     const fest = (e0, n0, e1, n1, br) => { const l = Math.hypot(e1 - e0, n1 - n0) || 1, ux = (e1 - e0) / l, uy = (n1 - n0) / l; for (let d = 0; d <= l; d += 1) for (let o = -br / 2; o <= br / 2; o += 0.8) X.stegSolid.add(Math.floor((O[0] + e0 + ux * d - uy * o) / 2) + ',' + Math.floor((O[1] + n0 + uy * d + ux * o) / 2)); };
     for (const st of stegs) fest(...st);
-    fest(-113, -10, -103, -10, 2.4); fest(-101, -10, -91, -10, 2.4);
+    fest(-113, -10, -103, -10, 2.4); fest(-101, -10, -91, -10, 2.4); fest(-115, -15.6, -105, -15.6, 2.4); fest(-102, -15.6, -92, -15.6, 2.4);
     { const a = 250 * DEG, ux = Math.sin(a), uy = Math.cos(a); fest(-175 - ux * 6.5, -8 - uy * 6.5, -175 + ux * 6.5, -8 + uy * 6.5, 3.8); }
     for (const e of [-116, -104, -92]) bx(e, -13.4, 1.6, 0.45, 0.45, 1.18, '#7a5a3c', 0.2);   /* Bänke */
     if (pf.length) { const cy = new THREE.CylinderGeometry(0.13, 0.13, 1, 6); cy.translate(0, 0.5, 0); const im = new THREE.InstancedMesh(cy, M('#4f4236', 0.05), pf.length), m4 = new THREE.Matrix4(); pf.forEach((q, i) => { const pp = L(q[0], q[1]); m4.makeScale(1, 3.6, 1).setPosition(pp[0], -2.4, pp[1]); im.setMatrixAt(i, m4); }); im.frustumCulled = false; grp.add(im); }
@@ -1577,7 +1704,9 @@ function revWzBuild(z) {
       if (mast) { const ms = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, mast, 6), M('#c9b28a', 0.2)); ms.position.set(len * 0.18, fb + mast / 2, 0); bg.add(ms); }
       if (name) { const c = document.createElement('canvas'); c.width = 256; c.height = 48; const x = c.getContext('2d'); x.fillStyle = '#1e1e1e'; x.font = 'italic bold 34px Georgia,serif'; x.textAlign = 'center'; x.fillText(name, 128, 36); const pl = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.3), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true })); pl.position.set(len * 0.25, fb * 0.65, -br / 2 - 0.01); pl.rotation.y = Math.PI; bg.add(pl); }
       grp.add(bg); return bg; };
-    boot(-108, -10, 0.05, 90, 10, 2.6, 1.05, '#f2f0ea', 8.5, 'Wolgaster Greif'); boot(-96, -10, 0.05, 90, 10, 2.6, 1.05, '#e9e4d6', 8.5, 'Paloma');
+    /* Kutter ZK 10 am Steg (Modell aus der Werftkoje), zwei im Becken, zwei an der Südseite des Stegs */
+    for (const [e, n, hd] of [[-108, -10, 90], [-96, -10, 90], [-110, -15.6, 270], [-97, -15.6, 270]]) { const p = L(e, n), t = L(e + Math.sin(hd * DEG) * 10, n + Math.cos(hd * DEG) * 10), rot = Math.atan2(t[0] - p[0], t[1] - p[1]) + Math.PI;
+      revZkLiegend().then(m => { if (!m) return; const k = m.clone(); k.position.set(p[0], 0, p[1]); k.rotation.y = rot; grp.add(k); }); }
     boot(-72, -21.5, 0.05, 80, 5, 1.6, 0.6, '#3d6f9e', 0, ''); boot(-64, -22.5, 0.05, 80, 4.2, 1.5, 0.55, '#c9c4b8', 0, '');
     const tr = [['#e8892b', 'Kuddel'], ['#f1f1ee', ''], ['#252a2e', 'Moby Dick'], ['#2f6b4f', ''], ['#e7e1cf', '']];
     tr.forEach(([c, nm], i) => { const e = -60 + i * 4.2, n = 8, z = Math.max(0.6, zAt(e, n)); bx(e, n, 0.15, 9, 0.12, z + 0.45, '#8f9499', 0.2); for (const dn of [-2.2, 2.2]) { const rd = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.22, 10), M('#1d1d1d', 0.05)); const p = L(e - 0.9, n + dn); rd.position.set(p[0], z + 0.33, p[1]); rd.rotation.z = Math.PI / 2; rd.rotation.y = rotE; grp.add(rd); const rd2 = rd.clone(); const p2 = L(e + 0.9, n + dn); rd2.position.set(p2[0], z + 0.33, p2[1]); grp.add(rd2); } boot(e, n, z + 0.6, 0, 7.5, 2.1, 0.9, c, 0, nm); });
@@ -1593,7 +1722,7 @@ function revWzBuild(z) {
         const E = O[0] + e, N_ = O[1] + n, z = revZ(E, N_); if (z < 0.05 || z > 2.2) continue;
         const lu = revCellLu(Math.floor(E / cs), Math.floor((X.H - N_) / cs)); if (lu !== 5 && !(z < 1.0 && lu !== 2)) continue; pos.push([E, N_, z]); }
       if (pos.length) { const im = new THREE.InstancedMesh(revSchilfGeo(), revSchilfMat(), pos.length), m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), c = new THREE.Color(), up = new THREE.Vector3(0, 1, 0), sv = new THREE.Vector3(), pv = new THREE.Vector3();
-        pos.forEach((q, i) => { const p = G(q[0], q[1]), s = 0.8 + Math.random() * 0.5; q4.setFromAxisAngle(up, Math.random() * Math.PI); sv.set(s * 1.6, s * (0.85 + Math.random() * 0.4), s * 1.6); pv.set(p[0], q[2] - 0.15, p[1]); m4.compose(pv, q4, sv); im.setMatrixAt(i, m4); c.setHSL(0.13 + Math.random() * 0.05, 0.35, 0.5 + Math.random() * 0.15); im.setColorAt(i, c); });
+        pos.forEach((q, i) => { const p = G(q[0], q[1]), s = 0.8 + Math.random() * 0.5; q4.setFromAxisAngle(up, Math.random() * Math.PI); sv.set(s * 1.6, s * (0.85 + Math.random() * 0.4), s * 1.6); pv.set(p[0], q[2] - 0.15, p[1]); m4.compose(pv, q4, sv); im.setMatrixAt(i, m4); c.setHSL(0.12 + Math.random() * 0.07, 0.28, 0.72 + Math.random() * 0.16); im.setColorAt(i, c); });
         im.frustumCulled = false; grp.add(im); } }
     const ll = revLampen(lat); if (ll) grp.add(ll);
   } else if (w.art === 'teepott') {
@@ -1607,7 +1736,16 @@ function revWzBuild(z) {
     const dm = new THREE.Mesh(dg, new THREE.MeshLambertMaterial({ color: '#f4f2ec', side: THREE.DoubleSide })); mats.push([dm.material, 0.3]); grp.add(dm);
   } else if (w.art === 'kreuzfahrt') {
     /* Kreuzfahrtschiff am Liegeplatz (Bug in Richtung w.dir) */
-    const sp = revSchiffSpec(w.typ || 'aida'); if (sp) { const m = revSchiffBau(sp, w.schiff || ''), d = (w.dir || 0) * DEG, p0 = G(w.x, w.y), p1 = G(w.x + Math.sin(d) * 10, w.y + Math.cos(d) * 10);
+    const sp0 = revSchiffSpec(w.typ || 'aida');
+    if (!sp0) {
+      /* kleinere Liegeschiffe: Fischkutter (Spielmodell) oder Kutter ZK 10 (Werftkoje-Modell) */
+      const d = (w.dir || 0) * DEG, p0 = G(w.x, w.y), p1 = G(w.x + Math.sin(d) * 10, w.y + Math.cos(d) * 10), rot = Math.atan2(p1[0] - p0[0], p1[1] - p0[1]) + Math.PI;
+      const setz = m => { m.position.set(p0[0], 0, p0[1]); m.rotation.y = rot; grp.add(m); };
+      const LB = w.typ === 'zk10' ? [10, 2.6] : [20.5, 6.4];
+      if (w.typ === 'zk10') revZkLiegend().then(m => { if (m) setz(m.clone()); }); else setz(revSchiffModell(w.typ || 'kutter', null, w.schiff || ''));
+      if (!X.stegSolid) X.stegSolid = new Set(); const ux = Math.sin(d), uy = Math.cos(d); for (let a = -LB[0] / 2; a <= LB[0] / 2; a += 1.5) for (let b = -LB[1] / 2; b <= LB[1] / 2; b += 1.2) X.stegSolid.add(Math.floor((w.x + ux * a + uy * b) / 2) + ',' + Math.floor((w.y + uy * a - ux * b) / 2));
+    }
+    const sp = sp0; if (sp) { const m = revSchiffBau(sp, w.schiff || ''), d = (w.dir || 0) * DEG, p0 = G(w.x, w.y), p1 = G(w.x + Math.sin(d) * 10, w.y + Math.cos(d) * 10);
       m.position.set(p0[0], 0, p0[1]); m.rotation.y = Math.atan2(p1[0] - p0[0], p1[1] - p0[1]) + Math.PI; grp.add(m); (X.nachtSchiffe = X.nachtSchiffe || []).push(m.userData.nachtMats);
       if (!X.stegSolid) X.stegSolid = new Set(); const ux = Math.sin(d), uy = Math.cos(d); for (let a = -sp.L / 2; a <= sp.L / 2; a += 1.5) for (let b = -sp.B / 2; b <= sp.B / 2; b += 1.5) X.stegSolid.add(Math.floor((w.x + ux * a + uy * b) / 2) + ',' + Math.floor((w.y + uy * a - ux * b) / 2)); }
   } else if (w.art === 'werfthalle') {
