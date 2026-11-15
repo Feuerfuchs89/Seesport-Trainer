@@ -790,7 +790,8 @@ function revLoad() {
     if (idx.courses && !idx.courses[S.revKurs] && !String(S.revKurs || '').startsWith('u:')) { const ks = Object.keys(idx.courses); if (ks.length) { S.revKurs = ks.find(k => !idx.courses[k].bahn) || ks[0]; try { saveS(); } catch (e) {} } }
     for (const t of idx.grid.tiles) X.meta.set(t[0] + ',' + t[1], { ti: t[0], tj: t[1], file: t[2], kx: t[3], ky: t[4], nh: t[5] });
     if (X.rev !== S.revier) return; /* inzwischen anderes Revier gewählt */
-    if (def.lage) { try { X.lage = await revFetch(base, def.lage, 'json'); const Lg = X.lage; X.flat = [[Lg.lsc.xy[0], Lg.lsc.xy[1], 150, 280, 35], [Lg.zoebigker.xy[0], Lg.zoebigker.xy[1], 110, 220, 50]]; } catch (e) { console.warn('Lage', e); } if (X.rev !== S.revier) return; }
+    if (def.lage) { try { X.lage = await revFetch(base, def.lage, 'json'); const Lg = X.lage; { const Mq = Lg.revier_aus_alt.M, tq = Lg.revier_aus_alt.t; X.bogenPt = [Mq[0][0] * 63 + Mq[0][1] * -2213 + tq[0], Mq[1][0] * 63 + Mq[1][1] * -2213 + tq[1]]; }
+    X.flat = [[Lg.lsc.xy[0], Lg.lsc.xy[1], 150, 280, 35], [Lg.zoebigker.xy[0], Lg.zoebigker.xy[1], 110, 220, 50]]; } catch (e) { console.warn('Lage', e); } if (X.rev !== S.revier) return; }
     REVX = REVH = X;
     if (REVIERE_K[S.revier]) {
       /* Kacheln rund um den Start vorab laden, dann bauen */
@@ -883,7 +884,7 @@ function revBuild() {
   try { MZ_MIN = 0.01; } catch (e) {}
   X.chunks = new Map(); X.scen = new Map(); X.lastE = null;
   X.matT = new THREE.MeshLambertMaterial({ vertexColors: true });
-  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null; X.brGrp = null; X.verkehr = null; X.brSkip = null; X.nv = null; X.zug = null;
+  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null; X.brGrp = null; X.verkehr = null; X.brSkip = null; X.nv = null; X.rad = null; X.wGrid = null; X.zug = null;
   X.haefen = (X.idx.haefen || []).map(h => Object.assign({}, h, { st: null, z: null, m: null, teile: null, grp: null }));
   revStrLoad(); revSchiffeInit();
   try { revTuerme(); } catch (e) { console.error('Leuchttürme', e); }
@@ -917,6 +918,29 @@ function revCospuObjekte(X) {
   const odS = LSC_REAL.od.slice(); LSC_REAL.od = [odr[0] / ol, odr[1] / ol];
   try { lscBuild(ring, nrm, null, null, li); } finally { LSC_REAL.od = odS; }
   SHORE.lscRev = { ring, li, wasser: [w[0] / wl, w[1] / wl] };
+  /* Wald hinter dem LSC (wie im Original: ca. 1100 Bäume, Lücke am Gelände, dichter nahe Ufer) */
+  try {
+    const od = LSC_REAL.od, ol0 = Math.hypot(odr[0], odr[1]) || 1, od2 = dirF(odr[0] / ol0, odr[1] / ol0), ol = Math.hypot(od2[0], od2[1]) || 1, ox = od2[0] / ol, oy = od2[1] / ol, tx = -oy, ty = ox;
+    const T1 = [], T2 = [], nl = S.gfx === 'niedrig' ? 550 : 1100;
+    for (let k = 0; k < 7000 && T1.length + T2.length < nl; k++) {
+      const a = rnd(-170, 170), o = rnd(-170, 40); if (Math.abs(a) < 68 && o > -58) continue; if (Math.abs(a) < 68 && o < -58 && Math.random() < 0.25) continue;
+      const x = uf[0] + tx * a + ox * o, y = uf[1] + ty * a + oy * o; if (polyInside(ring, x, y) || polyDist(ring, x, y)[0] < 5) continue;
+      const [E, N] = SHORE.realOf(x, y), y0 = revZ(E, N) + 0.35; if (y0 < 0.55 || revHafenMaske(E, N) >= 2 || revWegNah(E, N)) continue;
+      if (-o < 80) { const r = Math.random(); if (r < 0.5) T2.push([x, y0, y, rnd(8, 14)]); else if (r < 0.85) T1.push([x, y0, y, rnd(8, 14)]); else T2.push([x, y0, y, rnd(5, 9)]); }
+      else if (Math.random() < 0.15) T2.push([x, y0, y, rnd(10, 16)]); else T2.push([x, y0, y, rnd(15, 24)]);
+    }
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pp = new THREE.Vector3(), c = new THREE.Color(), fg = new THREE.Group();
+    const im = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 6).translate(0, 0.5, 0), new THREE.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, T1.length));
+    T1.forEach((t, k) => { pp.set(t[0], t[1] - 0.3, -t[2]); sc.set(t[3] * 0.24, t[3], t[3] * 0.24); m4.compose(pp, q, sc); im.setMatrixAt(k, m4); c.setHSL(rnd(0.27, 0.36), rnd(0.25, 0.45), rnd(0.1, 0.19)); im.setColorAt(k, c); });
+    im.count = T1.length;
+    const im2 = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, T2.length));
+    T2.forEach((t, k) => { const r = t[3] * 0.32; pp.set(t[0], t[1] + t[3] * 0.62, -t[2]); sc.set(r, r * rnd(0.85, 1.15), r); m4.compose(pp, q, sc); im2.setMatrixAt(k, m4); c.setHSL(rnd(0.19, 0.29), rnd(0.3, 0.5), rnd(0.15, 0.27)); im2.setColorAt(k, c); });
+    im2.count = T2.length;
+    const tr = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.25, 0.35, 1, 5).translate(0, 0.5, 0), new THREE.MeshLambertMaterial({ color: '#4b3a2a' }), Math.max(1, T2.length));
+    T2.forEach((t, k) => { pp.set(t[0], t[1] - 0.2, -t[2]); sc.set(1, t[3] * 0.55, 1); m4.compose(pp, q, sc); tr.setMatrixAt(k, m4); }); tr.count = T2.length;
+    for (const m of [im, im2, tr]) { m.frustumCulled = false; fg.add(m); }
+    shoreG.add(fg); try { seasonApply(fg); } catch (e) {}
+  } catch (e) { console.error('LSC-Wald', e); }
   SHORE.altF = (a, b) => { const r = alt2rev(a, b); return F(r[0], r[1]); }; SHORE.altLsc = L.lsc.alt;
   try { horizon3D(ring); } catch (e) { console.error('Horizont', e); }
   /* Hafen Zöbigker + Steg Nordufer nach Aufmaß */
@@ -935,10 +959,11 @@ function revCospuObjekte(X) {
        if(e[5])for(let t=e[5];t<L-3;t+=4.4){if(Math.random()<0.12)continue;for(const sd of [1,-1]){const dx=-uy*sd,dy=ux*sd,ty=pickT(),o=w/2+TY[ty].L/2+0.3;hc.push([a0+ux*t+dx*o,b0+uy*t+dy*o,Math.atan2(dx,-dy),ty]);const cx=a0+ux*t+dx*o,cy=b0+uy*t+dy*o,hl=TY[ty].L*0.42;SHORE.zobst.push({ax:cx-dx*hl,ay:cy-dy*hl,bx:cx+dx*hl,by:cy+dy*hl,r:TY[ty].B/2,name:'Liegeboot',pier:true,boat:true});}}}
      const M=new THREE.Matrix4(),Q=new THREE.Quaternion(),V=new THREE.Vector3(),SC=new THREE.Vector3(),CC=new THREE.Color(),cols=['#f4f4f0','#f4f4f0','#f4f4f0','#e6e8e8','#2c4a6b','#c9322a','#2f6db3','#d8d2b8','#2f8f5b'];
      TY.forEach((t,ti)=>{const L=hc.filter(h=>h[3]===ti);if(!L.length)return;const hull=new THREE.InstancedMesh(t.g,new THREE.MeshLambertMaterial({color:0xffffff}),L.length);const ms=t.mast?new THREE.InstancedMesh(new THREE.CylinderGeometry(0.05,0.07,1,5),new THREE.MeshLambertMaterial({color:'#c9c9c4'}),L.length):null;const cab=t.k==='motor'?new THREE.InstancedMesh(new THREE.BoxGeometry(t.B*0.7,0.9,t.L*0.4),new THREE.MeshLambertMaterial({color:'#e8e8e4'}),L.length):null;
+       const mkS=z=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,0,1,0,0,0.08,z],3));g.setIndex([0,1,2]);g.computeVertexNormals();return g;};const SM=new THREE.MeshLambertMaterial({color:0xffffff,side:THREE.DoubleSide}),sm=t.mast?new THREE.InstancedMesh(mkS(-1),SM,L.length):null,jb=t.mast?new THREE.InstancedMesh(mkS(1),SM,L.length):null,SCOL=['#fafafa','#f1ecdc','#e8eef5','#dcd6c4','#fafafa'];
        L.forEach((h,k)=>{const f=rnd(0.92,1.1);Q.setFromAxisAngle(YA,h[2]+rnd(-0.05,0.05));V.set(h[0],0.45,-h[1]);SC.set(f,1,f);M.compose(V,Q,SC);hull.setMatrixAt(k,M);hull.setColorAt(k,CC.set(cols[Math.floor(Math.random()*cols.length)]));
-         if(ms){const mh=rnd(t.mast[0],t.mast[1]);const fw=new THREE.Vector3(Math.sin(h[2]),0,Math.cos(h[2]));V.set(h[0]-fw.x*t.L*0.12,mh/2+0.9,-h[1]-fw.z*t.L*0.12);Q.identity();SC.set(1,mh,1);M.compose(V,Q,SC);ms.setMatrixAt(k,M);}
+         if(ms){const mh=rnd(t.mast[0],t.mast[1]);const fw=new THREE.Vector3(Math.sin(h[2]),0,Math.cos(h[2]));V.set(h[0]-fw.x*t.L*0.12,mh/2+0.9,-h[1]-fw.z*t.L*0.12);Q.identity();SC.set(1,mh,1);M.compose(V,Q,SC);ms.setMatrixAt(k,M);Q.setFromAxisAngle(YA,h[2]);V.y=0.95;SC.set(1,mh*0.93,t.L*0.42);M.compose(V,Q,SC);sm.setMatrixAt(k,M);sm.setColorAt(k,CC.set(SCOL[k%5]));SC.set(1,mh*0.8,t.L*0.42);M.compose(V,Q,SC);jb.setMatrixAt(k,M);jb.setColorAt(k,CC.set(SCOL[(k+2)%5]));}
          if(cab){const fw=[Math.sin(h[2]),Math.cos(h[2])];Q.setFromAxisAngle(YA,h[2]);V.set(h[0]-fw[0]*t.L*0.1,1.35,-h[1]-fw[1]*t.L*0.1);SC.set(1,1,1);M.compose(V,Q,SC);cab.setMatrixAt(k,M);}});
-       shoreG.add(hull);if(ms)shoreG.add(ms);if(cab)shoreG.add(cab);});}
+       shoreG.add(hull);if(ms)shoreG.add(ms);if(sm){sm.frustumCulled=false;jb.frustumCulled=false;shoreG.add(sm,jb);}if(cab)shoreG.add(cab);});}
   objSec(null);
   if (O.n22) { objSec('n22', 'Steg am Nordufer', 'Steganlagen'); const a0 = F(O.n22[0], O.n22[1]), a1 = F(O.n22[2], O.n22[3]), Ln = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]);
     const p = new THREE.Mesh(new THREE.BoxGeometry(2, 0.35, Ln), dk); p.position.set((a0[0] + a1[0]) / 2, 1.2, -(a0[1] + a1[1]) / 2); p.rotation.y = Math.atan2((a1[0] - a0[0]) / Ln, -(a1[1] - a0[1]) / Ln); shoreG.add(p);
@@ -1014,8 +1039,9 @@ function revScenBuild(t) {
     const nC = Math.ceil(use.length / 3), imC = new THREE.InstancedMesh(cone, new THREE.MeshLambertMaterial({ color: 0xffffff }), nC), imB = new THREE.InstancedMesh(blob, new THREE.MeshLambertMaterial({ color: 0xffffff }), use.length - nC + 1);
     let a = 0, b = 0;
     use.forEach((tr, k) => {
-      const [x, y] = F(tr[0], tr[1]), h0 = revZ(tr[0], tr[1]) + 0.35; if (h0 < 0.8) return;
+      const [x, y] = F(tr[0], tr[1]), h0 = revZ(tr[0], tr[1]) + 0.35; if (h0 < (X.flat ? 0.55 : 0.8)) return;
       const hm = revHafenMaske(tr[0], tr[1]); if (hm >= 2) return;
+      if (revWegNah(tr[0], tr[1])) return;
       if (X.frei && X.frei.some(f => Math.hypot(tr[0] - f[0], tr[1] - f[1]) < f[2])) return;
       if (k % 3 === 0) { const hh = tr[2] === 6 ? rnd(3, 6) : rnd(11, 19); sc.set(hh * 0.28, hh, hh * 0.28); p.set(x, h0 - 0.3, -y); m4.compose(p, q, sc); imC.setMatrixAt(a, m4); c.setHSL(rnd(0.27, 0.33), rnd(0.3, 0.45), rnd(0.16, 0.24)); imC.setColorAt(a++, c); }
       else { const r = tr[2] === 6 ? rnd(1.5, 3) : rnd(3.5, 6.5); sc.set(r, r * rnd(1.1, 1.5), r); p.set(x, h0 + r * 0.9, -y); m4.compose(p, q, sc); imB.setMatrixAt(b, m4); c.setHSL(rnd(0.2, 0.3), rnd(0.32, 0.5), rnd(0.2, 0.3)); imB.setColorAt(b++, c); }
@@ -1080,7 +1106,7 @@ function revTick(force) {
   for (const [k, t] of X.tiles) {
     if (t.st !== 'da') continue;
     const d = revRectDist(E, N, t.i1 * cs, X.H - (t.j1 + t.ky) * cs, t.kx * cs), s = X.scen.get(k);
-    if (d < RS && !s && budget > 0) { X.scen.set(k, revScenBuild(t)); budget -= 3; }
+    if (d < RS && !s && budget > 0 && (X.netz || !X.idx.strassen)) { X.scen.set(k, revScenBuild(t)); budget -= 3; }
     else if (d > RS + 2500 && s) { revDispose(s); X.scen.delete(k); }
   }
   try { revHafenTick(E, N); revTurmGrund(); revWzTick(E, N); } catch (e) { console.error('Hafen', e); }
@@ -2094,11 +2120,33 @@ function revCarLightMat() {
   });
   return REV_CARLIGHT;
 }
+/* A38-Bogenbrücke „Neue Harth“ (drei rote Stahlbögen) auf die OSM-Brücke setzen */
+function revBogen(grp, M, sc, cands) {
+  const m0 = Math.min(...cands.map(c => c.bd)), cs = cands.filter(c => c.bd < m0 + 70);
+  let E = 0, N = 0, dx = 0, dy = 0, h = 0; const d0 = cs[0].d;
+  for (const c of cs) { const sg = (c.d[0] * d0[0] + c.d[1] * d0[1]) < 0 ? -1 : 1; E += c.E; N += c.N; dx += c.d[0] * sg; dy += c.d[1] * sg; h += c.h; }
+  E /= cs.length; N /= cs.length; h /= cs.length; const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
+  const SPAN = 62, RISE = 19, HS = SPAN / 2, W = cs.length > 1 ? Math.max(15, Math.min(22, Math.hypot(cs[0].E - cs[1].E, cs[0].N - cs[1].N) / 2 + 8)) : 15;
+  const g = new THREE.Group(), p = sc(E, N); g.position.set(p[0], 0, p[1]); g.rotation.y = Math.atan2(dy, dx);
+  const red = M('#b4484f', 0.3), hang = M('#d9d3b0', 0.3);
+  const box = (w, hh, d, x, y, z, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(d, hh, w), m); b.position.set(x, y, z); g.add(b); };
+  for (const z of [-W, W]) box(0.8, 1.7, SPAN, 0, h - 0.85, z, red);
+  box(1.2, 2.6, SPAN, 0, h - 0.4, 0, red);
+  const hg = new THREE.CylinderGeometry(0.1, 0.1, 1, 5);
+  for (const z of [-W, 0, W]) {
+    const arch = x => h + 0.6 + RISE * (1 - Math.pow(x / HS, 2)), pts = [];
+    for (let i = 0; i <= 40; i++) { const x = -HS + SPAN * i / 40; pts.push(new THREE.Vector3(x, arch(x), z)); }
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, 0.8, 8, false), red));
+    for (const sx of [-1, 1]) box(1.6, 1.6, 2.4, sx * (HS - 0.6), h + 0.4, z, red);
+    for (let x = -27.5; x <= 27.5; x += 5) { const y0 = h + (z === 0 ? 0.9 : 0), y1 = arch(x) - 0.5, c = new THREE.Mesh(hg, hang); c.scale.set(1, y1 - y0, 1); c.position.set(x, (y0 + y1) / 2, z); g.add(c); }
+  }
+  grp.add(g);
+}
 function revBrueckenBuild() {
   const X = REVX, F = SHORE.fwd, list = X.idx.bruecken || [];
   const altAutos = X.verkehr ? X.verkehr.cars : null;
   if (X.brGrp) revDispose(X.brGrp); if (X.verkehr) { revDispose(X.verkehr.im); revDispose(X.verkehr.pp); }
-  X.brGrp = null; X.brSig = revBrSig();
+  X.brGrp = null; X.brSig = revBrSig(); X.bogenCand = [];
   X.brSolid = new Set(); X.brKlMap = new Map(); X.brMats = []; X.klappen = []; X.strassen = []; X.brBB = null; X.feuerExtra = []; X.verkehr = null;
   if (!list.length) return;
   const grp = new THREE.Group(), CS = 4, key = (E, N) => Math.floor(E / CS) + ',' + Math.floor(N / CS);
@@ -2288,8 +2336,10 @@ function revBrueckenBuild() {
     if (dalben.length) { const cg = new THREE.CylinderGeometry(0.85, 0.85, 1, 12); cg.translate(0, 0.5, 0); const im = new THREE.InstancedMesh(cg, M('#23262a', 0.1), dalben.length), ik = new THREE.InstancedMesh(cg, M('#f2f2ee', 0.6), dalben.length), m4 = new THREE.Matrix4();
       dalben.forEach((q, i) => { const p = sc(q[0], q[1]); m4.makeScale(1, 6.5, 1).setPosition(p[0], -3, p[1]); im.setMatrixAt(i, m4); m4.makeScale(1.04, 0.9, 1.04).setPosition(p[0], 3.5, p[1]); ik.setMatrixAt(i, m4); }); im.frustumCulled = ik.frustumCulled = false; grp.add(im, ik); }
     if (!X.brSkip) X.brSkip = new Set(); for (const q of P) for (let a = -1; a <= 1; a++) for (let c2 = -1; c2 <= 1; c2++) X.brSkip.add((Math.floor(q[0] / 16) + a) + ',' + (Math.floor(q[1] / 16) + c2));
+    if (X.bogenPt) { let bi = -1, bd = 1e9; for (let i = 0; i < n; i++) { const dd = Math.hypot(P[i][0] - X.bogenPt[0], P[i][1] - X.bogenPt[1]); if (dd < bd) { bd = dd; bi = i; } } if (bi >= 0 && bd < 160) X.bogenCand.push({ E: P[bi][0], N: P[bi][1], d: dir[bi], h: hArr[bi], bd }); }
     X.strassen.push({ name: b.n, P, s, dir, h: hArr, L: s[n - 1], vmax, spur, klappen: X.klappen.filter(k => k.strasse === X.strassen.length) });
   }
+  if (X.bogenCand && X.bogenCand.length) { try { revBogen(grp, M, sc, X.bogenCand); } catch (e) { console.error('Bogenbrücke', e); } }
   if (markV.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(markV, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(markC, 3)); g.computeVertexNormals(); const m = new THREE.MeshBasicMaterial({ vertexColors: true }); grp.add(new THREE.Mesh(g, m)); }
   const lp = revLampen(lampen); if (lp) grp.add(lp);
   if (masten.length) {
@@ -2406,8 +2456,23 @@ function revBrueckenTick() {
    In 2-km-Zellen rund ums Boot gebaut, liegt auf dem Gelände, mit Markierung und Laternen in Orten. */
 var REV_STR = {               /* Breite, Farbe, Markierung (0 keine, 1 Mitte, 2 Mitte+Rand) */
   motorway: [22, '#4a4d51', 2], trunk: [12, '#4c4f53', 2], primary: [9, '#505357', 2], secondary: [7.5, '#55585c', 1],
-  tertiary: [6.5, '#5a5c60', 1], unclassified: [5, '#606265', 0], residential: [5.5, '#5d5f62', 0]
+  tertiary: [6.5, '#5a5c60', 1], unclassified: [5, '#606265', 0], residential: [5.5, '#5d5f62', 0],
+  cycleway: [3.2, '#7a7c7f', 0], path: [2.4, '#b3a583', 0], track: [3.6, '#a19474', 0], footway: [2.2, '#b8aa8a', 0]
 };
+var REV_RAD = { cycleway: 1, path: 1, track: 1, footway: 1 };
+function revWegNah(E, N) {
+  const X = REVX; if (!X || !X.netz) return false;
+  if (!X.wGrid) {
+    const g = new Map(), G = 32;
+    X.netz.wege.forEach(w => { const kl = X.netz.kl[w[0]], D = REV_STR[kl]; if (!D) return; const r = D[0] / 2 + (kl === 'motorway' ? 6 : kl === 'trunk' ? 4 : 2.5);
+      for (let k = 1; k < w.length - 3; k += 2) { const ax = w[k], ay = w[k + 1], bx = w[k + 2], by = w[k + 3], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / 16));
+        for (let q = 0; q <= n; q++) { const x = ax + (bx - ax) * q / n, y = ay + (by - ay) * q / n, key = Math.floor(x / G) + ',' + Math.floor(y / G); let l = g.get(key); if (!l) g.set(key, l = []); l.push(x, y, r); } } });
+    X.wGrid = g; X.wG = G;
+  }
+  const G = X.wG, ci = Math.floor(E / G), cj = Math.floor(N / G);
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = X.wGrid.get((ci + a) + ',' + (cj + b)); if (l) for (let i = 0; i < l.length; i += 3) if (Math.hypot(l[i] - E, l[i + 1] - N) < l[i + 2] + 8) return true; }
+  return false;
+}
 function revStrLoad() {
   const X = REVX; X.netz = null; X.netzG = new Map();
   if (!X.idx.strassen) return;
@@ -2983,7 +3048,7 @@ function revNvSpawn(E, N) {
   for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const l = N_.cells.get((Math.floor(E / C) + di) + ',' + (Math.floor(N / C) + dj)); if (l) for (const wi of l) cand.push(wi); }
   for (let tries = 0; tries < 12 && cand.length; tries++) {
     const wi = cand[Math.floor(Math.random() * cand.length)], w = N_.wege[wi], kl = N_.kl[w[0]];
-    if (kl === 'residential' && Math.random() < 0.6) continue;
+    if (REV_RAD[kl]) continue; if (kl === 'residential' && Math.random() < 0.6) continue;
     const n = (w.length - 1) / 2; if (n < 2) continue;
     const i = Math.floor(Math.random() * (n - 1)), x = w[1 + 2 * i], y = w[2 + 2 * i];
     if (Math.hypot(x - E, y - N) > 3500 || Math.hypot(x - E, y - N) < 250) continue;
@@ -2992,6 +3057,48 @@ function revNvSpawn(E, N) {
     return { wi, i: d > 0 ? i : i + 1, d, f: 0, v: REV_NV_V[kl] * (0.8 + Math.random() * 0.25), lkw: Math.random() < 0.1 };
   }
   return null;
+}
+function revRadTick(E0, N0) {
+  const X = REVX, N_ = X.netz, V = X.nv, F = SHORE.fwd; if (!N_ || !V) return;
+  if (!X.rad) {
+    const max = S.gfx === 'niedrig' ? 6 : 16, mk = (g, col) => { const m = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ color: 0xffffff }), max); m.count = 0; m.frustumCulled = false; m.userData.sznSkip = 1; shoreG.add(m); return m; };
+    const bike = new THREE.BoxGeometry(0.1, 0.8, 1.75); bike.translate(0, 0.45, 0); const body = new THREE.BoxGeometry(0.44, 0.7, 0.3); body.translate(0, 1.2, -0.12); const head = new THREE.IcosahedronGeometry(0.17, 0); head.translate(0, 1.72, 0.0);
+    const rad = X.rad = { max, bike: mk(bike), body: mk(body), head: mk(head), cars: [], spawnT: 0, t: performance.now() };
+    const c = new THREE.Color(), JC = ['#d32f2f', '#1976d2', '#f9a825', '#2e7d32', '#6a1b9a', '#ef6c00', '#00838f'];
+    for (let i = 0; i < max; i++) { rad.bike.setColorAt(i, c.set('#2b2e33')); rad.body.setColorAt(i, c.set(JC[i % 7])); rad.head.setColorAt(i, c.set('#e8c3a0')); }
+  }
+  const R = X.rad, now = performance.now(), dt = Math.min(0.1, (now - R.t) / 1000); R.t = now;
+  if (R.cars.length < R.max && now - R.spawnT > 700) {
+    R.spawnT = now; const C = N_.C, cand = [];
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const l = N_.cells.get((Math.floor(E0 / C) + di) + ',' + (Math.floor(N0 / C) + dj)); if (l) for (const wi of l) if (REV_RAD[N_.kl[N_.wege[wi][0]]]) cand.push(wi); }
+    for (let tr = 0; tr < 10 && cand.length; tr++) {
+      const wi = cand[Math.floor(Math.random() * cand.length)], w = N_.wege[wi], n = (w.length - 1) / 2; if (n < 2) continue;
+      const i = Math.floor(Math.random() * (n - 1)), x = w[1 + 2 * i], y = w[2 + 2 * i], dd = Math.hypot(x - E0, y - N0); if (dd > 2200 || dd < 120) continue;
+      const d = Math.random() < 0.5 ? 1 : -1; R.cars.push({ wi, i: d > 0 ? i : i + 1, d, f: 0, v: 4.2 + Math.random() * 2.2 }); break;
+    }
+  }
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(1, 1, 1), pv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0); let k = 0;
+  for (let ci = R.cars.length - 1; ci >= 0; ci--) {
+    const a = R.cars[ci]; let w = N_.wege[a.wi], n = (w.length - 1) / 2, weg = false, rest = a.v * dt;
+    while (rest > 0 && !weg) {
+      const j = a.i + a.d;
+      if (j < 0 || j >= n) {
+        const ex = w[1 + 2 * a.i], ey = w[2 + 2 * a.i], L = (V.ends.get(V.key(ex, ey)) || []).filter(o => o[0] !== a.wi && REV_RAD[N_.kl[N_.wege[o[0]][0]]]);
+        if (!L.length) { a.d = -a.d; a.f = 0; rest = 0; break; }
+        const o = L[Math.floor(Math.random() * L.length)]; a.wi = o[0]; w = N_.wege[a.wi]; n = (w.length - 1) / 2;
+        if (o[1] === 0) { a.i = 0; a.d = 1; } else { a.i = n - 1; a.d = -1; } a.f = 0; continue;
+      }
+      const ax = w[1 + 2 * a.i], ay = w[2 + 2 * a.i], bx = w[1 + 2 * j], by = w[2 + 2 * j], L = Math.hypot(bx - ax, by - ay) || 0.01, f2 = a.f + rest / L;
+      if (f2 < 1) { a.f = f2; rest = 0; } else { rest -= (1 - a.f) * L; a.i = j; a.f = 0; }
+    }
+    const j = Math.max(0, Math.min(n - 1, a.i + a.d)), ax = w[1 + 2 * a.i], ay = w[2 + 2 * a.i], bx = w[1 + 2 * j], by = w[2 + 2 * j], L = Math.hypot(bx - ax, by - ay) || 1;
+    const dx = (bx - ax) / L, dy = (by - ay) / L, E = ax + (bx - ax) * a.f + dy * 0.5, N = ay + (by - ay) * a.f - dx * 0.5;
+    if (Math.hypot(E - E0, N - N0) > 2600 || (X.brSkip && X.brSkip.has(Math.floor(E / 16) + ',' + Math.floor(N / 16)))) { R.cars.splice(ci, 1); continue; }
+    const z = revZ(E, N); if (z < 0.3) continue;
+    const p0 = F(E, N), p1 = F(E + dx, N + dy); q.setFromAxisAngle(up, Math.atan2(p1[0] - p0[0], -(p1[1] - p0[1]))); pv.set(p0[0], z + 0.42, -p0[1]); m4.compose(pv, q, sv);
+    R.bike.setMatrixAt(k, m4); R.body.setMatrixAt(k, m4); R.head.setMatrixAt(k, m4); k++;
+  }
+  for (const m of [R.bike, R.body, R.head]) { m.count = k; m.instanceMatrix.needsUpdate = true; }
 }
 function revNvTick(E0, N0) {
   const X = REVX; if (!X || !X.netz) return; if (!X.nv) revNvInit(); const V = X.nv; if (!V) return;
@@ -3034,6 +3141,7 @@ function revNvTick(E0, N0) {
   }
   for (let i = k * 12; i < V.max * 12; i++) pa[i] = i % 3 === 1 ? -9999 : 0;
   V.im.count = k; V.im.instanceMatrix.needsUpdate = true; V.pp.geometry.attributes.position.needsUpdate = true;
+  try { revRadTick(E0, N0); } catch (e) { if (!X.radErr) { X.radErr = 1; console.warn('Radfahrer', e); } }
 }
 
 /* ---------- Züge auf allen Gleisen (DB Regio rot, auf Usedom die UBB weiß-grün), halten vor offener Klappbrücke ---------- */
@@ -3920,7 +4028,7 @@ const SCHEMA=[
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
-  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 5'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 8'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
   {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
   {k:'bruecke',label:'Klappbrücken (Ziegelgraben, Wolgast)',type:'select',options:[['echt','Öffnen zu den echten Zeiten'],['offen','Immer offen']],hint:'Ziegelgrabenbrücke im Rügendamm: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 Uhr je 20 min. Peenebrücke Wolgast: 5:45, 7:45, 12:45, 17:45, 20:45 Uhr je 15 min, Juni–September auch 23:45 Uhr. Es zählt die Uhrzeit deines Geräts. Unter der Rügenbrücke passt du mit 42 m immer durch – die Klappe daneben musst du abwarten. Autos halten vor der offenen Klappe.'},
   {k:'schiffsverkehr',label:'Schiffsverkehr',type:'select',options:[['an','Fähren, Ausflugsschiffe und Kutter fahren'],['aus','Alle bleiben im Hafen']],hint:'Hiddensee-Fähre Schaprode–Vitte, Ausflugsschiff Sassnitz–Königsstuhl, Bäderschiff Binz–Sellin und ein Fischkutter aus Sassnitz. Sie weichen Regattabahnen aus und warten vor Start und Ziel einer laufenden Regatta – nach den Ausweichregeln musst du ihnen aber trotzdem Platz lassen.'},
@@ -5371,7 +5479,7 @@ function hbBerthPos(B){if(B.box)return {ax:B.ax,ay:B.ay,bx:B.bx,by:B.by};const o
 function hbClock(b,x,y){const rel=wrap360(brg(b.x,b.y,x,y)-b.h);let c=Math.round(rel/30)%12;return (c||12)+' Uhr';}
 function hbWindRel(B){const tw=dirv(G.wind.cur+180);const d=tw[0]*B.n[0]+tw[1]*B.n[1];return d>0.45?'ablandig':d<-0.45?'auflandig':'längs';}
 /* Stege (Zöbigker, Nordufer, selbst gebaute) und Liegeboote als feste Hindernisse */
-function shoreObst(C){if(!SHORE||SHORE.kind!=='poly')return;for(const e of OBJ_REG.values()){if(!e.catT||!e.grp||!e.grp.visible||e.catT.opt.water)continue;const cat=e.catT.cat;if(cat!=='Gebäude'&&cat!=='Am Wasser')continue;const ov=objOv(e);if(!ov)continue;const b=e.box,d=ov.d,c=Math.cos(ov.r||0),s=Math.sin(ov.r||0),W=(x,z)=>[c*x+s*z+d[0],-(-s*x+c*z+d[2])];
+function shoreObst(C){if(!SHORE||(SHORE.kind!=='poly'&&!(SHORE.kind==='revier'&&S.revier==='cospu_neu')))return;for(const e of OBJ_REG.values()){if(!e.catT||!e.grp||!e.grp.visible||e.catT.opt.water)continue;const cat=e.catT.cat;if(cat!=='Gebäude'&&cat!=='Am Wasser')continue;const ov=objOv(e);if(!ov)continue;const b=e.box,d=ov.d,c=Math.cos(ov.r||0),s=Math.sin(ov.r||0),W=(x,z)=>[c*x+s*z+d[0],-(-s*x+c*z+d[2])];
     const sx=b.max.x-b.min.x,sz=b.max.z-b.min.z,cx=(b.min.x+b.max.x)/2,cz=(b.min.z+b.max.z)/2,lx=sx>sz,h=Math.abs(sx-sz)/2,A=lx?W(cx-h,cz):W(cx,cz-h),B=lx?W(cx+h,cz):W(cx,cz+h);C.obst.push({ax:A[0],ay:A[1],bx:B[0],by:B[1],r:Math.min(sx,sz)/2,name:e.catT.name,pier:true});}for(const p of SHORE.piersX||[])if(Array.isArray(p)&&p.length>=5)C.obst.push({ax:p[0],ay:p[1],bx:p[2],by:p[3],r:(p[4]||2)/2,name:'Steg',pier:true});for(const o of SHORE.zobst||[])C.obst.push(o);}
 function hbPierHit(A,ob,k,dt,fA,hl){const lim=ob.r+BEAM/2-0.15;const d=segDist(A.x+fA[0]*hl,A.y+fA[1]*hl,A.x-fA[0]*hl,A.y-fA[1]*hl,ob.ax,ob.ay,ob.bx,ob.by);if(d>=lim)return;
   let best=1e9,px=A.x,py=A.y,qx=A.x,qy=A.y;for(let s=-1;s<=1.001;s+=0.25){const hx=A.x+fA[0]*hl*s,hy=A.y+fA[1]*hl*s;const q=nearSeg(hx,hy,ob);const dd=Math.hypot(hx-q[0],hy-q[1]);if(dd<best){best=dd;px=hx;py=hy;qx=q[0];qy=q[1];}}
@@ -6770,7 +6878,7 @@ function newRace(lesson,opts){
   C.obst=C.buoys.map(bu=>Object.assign(ob(bu,0.9,bu.m.kind==='gate'||bu.m.kind==='wp'?'Tor-Tonne':bu.m.name),{mk:bu.m}));
   if(!lesson){C.obst.push(Object.assign(ob(C.pin,0.7,'Pin-Tonne'),{mk:'start'}),{ax:C.cb.x-U[0]*3.4,ay:C.cb.y-U[1]*3.4,bx:C.cb.x+U[0]*3.4,by:C.cb.y+U[1]*3.4,r:1.75,name:'Startschiff',mk:'start'});
     if(C.finishUp)C.obst.push(Object.assign(ob(C.fin.a,0.7,'Zieltonne'),{mk:'fin'}),{ax:C.fin.b.x-U[0]*3.4,ay:C.fin.b.y-U[1]*3.4,bx:C.fin.b.x+U[0]*3.4,by:C.fin.b.y+U[1]*3.4,r:1.75,name:'Zielschiff',mk:'fin'});}
-  if(S.revier==='cospu'&&SHORE.lsc)for(const o of SHORE.lsc.obst)C.obst.push(o);shoreObst(C);
+  if((S.revier==='cospu'||S.revier==='cospu_neu')&&SHORE.lsc&&SHORE.lsc.obst)for(const o of SHORE.lsc.obst)C.obst.push(o);shoreObst(C);
   const cdir={lee:W0+180,luv:W0,links:W0-90,rechts:W0+90}[S.currentDir];const cd=dirv(cdir==null?W0+180:cdir);const cs=(lesson?0:S.current)*KN;CUR=[cd[0]*cs,cd[1]*cs];waterMat.uniforms.uCur.value.set(CUR[0],-CUR[1]);
   const ST=opts&&opts.drill?60:S.startTime;
   G={t:(lesson||(opts&&opts.free))?0:-ST,course:C,boats:[],msgs:[],hits:{},running:false,paused:false,over:false,sigIdx:0,hudT:0,endT:null,lesson:null,noRefl:[],drill:!!(opts&&opts.drill),rec:[],windRec:[],events:[],ghostRec:[],flags:{},ana:{side:null,tacks:0,gybes:0,dirtyT:0,dirtyTot:0,hdrT:0,checkLay:0}};
@@ -6793,7 +6901,7 @@ function newRace(lesson,opts){
   if(opts&&opts.row){const lw=22;G.row={dist:Number(S.rowDist)||500};const lanes=[2,0,1,3,4];
     G.boats.forEach((b,k)=>{b.lane=(lanes[k%5]-2)*lw;b.x=b.lane;b.y=-L*0.6-1;b.h=W0;b.v=0;if(b.ai){b.ai.rowRate=27+S.cpuSkill*1.6+rnd(-1.5,1.5);b.ai.rowJit=0.3-0.08*S.cpuSkill;}});
     C.lineLen=5*lw+12;C.pin={x:-C.lineLen/2,y:0};C.cb={x:C.lineLen/2,y:0};C.finishUp=true;const dd=G.row.dist;C.fin={c:{x:0,y:dd},len:C.lineLen,a:{x:-C.lineLen/2,y:dd},b:{x:C.lineLen/2,y:dd}};
-    C.seq=['finish'];C.marks=[];C.buoys=[];C.obst=[];if(S.revier==='cospu'&&SHORE.lsc)for(const o of SHORE.lsc.obst)C.obst.push(o);shoreObst(C);G.t=-10;G.sigs=[-10,-5,-4,-3,-2,-1,0];}
+    C.seq=['finish'];C.marks=[];C.buoys=[];C.obst=[];if((S.revier==='cospu'||S.revier==='cospu_neu')&&SHORE.lsc&&SHORE.lsc.obst)for(const o of SHORE.lsc.obst)C.obst.push(o);shoreObst(C);G.t=-10;G.sigs=[-10,-5,-4,-3,-2,-1,0];}
   if(lesson){G.lesson={def:lesson,t:0,done:false};lesson.setup(G);}
   for(const b of G.boats){b.prevH=b.h;b.a=wrap180(W0-b.h);b.side=b.a>=0?1:-1;b.sailSide=b.side;buildBoat(b);}
   G.rec=G.boats.map(()=>[]);
