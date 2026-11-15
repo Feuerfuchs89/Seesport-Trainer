@@ -790,7 +790,7 @@ function revLoad() {
     if (idx.courses && !idx.courses[S.revKurs] && !String(S.revKurs || '').startsWith('u:')) { const ks = Object.keys(idx.courses); if (ks.length) { S.revKurs = ks.find(k => !idx.courses[k].bahn) || ks[0]; try { saveS(); } catch (e) {} } }
     for (const t of idx.grid.tiles) X.meta.set(t[0] + ',' + t[1], { ti: t[0], tj: t[1], file: t[2], kx: t[3], ky: t[4], nh: t[5] });
     if (X.rev !== S.revier) return; /* inzwischen anderes Revier gewählt */
-    if (def.lage) { try { X.lage = await revFetch(base, def.lage, 'json'); const Lg = X.lage; X.frei = [[Lg.lsc.xy[0], Lg.lsc.xy[1], 150], [Lg.zoebigker.xy[0], Lg.zoebigker.xy[1], 110]]; X.flat = [[Lg.lsc.xy[0], Lg.lsc.xy[1], 150, 280, 82], [Lg.zoebigker.xy[0], Lg.zoebigker.xy[1], 110, 220, 100]]; } catch (e) { console.warn('Lage', e); } if (X.rev !== S.revier) return; }
+    if (def.lage) { try { X.lage = await revFetch(base, def.lage, 'json'); const Lg = X.lage; X.flat = [[Lg.lsc.xy[0], Lg.lsc.xy[1], 150, 280, 35], [Lg.zoebigker.xy[0], Lg.zoebigker.xy[1], 110, 220, 50]]; } catch (e) { console.warn('Lage', e); } if (X.rev !== S.revier) return; }
     REVX = REVH = X;
     if (REVIERE_K[S.revier]) {
       /* Kacheln rund um den Start vorab laden, dann bauen */
@@ -1356,10 +1356,16 @@ function revHafenAt(E, N) {
   for (const h of X.haefen) if (h.z && E >= h.x0 && N >= h.y0 && E < h.x0 + revHW(h) && N < h.y0 + revHH(h)) return h;
   return null;
 }
+/* Cospu: Land rund um LSC/Zöbigker abflachen, damit Gebäude, Boote und Lagerfeuer nicht im Boden stecken */
+function revFlat(E, N, z) {
+  const X = REVX; if (!X || !X.flat || z < 0) return z;
+  for (const f of X.flat) { const d = Math.hypot(E - f[0], N - f[1]); if (d < f[3]) { const u = d <= f[2] ? 0 : (d - f[2]) / (f[3] - f[2]); z += (f[4] / 100 - z) * (1 - u * u * (3 - 2 * u)); } }
+  return z;
+}
 function revHafenZ(h, E, N) {
   const nx = h.nx || h.n, ny = h.ny || h.n, fx = (E - h.x0) / h.cs - 0.5, fy = (h.y0 + ny * h.cs - N) / h.cs - 0.5;
   const i0 = Math.max(0, Math.min(nx - 2, Math.floor(fx))), j0 = Math.max(0, Math.min(ny - 2, Math.floor(fy))), tx = Math.max(0, Math.min(1, fx - i0)), ty = Math.max(0, Math.min(1, fy - j0)), z = h.z;
-  return ((z[j0 * nx + i0] * (1 - tx) + z[j0 * nx + i0 + 1] * tx) * (1 - ty) + (z[(j0 + 1) * nx + i0] * (1 - tx) + z[(j0 + 1) * nx + i0 + 1] * tx) * ty) / 100;
+  return revFlat(E, N, ((z[j0 * nx + i0] * (1 - tx) + z[j0 * nx + i0 + 1] * tx) * (1 - ty) + (z[(j0 + 1) * nx + i0] * (1 - tx) + z[(j0 + 1) * nx + i0 + 1] * tx) * ty) / 100);
 }
 function revHafenMaske(E, N) {
   const h = revHafenAt(E, N); if (!h) return -1; const nx = h.nx || h.n, ny = h.ny || h.n;
@@ -1393,9 +1399,10 @@ function revHafenTeil(h, ci, cj, step) {
   if (m < 2 || k2 < 2) { h.teile.set(key, { step, mesh: null }); return; }
   const pos = new Float32Array(m * k2 * 3), col = new Float32Array(m * k2 * 3), C = REV_COLS, K = REV_KREIDE, tmp = new THREE.Color(), kai = new THREE.Color('#7d7b76'); let q = 0, any = false;
   for (let a = 0; a < k2; a++) for (let b = 0; b < m; b++) {
-    const i = Math.min(nx - 1, i0 + b * step), j = Math.min(ny - 1, j0 + a * step), z = h.z[j * nx + i] / 100, mk = h.m[j * nx + i];
+    const i = Math.min(nx - 1, i0 + b * step), j = Math.min(ny - 1, j0 + a * step), mk = h.m[j * nx + i];
+    const E = h.x0 + (i + 0.5) * cs, N = h.y0 + ny * cs - (j + 0.5) * cs, z = revFlat(E, N, h.z[j * nx + i] / 100);
     if (z > -0.5) any = true;
-    const E = h.x0 + (i + 0.5) * cs, N = h.y0 + ny * cs - (j + 0.5) * cs, [x, y] = F(E, N), hh = mk === 2 ? -2.2 : z > 0 ? z + 0.35 : z - 0.6;
+    const [x, y] = F(E, N), hh = mk === 2 ? -2.2 : z > 0 ? z + 0.35 : z - 0.6;
     pos[q * 3] = x; pos[q * 3 + 1] = hh; pos[q * 3 + 2] = -y;
     let v = 0.94 + 0.12 * Math.sin(i * 7.31 + j * 3.17);
     if (z <= 0 || mk === 2) tmp.copy(C.bed);
@@ -3913,7 +3920,7 @@ const SCHEMA=[
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
-  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 4'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 5'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
   {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
   {k:'bruecke',label:'Klappbrücken (Ziegelgraben, Wolgast)',type:'select',options:[['echt','Öffnen zu den echten Zeiten'],['offen','Immer offen']],hint:'Ziegelgrabenbrücke im Rügendamm: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 Uhr je 20 min. Peenebrücke Wolgast: 5:45, 7:45, 12:45, 17:45, 20:45 Uhr je 15 min, Juni–September auch 23:45 Uhr. Es zählt die Uhrzeit deines Geräts. Unter der Rügenbrücke passt du mit 42 m immer durch – die Klappe daneben musst du abwarten. Autos halten vor der offenen Klappe.'},
   {k:'schiffsverkehr',label:'Schiffsverkehr',type:'select',options:[['an','Fähren, Ausflugsschiffe und Kutter fahren'],['aus','Alle bleiben im Hafen']],hint:'Hiddensee-Fähre Schaprode–Vitte, Ausflugsschiff Sassnitz–Königsstuhl, Bäderschiff Binz–Sellin und ein Fischkutter aus Sassnitz. Sie weichen Regattabahnen aus und warten vor Start und Ziel einer laufenden Regatta – nach den Ausweichregeln musst du ihnen aber trotzdem Platz lassen.'},
