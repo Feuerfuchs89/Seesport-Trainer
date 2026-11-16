@@ -884,7 +884,7 @@ function revBuild() {
   try { MZ_MIN = 0.01; } catch (e) {}
   X.chunks = new Map(); X.scen = new Map(); X.lastE = null;
   X.matT = new THREE.MeshLambertMaterial({ vertexColors: true });
-  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null; X.brGrp = null; X.verkehr = null; X.brSkip = null; X.nv = null; X.rad = null; X.wGrid = null; X.zug = null;
+  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null; X.brGrp = null; X.verkehr = null; X.brSkip = null; X.brSkipM = null; X.nv = null; X.rad = null; X.wGrid = null; X.zug = null;
   X.haefen = (X.idx.haefen || []).map(h => Object.assign({}, h, { st: null, z: null, m: null, teile: null, grp: null }));
   revStrLoad(); revSchiffeInit();
   try { revTuerme(); } catch (e) { console.error('Leuchttürme', e); }
@@ -2192,8 +2192,8 @@ function revBogen(grp, M, sc, cands) {
   let E = 0, N = 0, dx = 0, dy = 0, h = 0; const d0 = cs[0].d;
   for (const c of cs) { const sg = (c.d[0] * d0[0] + c.d[1] * d0[1]) < 0 ? -1 : 1; E += c.E; N += c.N; dx += c.d[0] * sg; dy += c.d[1] * sg; h += c.h; }
   E /= cs.length; N /= cs.length; h /= cs.length; const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
-  const SPAN = 62, RISE = 19, HS = SPAN / 2, W = cs.length > 1 ? Math.max(15, Math.min(22, Math.hypot(cs[0].E - cs[1].E, cs[0].N - cs[1].N) / 2 + 8)) : 15;
-  const g = new THREE.Group(), p = sc(E, N); g.position.set(p[0], 0, p[1]); g.rotation.y = Math.atan2(dy, dx);
+  const SPAN = cs[0].span || 62, RISE = 19, HS = SPAN / 2, W = cs.length > 1 ? Math.max(15, Math.min(22, Math.hypot(cs[0].E - cs[1].E, cs[0].N - cs[1].N) / 2 + 8)) : 15;
+  const g = new THREE.Group(), p = sc(E, N), p2 = sc(E + dx * 10, N + dy * 10); g.position.set(p[0], 0, p[1]); g.rotation.y = Math.atan2(-(p2[1] - p[1]), p2[0] - p[0]);
   const red = M('#b4484f', 0.3), hang = M('#d9d3b0', 0.3);
   const box = (w, hh, d, x, y, z, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(d, hh, w), m); b.position.set(x, y, z); g.add(b); };
   for (const z of [-W, W]) box(0.8, 1.7, SPAN, 0, h - 0.85, z, red);
@@ -2289,6 +2289,16 @@ function revBrueckenBuild() {
       const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lv, 3)); grp.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#f4f6f8' })));
       for (let i = i0; i <= i1; i++) if (b.nass[i] && hArr[i] - 3.2 < 14) for (let o = -8; o <= 8; o += 2) solid(P[i][0] - dir[i][1] * o, P[i][1] + dir[i][0] * o);
       for (let sv = sb + 20; sv < se; sv += 36) { const q = at(sv), ii = q.i; for (const o of [-6.8, 6.8]) { const p = sc(q.E - q.d[1] * o, q.N + q.d[0] * o); lampe(p[0], hArr[ii] + 9, p[1], 9); } }
+    } else if (b.art === 'platte') {
+      /* Autobahnbrücke (Beton) über Tal/Straße/Fluss: Fahrbahnplatte auf Höhe der Dammkrone an den Enden, Pfeiler, Leitplanken */
+      vmax = 33; spur = 6; const hw = b.hw || 14; hwStr = hw;
+      const hE = Math.max(grund(P[0][0], P[0][1]), grund(P[n - 1][0], P[n - 1][1])) + 0.3;
+      for (let i = 0; i < n; i++) { hArr[i] = hE; deck[i] = 1; }
+      band(0, n - 1, i => hArr[i], hw, 2.4, '#55585d', '#a3a7aa', '#7b7f83');
+      band(0, n - 1, i => hArr[i] + 0.55, 0.18, 0.5, '#b9bdc1', '#b9bdc1', '#b9bdc1', 0.4, hw);
+      band(0, n - 1, i => hArr[i] + 0.55, 0.18, 0.5, '#b9bdc1', '#b9bdc1', '#b9bdc1', 0.4, -hw);
+      markierung(0, n - 1, hArr, hw);
+      for (let sv = 22; sv < s[n - 1] - 12; sv += 26) { const q = at(sv); saeulen.push([q.E, q.N, 0, Math.min(grund(q.E, q.N), hE - 1) - 0.5, hE - 2.3, q.d, hw * 1.7]); }
     } else if (b.art === 'bogen') {
       /* A 38: Fahrbahnplatte (beide Richtungsfahrbahnen) auf Höhe der Talränder; Bögen kommen aus revBogen() */
       vmax = 33; spur = 7.5; hwStr = 15;
@@ -2411,8 +2421,8 @@ function revBrueckenBuild() {
     if (pfosten.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pfosten, 3)); grp.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: '#f4f4f0' }))); }
     if (dalben.length) { const cg = new THREE.CylinderGeometry(0.85, 0.85, 1, 12); cg.translate(0, 0.5, 0); const im = new THREE.InstancedMesh(cg, M('#23262a', 0.1), dalben.length), ik = new THREE.InstancedMesh(cg, M('#f2f2ee', 0.6), dalben.length), m4 = new THREE.Matrix4();
       dalben.forEach((q, i) => { const p = sc(q[0], q[1]); m4.makeScale(1, 6.5, 1).setPosition(p[0], -3, p[1]); im.setMatrixAt(i, m4); m4.makeScale(1.04, 0.9, 1.04).setPosition(p[0], 3.5, p[1]); ik.setMatrixAt(i, m4); }); im.frustumCulled = ik.frustumCulled = false; grp.add(im, ik); }
-    if (!X.brSkip) X.brSkip = new Set(); for (const q of P) for (let a = -1; a <= 1; a++) for (let c2 = -1; c2 <= 1; c2++) X.brSkip.add((Math.floor(q[0] / 16) + a) + ',' + (Math.floor(q[1] / 16) + c2));
-    if (X.bogenPt) { let bi = -1, bd = 1e9; for (let i = 0; i < n; i++) { const dd = Math.hypot(P[i][0] - X.bogenPt[0], P[i][1] - X.bogenPt[1]); if (dd < bd) { bd = dd; bi = i; } } if (bi >= 0 && bd < 160) X.bogenCand.push({ E: P[bi][0], N: P[bi][1], d: dir[bi], h: hArr[bi], bd }); }
+    const SKS = (b.art === 'bogen' || b.art === 'platte') ? (X.brSkipM || (X.brSkipM = new Set())) : (X.brSkip || (X.brSkip = new Set())); for (const q of P) for (let a = -1; a <= 1; a++) for (let c2 = -1; c2 <= 1; c2++) SKS.add((Math.floor(q[0] / 16) + a) + ',' + (Math.floor(q[1] / 16) + c2));
+    if (X.bogenPt) { let bi = -1, bd = 1e9; for (let i = 0; i < n; i++) { const dd = Math.hypot(P[i][0] - X.bogenPt[0], P[i][1] - X.bogenPt[1]); if (dd < bd) { bd = dd; bi = i; } } if (b.art === 'bogen') { bi = (n - 1) >> 1; bd = 0; } if (bi >= 0 && bd < 160) X.bogenCand.push({ E: P[bi][0], N: P[bi][1], d: dir[bi], h: hArr[bi], bd, span: b.art === 'bogen' ? Math.max(40, Math.min(75, (b.laenge || 82) - 22)) : 62 }); }
     X.strassen.push({ name: b.n, P, s, dir, h: hArr, L: s[n - 1], vmax, spur, klappen: X.klappen.filter(k => k.strasse === X.strassen.length) });
   }
   if (X.bogenCand && X.bogenCand.length) { try { revBogen(grp, M, sc, X.bogenCand); } catch (e) { console.error('Bogenbrücke', e); } }
@@ -2536,6 +2546,7 @@ var REV_STR = {               /* Breite, Farbe, Markierung (0 keine, 1 Mitte, 2 
   cycleway: [3.2, '#7a7c7f', 0], path: [2.4, '#b3a583', 0], track: [3.6, '#a19474', 0], footway: [2.2, '#b8aa8a', 0]
 };
 var REV_RAD = { cycleway: 1, path: 1, track: 1, footway: 1 };
+function revSkipAny(k) { const X = REVX; return !!((X.brSkip && X.brSkip.has(k)) || (X.brSkipM && X.brSkipM.has(k))); }
 function revWegNah(E, N) {
   const X = REVX; if (!X || !X.netz) return false;
   if (!X.wGrid) {
@@ -2563,7 +2574,7 @@ function revStrLoad() {
 function revStrZelle(ci, cj) {
   const X = REVX, N_ = X.netz, F = SHORE.fwd, C = N_.C, x0 = ci * C, y0 = cj * C, x1 = x0 + C, y1 = y0 + C, grp = new THREE.Group();
   const v = [], col = [], ix = [], mv = [], sv = [], lampen = [], masten = [], tmp = new THREE.Color();
-  const skip = X.brSkip || new Set();
+  const skip = X.brSkip || new Set(), skipM = X.brSkipM || new Set();
   const sc = (E, N) => { const q = F(E, N); return [q[0], -q[1]]; };
   for (const wi of N_.cells.get(ci + ',' + cj) || []) {
     const w = N_.wege[wi], kl = N_.kl[w[0]], D = REV_STR[kl]; if (!D) continue;
@@ -2574,7 +2585,7 @@ function revStrZelle(ci, cj) {
       const ax = w[k], ay = w[k + 1], bx = w[k + 2], by = w[k + 3], L = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(L / 10));
       for (let s = (k === 1 ? 0 : 1); s <= n; s++) P.push([ax + (bx - ax) * s / n, ay + (by - ay) * s / n]);
     }
-    const drin = q => q[0] >= x0 - 10 && q[0] < x1 + 10 && q[1] >= y0 - 10 && q[1] < y1 + 10 && !skip.has(Math.floor(q[0] / 16) + ',' + Math.floor(q[1] / 16)) && revZ(q[0], q[1]) > -2.5;
+    const drin = q => q[0] >= x0 - 10 && q[0] < x1 + 10 && q[1] >= y0 - 10 && q[1] < y1 + 10 && !skip.has(Math.floor(q[0] / 16) + ',' + Math.floor(q[1] / 16)) && !((kl === 'motorway' || kl === 'trunk') && skipM.has(Math.floor(q[0] / 16) + ',' + Math.floor(q[1] / 16))) && revZ(q[0], q[1]) > -2.5;
     let run = [];
     const flush = () => {
       if (run.length >= 2) {
@@ -3128,7 +3139,7 @@ function revNvSpawn(E, N) {
     const n = (w.length - 1) / 2; if (n < 2) continue;
     const i = Math.floor(Math.random() * (n - 1)), x = w[1 + 2 * i], y = w[2 + 2 * i];
     if (Math.hypot(x - E, y - N) > 3500 || Math.hypot(x - E, y - N) < 250) continue;
-    if (X.brSkip && X.brSkip.has(Math.floor(x / 16) + ',' + Math.floor(y / 16))) continue;
+    if (revSkipAny(Math.floor(x / 16) + ',' + Math.floor(y / 16))) continue;
     const d = Math.random() < 0.5 ? 1 : -1;
     return { wi, i: d > 0 ? i : i + 1, d, f: 0, v: REV_NV_V[kl] * (0.8 + Math.random() * 0.25), lkw: Math.random() < 0.1 };
   }
@@ -3169,7 +3180,7 @@ function revRadTick(E0, N0) {
     }
     const j = Math.max(0, Math.min(n - 1, a.i + a.d)), ax = w[1 + 2 * a.i], ay = w[2 + 2 * a.i], bx = w[1 + 2 * j], by = w[2 + 2 * j], L = Math.hypot(bx - ax, by - ay) || 1;
     const dx = (bx - ax) / L, dy = (by - ay) / L, E = ax + (bx - ax) * a.f + dy * 0.5, N = ay + (by - ay) * a.f - dx * 0.5;
-    if (Math.hypot(E - E0, N - N0) > 2600 || (X.brSkip && X.brSkip.has(Math.floor(E / 16) + ',' + Math.floor(N / 16)))) { R.cars.splice(ci, 1); continue; }
+    if (Math.hypot(E - E0, N - N0) > 2600 || revSkipAny(Math.floor(E / 16) + ',' + Math.floor(N / 16))) { R.cars.splice(ci, 1); continue; }
     const z = revZ(E, N); if (z < 0.3) continue;
     const p0 = F(E, N), p1 = F(E + dx, N + dy); q.setFromAxisAngle(up, Math.atan2(p1[0] - p0[0], -(p1[1] - p0[1]))); pv.set(p0[0], z + 0.42, -p0[1]); m4.compose(pv, q, sv);
     R.bike.setMatrixAt(k, m4); R.body.setMatrixAt(k, m4); R.head.setMatrixAt(k, m4); k++;
@@ -3202,7 +3213,7 @@ function revNvTick(E0, N0) {
       const j = Math.max(0, Math.min(n - 1, a.i + a.d)), ax = w[1 + 2 * a.i], ay = w[2 + 2 * a.i], bx = w[1 + 2 * j], by = w[2 + 2 * j], L = Math.hypot(bx - ax, by - ay) || 1;
       const dx = (bx - ax) / L, dy = (by - ay) / L, kl = N_.kl[w[0]], off = (REV_STR[kl] ? REV_STR[kl][0] : 6) * 0.22;
       const E = ax + (bx - ax) * a.f + dy * off, N = ay + (by - ay) * a.f - dx * off;
-      if (Math.hypot(E - E0, N - N0) > 4200 || (X.brSkip && X.brSkip.has(Math.floor(E / 16) + ',' + Math.floor(N / 16)))) weg = true;
+      if (Math.hypot(E - E0, N - N0) > 4200 || revSkipAny(Math.floor(E / 16) + ',' + Math.floor(N / 16))) weg = true;
       else {
         const z = revZ(E, N); if (z < -2.5) continue;   /* im Tunnel */
         const h = z < 0.2 ? 1.8 : z + 0.42, p0 = F(E, N), p1 = F(E + dx, N + dy), fx = p1[0] - p0[0], fz = -(p1[1] - p0[1]);
@@ -4104,7 +4115,7 @@ const SCHEMA=[
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
-  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 11'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 12'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
   {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
   {k:'bruecke',label:'Klappbrücken (Ziegelgraben, Wolgast)',type:'select',options:[['echt','Öffnen zu den echten Zeiten'],['offen','Immer offen']],hint:'Ziegelgrabenbrücke im Rügendamm: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 Uhr je 20 min. Peenebrücke Wolgast: 5:45, 7:45, 12:45, 17:45, 20:45 Uhr je 15 min, Juni–September auch 23:45 Uhr. Es zählt die Uhrzeit deines Geräts. Unter der Rügenbrücke passt du mit 42 m immer durch – die Klappe daneben musst du abwarten. Autos halten vor der offenen Klappe.'},
   {k:'schiffsverkehr',label:'Schiffsverkehr',type:'select',options:[['an','Fähren, Ausflugsschiffe und Kutter fahren'],['aus','Alle bleiben im Hafen']],hint:'Hiddensee-Fähre Schaprode–Vitte, Ausflugsschiff Sassnitz–Königsstuhl, Bäderschiff Binz–Sellin und ein Fischkutter aus Sassnitz. Sie weichen Regattabahnen aus und warten vor Start und Ziel einer laufenden Regatta – nach den Ausweichregeln musst du ihnen aber trotzdem Platz lassen.'},
