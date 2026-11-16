@@ -900,6 +900,51 @@ function revBuild() {
 }
 
 /* ---------- Cospudener See (echte Daten): LSC-Hafen, Stege, Tonnen aus cospu-lage.json ---------- */
+function revRng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+/* Inseln im Cospudener See (Westinsel mit Steinhaufen, Briefkasten, Plastikflamingos) – feste Zufallsfolge */
+function revInselBau(){const F=SHORE.altF,R=revRng(20241), rnd=(a,b)=>a+(b-a)*R();
+    const isl=COSPU_INSELN.map(ring=>{const poly=ring.slice(0,-1).map(q=>{const [x,y]=F(q[0],q[1]);return {x,y};});let cx=0,cy=0;for(const p of poly){cx+=p.x;cy+=p.y;}cx/=poly.length;cy/=poly.length;let r=0;for(const p of poly)r+=Math.hypot(p.x-cx,p.y-cy);return {x:cx,y:cy,r:r/poly.length,poly};});
+    SHORE.isl=isl;SHORE.shoal=[isl[0].x,isl[0].y,isl[1].x,isl[1].y,Math.max(isl[0].r,isl[1].r)+7];
+    const shp=(o,k)=>{const sh=new THREE.Shape();o.poly.forEach((p,i)=>{const X=o.x+(p.x-o.x)*k,Y=o.y+(p.y-o.y)*k;if(i)sh.lineTo(X,Y);else sh.moveTo(X,Y);});sh.closePath();return sh;};
+    const ext=(sh,depth,y0)=>{const g=new THREE.ExtrudeGeometry(sh,{depth,bevelEnabled:false});g.rotateX(-Math.PI/2);g.translate(0,y0,0);return g;};
+    const mSand=new THREE.MeshLambertMaterial({color:'#b3a578'}),mGrass=new THREE.MeshLambertMaterial({color:'#6f8a4a'}),mEarth=new THREE.MeshLambertMaterial({color:'#8a7d5c'});
+    for(const o of isl){shoreG.add(new THREE.Mesh(ext(shp(o,1.6),0.5,-0.48),mSand));shoreG.add(new THREE.Mesh(ext(shp(o,1.0),0.9,-0.35),[mGrass,mEarth]));}
+    const M4=new THREE.Matrix4(),Q4=new THREE.Quaternion(),E4=new THREE.Euler(),S4=new THREE.Vector3(),P4=new THREE.Vector3(),C4=new THREE.Color();
+    const stones=[];
+    for(const o of isl)for(let k=0;k<16;k++){const p=o.poly[Math.floor(k*o.poly.length/16)];const f=rnd(1.08,1.5);stones.push([o.x+(p.x-o.x)*f,0.08,o.y+(p.y-o.y)*f,rnd(0.14,0.3)]);}
+    const [px,py]=F(COSPU_INSEL_OBJ.pile[0],COSPU_INSEL_OBJ.pile[1]);
+    for(let k=0;k<26;k++){const a=rnd(0,6.283),rr=Math.sqrt(R())*0.85,hh=0.62*Math.max(0,1-rr/1.0);stones.push([px+Math.cos(a)*rr,0.55+hh*rnd(0.45,1),py+Math.sin(a)*rr,rnd(0.17,0.34)]);}
+    stones.push([px,1.0,py,0.3]);
+    const sm=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0xffffff,flatShading:true,roughness:0.95,metalness:0}),stones.length);
+    stones.forEach((t,k)=>{P4.set(t[0],t[1],-t[2]);Q4.setFromEuler(E4.set(rnd(0,3),rnd(0,6),rnd(0,3)));S4.set(t[3]*rnd(0.9,1.3),t[3]*rnd(0.7,1),t[3]*rnd(0.9,1.3));M4.compose(P4,Q4,S4);sm.setMatrixAt(k,M4);C4.setHSL(0.1,0.05,rnd(0.42,0.62));sm.setColorAt(k,C4);});
+    shoreG.add(sm);
+    // Briefkasten (klein, weiß) oben auf dem Steinhaufen, Vorderseite zu den Flamingos
+    const fl=COSPU_INSEL_OBJ.fla.map(q=>F(q[0],q[1]));const mx=(fl[0][0]+fl[1][0])/2-px,my=(fl[0][1]+fl[1][1])/2-py;
+    objSec('insel:briefkasten','Briefkasten auf dem Steinhaufen','Insel');{const g=new THREE.Group();const white=new THREE.MeshLambertMaterial({color:'#f5f5f0'}),grey=new THREE.MeshLambertMaterial({color:'#c9cac6'}),dark=new THREE.MeshLambertMaterial({color:'#2b2b2b'});
+     const body=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.26,0.36),white);body.position.y=0.13;g.add(body);
+     const roof=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.03,0.4),grey);roof.position.y=0.275;g.add(roof);
+     const slot=new THREE.Mesh(new THREE.BoxGeometry(0.01,0.025,0.2),dark);slot.position.set(0.085,0.19,0);g.add(slot);
+     g.position.set(px,1.16,-py);g.rotation.y=Math.atan2(my,mx);shoreG.add(g);objSec(null);}
+    // Plastikflamingos
+    {const pink=new THREE.MeshLambertMaterial({color:'#f0668f'}),wire=new THREE.MeshLambertMaterial({color:'#b83566'}),beak=new THREE.MeshLambertMaterial({color:'#f3d8d0'}),blk=new THREE.MeshLambertMaterial({color:'#1d1d1d'});
+     const flam=(oneLeg,low)=>{const g=new THREE.Group();
+       const body=new THREE.Mesh(new THREE.SphereGeometry(1,10,7),pink);body.scale.set(0.21,0.12,0.11);body.position.set(0,0.62,0);g.add(body);
+       const tail=new THREE.Mesh(new THREE.ConeGeometry(0.06,0.2,6),pink);tail.rotation.z=Math.PI/2+0.3;tail.position.set(-0.24,0.6,0);g.add(tail);
+       const pts=low?[[0.16,0.66],[0.27,0.72],[0.3,0.86],[0.36,0.95],[0.46,0.93]]:[[0.16,0.66],[0.25,0.75],[0.22,0.9],[0.3,1.02],[0.39,1.05]];
+       const cur=new THREE.CatmullRomCurve3(pts.map(q=>new THREE.Vector3(q[0],q[1],0)));g.add(new THREE.Mesh(new THREE.TubeGeometry(cur,16,0.026,6),pink));
+       const e=pts[pts.length-1];const head=new THREE.Mesh(new THREE.SphereGeometry(0.042,8,6),pink);head.position.set(e[0],e[1],0);g.add(head);
+       const b1=new THREE.Mesh(new THREE.ConeGeometry(0.03,0.1,6),beak);b1.rotation.z=-Math.PI/2-0.45;b1.position.set(e[0]+0.065,e[1]-0.03,0);g.add(b1);
+       const b2=new THREE.Mesh(new THREE.ConeGeometry(0.02,0.045,6),blk);b2.rotation.z=-Math.PI/2-0.45;b2.position.set(e[0]+0.12,e[1]-0.06,0);g.add(b2);
+       const leg=(x,z,len,rz)=>{const l=new THREE.Mesh(new THREE.CylinderGeometry(0.009,0.009,len,5),wire);l.position.set(x,len/2,z);l.rotation.z=rz||0;g.add(l);};
+       leg(0.01,0.035,0.62);if(oneLeg){const l=new THREE.Mesh(new THREE.CylinderGeometry(0.009,0.009,0.26,5),wire);l.position.set(0.04,0.5,-0.04);l.rotation.z=1.0;g.add(l);}else leg(0.03,-0.035,0.62);
+       return g;};
+     objSec('insel:flamingos','Flamingo-Paar am Briefkasten','Insel');fl.forEach((q,k)=>{const g=flam(k===1,k===1);g.position.set(q[0],0.52,-q[1]);g.rotation.y=Math.atan2(py-q[1],px-q[0])+(k?0.9:-0.25);shoreG.add(g);});
+     // weitere Flamingos im Sand rund um die Inseln (feste Anordnung, steht bei jedem Neuaufbau gleich)
+     const rAt=(o,th)=>{let best=9,bd=o.r;for(const p of o.poly){const a=Math.atan2(p.y-o.y,p.x-o.x);const d=Math.abs(((a-th+Math.PI*3)%(Math.PI*2))-Math.PI);if(d<best){best=d;bd=Math.hypot(p.x-o.x,p.y-o.y);}}return bd;};
+     objSec('insel:ring','Flamingos rund um die Inseln','Insel');[[0,0.2,1.28,0],[0,0.9,1.4,1],[0,1.55,1.25,0],[0,2.2,1.38,1],[0,2.9,1.3,0],[0,3.6,1.42,0],[0,4.25,1.27,1],[0,4.9,1.36,0],[0,5.55,1.3,1],[1,0.6,1.3,0],[1,2.4,1.38,1],[1,4.3,1.3,0],[1,5.4,1.35,0]].forEach((c,k)=>{
+       const o=isl[c[0]],th=c[1],rr=rAt(o,th)*c[2],X=o.x+Math.cos(th)*rr,Y=o.y+Math.sin(th)*rr;
+       const g=flam(!!c[3],k%3===1);g.position.set(X,0,-Y);g.rotation.y=[th+Math.PI+0.4,th+0.3,th+Math.PI/2][k%3];g.scale.setScalar(0.92+0.016*((k*37)%10));shoreG.add(g);});objSec(null);}
+}
 function revCospuObjekte(X) {
   const L = X.lage; if (!L || !L.lsc || !L.revier_aus_alt) return;
   const F = SHORE.fwd, Mx = L.revier_aus_alt.M, t0 = L.revier_aus_alt.t;
@@ -921,13 +966,13 @@ function revCospuObjekte(X) {
   /* Wald hinter dem LSC (wie im Original: ca. 1100 Bäume, Lücke am Gelände, dichter nahe Ufer) */
   try {
     const od = LSC_REAL.od, ol0 = Math.hypot(odr[0], odr[1]) || 1, od2 = dirF(odr[0] / ol0, odr[1] / ol0), ol = Math.hypot(od2[0], od2[1]) || 1, ox = od2[0] / ol, oy = od2[1] / ol, tx = -oy, ty = ox;
-    const T1 = [], T2 = [], nl = S.gfx === 'niedrig' ? 550 : 1100;
+    const R = revRng(7117), rnd = (a, b) => a + (b - a) * R(), T1 = [], T2 = [], nl = S.gfx === 'niedrig' ? 550 : 1100;
     for (let k = 0; k < 7000 && T1.length + T2.length < nl; k++) {
-      const a = rnd(-170, 170), o = rnd(-170, 40); if (Math.abs(a) < 68 && o > -58) continue; if (Math.abs(a) < 68 && o < -58 && Math.random() < 0.25) continue;
+      const a = rnd(-170, 170), o = rnd(-170, 40); if (Math.abs(a) < 68 && o > -58) continue; if (Math.abs(a) < 68 && o < -58 && R() < 0.25) continue;
       const x = uf[0] + tx * a + ox * o, y = uf[1] + ty * a + oy * o; if (polyInside(ring, x, y) || polyDist(ring, x, y)[0] < 5) continue;
       const [E, N] = SHORE.realOf(x, y), y0 = revZ(E, N) + 0.35; if (y0 < 0.55 || revHafenMaske(E, N) >= 2 || revWegNah(E, N)) continue;
-      if (-o < 80) { const r = Math.random(); if (r < 0.5) T2.push([x, y0, y, rnd(8, 14)]); else if (r < 0.85) T1.push([x, y0, y, rnd(8, 14)]); else T2.push([x, y0, y, rnd(5, 9)]); }
-      else if (Math.random() < 0.15) T2.push([x, y0, y, rnd(10, 16)]); else T2.push([x, y0, y, rnd(15, 24)]);
+      if (-o < 80) { const r = R(); if (r < 0.5) T2.push([x, y0, y, rnd(8, 14)]); else if (r < 0.85) T1.push([x, y0, y, rnd(8, 14)]); else T2.push([x, y0, y, rnd(5, 9)]); }
+      else if (R() < 0.15) T2.push([x, y0, y, rnd(10, 16)]); else T2.push([x, y0, y, rnd(15, 24)]);
     }
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pp = new THREE.Vector3(), c = new THREE.Color(), fg = new THREE.Group();
     const im = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 6).translate(0, 0.5, 0), new THREE.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, T1.length));
@@ -943,6 +988,25 @@ function revCospuObjekte(X) {
   } catch (e) { console.error('LSC-Wald', e); }
   SHORE.altF = (a, b) => { const r = alt2rev(a, b); return F(r[0], r[1]); }; SHORE.altLsc = L.lsc.alt;
   try { horizon3D(ring); } catch (e) { console.error('Horizont', e); }
+  try { revInselBau(); } catch (e) { console.error('Inseln', e); }
+  /* Stege am LSC bis zum echten Ufer verlängern (Ufer liegt hier etwas anders als im alten Polygon) */
+  try {
+    const pl = SHORE.lsc && SHORE.lsc.piers || [], holz = new THREE.MeshLambertMaterial({ color: '#8b7458' }), extra = [];
+    for (const q of pl.slice()) {
+      if (!Array.isArray(q) || q[4] < 1.1 || q[5] === '#7fc49a') continue;
+      for (const [ex, ey, fx, fy] of [[q[0], q[1], q[2], q[3]], [q[2], q[3], q[0], q[1]]]) {
+        const L = Math.hypot(ex - fx, ey - fy) || 1, ux = (ex - fx) / L, uy = (ey - fy) / L;
+        if (!polyInside(ring, ex, ey)) continue;                 /* Ende liegt schon an Land */
+        let t = 0; for (; t <= 30; t += 0.25) if (!polyInside(ring, ex + ux * t, ey + uy * t)) break;
+        if (t > 30 || t < 0.3) continue;
+        t += 1.2; const w = q[4], m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.22, t), holz);
+        m.position.set(ex + ux * t / 2, 1.15, -(ey + uy * t / 2)); m.rotation.y = Math.atan2(ux, -uy); shoreG.add(m);
+        extra.push({ ax: ex, ay: ey, bx: ex + ux * t, by: ey + uy * t, r: w / 2 + 0.05, name: 'Steg', pier: true });
+        break;
+      }
+    }
+    for (const o of extra) SHORE.lsc.obst.push(o);
+  } catch (e) { console.error('Stegverlängerung', e); }
   /* Hafen Zöbigker + Steg Nordufer nach Aufmaß */
   const O = L.objekte || {}, dk = new THREE.MeshLambertMaterial({ color: '#8a7a63' }), hull = new THREE.MeshLambertMaterial({ color: '#e8e8e4' });
   SHORE.piersX = objArr([], 'pier'); SHORE.zobst = objArr([], 'obst');
@@ -1024,14 +1088,15 @@ function revChunkBuild(c, step) {
 }
 /* Bäume und Häuser einer Kachel (nur in der Nähe) */
 function revScenBuild(t) {
+  const R_ = revRng(((t.i1 | 0) * 73856093) ^ ((t.j1 | 0) * 19349663) ^ 0x5bd1), rnd = (a, b) => a + (b - a) * R_();
   const X = REVX, F = SHORE.fwd, cs = X.cs, lo = S.gfx === 'niedrig', grp = new THREE.Group();
   const cap = lo ? 2200 : 7000, pts = [];
   for (let j = 0; j < t.ky; j++) for (let i = 0; i < t.kx; i++) {
     const k = j * t.kx + i, lu = t.lu[k]; if (lu !== 1 && lu !== 6) continue; if (t.cd[k] > (lo ? 14 : 24) || t.z[k] < 80) continue;
     const nn = lu === 1 ? (t.cd[k] < 6 ? 3 : 2) : 1;
-    for (let q = 0; q < nn; q++) pts.push([(t.i1 + i + Math.random()) * cs, X.H - (t.j1 + j + Math.random()) * cs, lu]);
+    for (let q = 0; q < nn; q++) pts.push([(t.i1 + i + R_()) * cs, X.H - (t.j1 + j + R_()) * cs, lu]);
   }
-  for (let a = pts.length - 1; a > 0; a--) { const b = Math.floor(Math.random() * (a + 1)); const tt = pts[a]; pts[a] = pts[b]; pts[b] = tt; }
+  for (let a = pts.length - 1; a > 0; a--) { const b = Math.floor(R_() * (a + 1)); const tt = pts[a]; pts[a] = pts[b]; pts[b] = tt; }
   const use = pts.slice(0, cap);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
   if (use.length) {
@@ -2223,6 +2288,16 @@ function revBrueckenBuild() {
       const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lv, 3)); grp.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#f4f6f8' })));
       for (let i = i0; i <= i1; i++) if (b.nass[i] && hArr[i] - 3.2 < 14) for (let o = -8; o <= 8; o += 2) solid(P[i][0] - dir[i][1] * o, P[i][1] + dir[i][0] * o);
       for (let sv = sb + 20; sv < se; sv += 36) { const q = at(sv), ii = q.i; for (const o of [-6.8, 6.8]) { const p = sc(q.E - q.d[1] * o, q.N + q.d[0] * o); lampe(p[0], hArr[ii] + 9, p[1], 9); } }
+    } else if (b.art === 'bogen') {
+      /* A 38: Fahrbahnplatte (beide Richtungsfahrbahnen) auf Höhe der Talränder; Bögen kommen aus revBogen() */
+      vmax = 33; spur = 7.5; hwStr = 15;
+      const hE = Math.max(grund(P[0][0], P[0][1]), grund(P[n - 1][0], P[n - 1][1])) + 0.6;
+      for (let i = 0; i < n; i++) { hArr[i] = hE; deck[i] = 1; }
+      band(0, n - 1, i => hArr[i], 15, 1.9, '#55585d', '#9a9fa4', '#6e7378');
+      band(0, n - 1, i => hArr[i] + 0.55, 0.18, 0.5, '#b9bdc1', '#b9bdc1', '#b9bdc1', 0.4, 15);
+      band(0, n - 1, i => hArr[i] + 0.55, 0.18, 0.5, '#b9bdc1', '#b9bdc1', '#b9bdc1', 0.4, -15);
+      markierung(0, n - 1, hArr, 15);
+      for (let sv = 4; sv < s[n - 1]; sv += 30) { const q = at(sv); for (const o of [-15, 15]) { const p = sc(q.E - q.d[1] * o, q.N + q.d[0] * o); lampe(p[0], hArr[q.i] + 9, p[1], 9); } }
     } else {
       /* Niedrige Brücken mit Klappe: Rügendamm (zwei Flügel, Ziegelgraben) und Wolgast (eine Wippe) */
       const H = b.hoehe || 6, kl = b.klappe, wippe = kl && kl.art === 'wippe', hwD = wippe ? 9.5 : 6.5;
@@ -4028,7 +4103,7 @@ const SCHEMA=[
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
-  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 8'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 10'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
   {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
   {k:'bruecke',label:'Klappbrücken (Ziegelgraben, Wolgast)',type:'select',options:[['echt','Öffnen zu den echten Zeiten'],['offen','Immer offen']],hint:'Ziegelgrabenbrücke im Rügendamm: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 Uhr je 20 min. Peenebrücke Wolgast: 5:45, 7:45, 12:45, 17:45, 20:45 Uhr je 15 min, Juni–September auch 23:45 Uhr. Es zählt die Uhrzeit deines Geräts. Unter der Rügenbrücke passt du mit 42 m immer durch – die Klappe daneben musst du abwarten. Autos halten vor der offenen Klappe.'},
   {k:'schiffsverkehr',label:'Schiffsverkehr',type:'select',options:[['an','Fähren, Ausflugsschiffe und Kutter fahren'],['aus','Alle bleiben im Hafen']],hint:'Hiddensee-Fähre Schaprode–Vitte, Ausflugsschiff Sassnitz–Königsstuhl, Bäderschiff Binz–Sellin und ein Fischkutter aus Sassnitz. Sie weichen Regattabahnen aus und warten vor Start und Ziel einer laufenden Regatta – nach den Ausweichregeln musst du ihnen aber trotzdem Platz lassen.'},
