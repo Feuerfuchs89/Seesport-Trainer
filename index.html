@@ -2187,6 +2187,16 @@ function revCarLightMat() {
   return REV_CARLIGHT;
 }
 /* A38-Bogenbrücke „Neue Harth“ (drei rote Stahlbögen) auf die OSM-Brücke setzen */
+/* Fahrbahnhöhe einer Dammbrücke: Dammkrone 20–45 m hinter den Brückenenden (nicht das Tal an den Enden) */
+function revDeckH(P, n, grund) {
+  let m = -1e9;
+  for (const [i, j] of [[0, 1], [n - 1, n - 2]]) {
+    const dx = P[i][0] - P[j][0], dy = P[i][1] - P[j][1], L = Math.hypot(dx, dy) || 1;
+    for (const t of [14, 24, 34, 44]) m = Math.max(m, grund(P[i][0] + dx / L * t, P[i][1] + dy / L * t));
+    m = Math.max(m, grund(P[i][0], P[i][1]));
+  }
+  return m;
+}
 function revBogen(grp, M, sc, cands) {
   const m0 = Math.min(...cands.map(c => c.bd)), cs = cands.filter(c => c.bd < m0 + 70);
   let E = 0, N = 0, dx = 0, dy = 0, h = 0; const d0 = cs[0].d;
@@ -2292,7 +2302,7 @@ function revBrueckenBuild() {
     } else if (b.art === 'platte') {
       /* Autobahnbrücke (Beton) über Tal/Straße/Fluss: Fahrbahnplatte auf Höhe der Dammkrone an den Enden, Pfeiler, Leitplanken */
       vmax = 33; spur = 6; const hw = b.hw || 14; hwStr = hw;
-      const hE = Math.max(grund(P[0][0], P[0][1]), grund(P[n - 1][0], P[n - 1][1])) + 0.3;
+      const hE = revDeckH(P, n, grund) + 0.15;
       for (let i = 0; i < n; i++) { hArr[i] = hE; deck[i] = 1; }
       band(0, n - 1, i => hArr[i], hw, 2.4, '#55585d', '#a3a7aa', '#7b7f83');
       band(0, n - 1, i => hArr[i] + 0.55, 0.18, 0.5, '#b9bdc1', '#b9bdc1', '#b9bdc1', 0.4, hw);
@@ -2302,7 +2312,7 @@ function revBrueckenBuild() {
     } else if (b.art === 'bogen') {
       /* A 38: Fahrbahnplatte (beide Richtungsfahrbahnen) auf Höhe der Talränder; Bögen kommen aus revBogen() */
       vmax = 33; spur = 7.5; hwStr = 15;
-      const hE = Math.max(grund(P[0][0], P[0][1]), grund(P[n - 1][0], P[n - 1][1])) + 0.6;
+      const hE = revDeckH(P, n, grund) + 0.15;
       for (let i = 0; i < n; i++) { hArr[i] = hE; deck[i] = 1; }
       band(0, n - 1, i => hArr[i], 15, 1.9, '#55585d', '#9a9fa4', '#6e7378');
       band(0, n - 1, i => hArr[i] + 0.55, 0.18, 0.5, '#b9bdc1', '#b9bdc1', '#b9bdc1', 0.4, 15);
@@ -4115,7 +4125,7 @@ const SCHEMA=[
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
-  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 12'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 13'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
   {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
   {k:'bruecke',label:'Klappbrücken (Ziegelgraben, Wolgast)',type:'select',options:[['echt','Öffnen zu den echten Zeiten'],['offen','Immer offen']],hint:'Ziegelgrabenbrücke im Rügendamm: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 Uhr je 20 min. Peenebrücke Wolgast: 5:45, 7:45, 12:45, 17:45, 20:45 Uhr je 15 min, Juni–September auch 23:45 Uhr. Es zählt die Uhrzeit deines Geräts. Unter der Rügenbrücke passt du mit 42 m immer durch – die Klappe daneben musst du abwarten. Autos halten vor der offenen Klappe.'},
   {k:'schiffsverkehr',label:'Schiffsverkehr',type:'select',options:[['an','Fähren, Ausflugsschiffe und Kutter fahren'],['aus','Alle bleiben im Hafen']],hint:'Hiddensee-Fähre Schaprode–Vitte, Ausflugsschiff Sassnitz–Königsstuhl, Bäderschiff Binz–Sellin und ein Fischkutter aus Sassnitz. Sie weichen Regattabahnen aus und warten vor Start und Ziel einer laufenden Regatta – nach den Ausweichregeln musst du ihnen aber trotzdem Platz lassen.'},
