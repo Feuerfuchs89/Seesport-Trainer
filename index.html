@@ -604,10 +604,11 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
 <div id="mpOv" class="overlay" hidden>
   <div class="card narrow">
     <h2>Mehrspieler</h2>
-    <p class="lede" style="margin-top:4px">Alle öffnen dieselbe Seite und geben denselben Raumcode ein. Die Wettfahrtleitung stellt Bootsklasse, Wind und Bahn vorher im Hauptmenü ein und startet das Rennen. Die Browser verbinden sich direkt miteinander (WebRTC), ein eigener Server ist nicht nötig.</p>
+    <p class="lede" style="margin-top:4px">Alle öffnen dieselbe Seite und geben denselben Raumcode ein. Die Wettfahrtleitung stellt Bootsklasse, Wind und Bahn vorher im Hauptmenü ein und startet das Rennen. Verbunden wird über den Vereinsserver (Raspberry Pi). Ist er nicht erreichbar, verbinden sich die Browser direkt miteinander (WebRTC).</p>
     <div class="mpform">
       <div class="row"><label for="mpName">Bootsname</label><input type="text" id="mpName" maxlength="14"></div>
       <div class="row"><label for="mpRoom">Raumcode</label><input type="text" id="mpRoom" maxlength="16"></div>
+      <div class="row"><label for="mpServer">Vereinsserver</label><input type="text" id="mpServer" maxlength="120" placeholder="leer = Direktverbindung" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
       <div class="row"><label for="mpRole">Rolle</label><select id="mpRole"><option value="join">Mitsegeln</option><option value="host">Wettfahrtleitung (startet)</option><option value="coach">Trainer (zuschauen)</option></select></div>
       <div class="row mphost"><label for="mpFan">Kursfächer für alle erlaubt</label><input type="checkbox" id="mpFan" checked></div>
       <div class="row mphost"><label for="mpRib">Wettfahrtleitung fährt Schlauchboot</label><input type="checkbox" id="mpRib" checked></div>
@@ -754,7 +755,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
    Grundberührung nach Tiefgang der Bootsklasse. KEINE Navigationskarte.
    ===================================================================== */
 var REV_BASES = ['../See-Editor/', ''];           /* erst die See-Editor-Seite, dann der eigene Ordner */
-var REVIERE_K = { ruegen: { datei: 'ruegen-spiel.json', name: 'Rügen · Bodden · Peenestrom' }, usedom: { datei: 'usedom-spiel.json', name: 'Usedom · Haff · Peenestrom' }, rostock: { datei: 'rostock-spiel.json', name: 'Rostock · Warnemünde' }, cospu_neu: { datei: 'cospu-spiel.json', lage: 'cospu-lage.json', name: 'Cospudener See · echte Daten (neu)' }, lehalle: { datei: 'lehalle-spiel.json', name: 'Leipzig–Halle · alle Seen, Flüsse, Auwald' } };
+var REVIERE_K = { ruegen: { datei: 'ruegen-spiel.json', name: 'Rügen · Bodden · Peenestrom' }, usedom: { datei: 'usedom-spiel.json', name: 'Usedom · Haff · Peenestrom' }, rostock: { datei: 'rostock-spiel.json', name: 'Rostock · Warnemünde' }, cospu_neu: { datei: 'cospu-spiel.json', lage: 'cospu-lage.json', name: 'Cospudener See · echte Daten (neu)' } };
 var REVX = null, REVH = null, REVH_LOAD = null, REVH_ERR = null;
 var REV_DRAFT = { gorchfock: 4.8, jolle: 1.0, opti: 0.75, topcat: 0.7, viking: 1.0, imoca: 4.5, zk10: 1.0, ixylon: 0.9, k6: 0.9, moth: 1.0 };
 var REV_ORIG_ALT = { hiddensee: [366520, 6016000] };  /* Strecken aus der ersten Hiddensee-Version umrechnen */
@@ -884,7 +885,7 @@ function revBuild() {
   try { MZ_MIN = 0.01; } catch (e) {}
   X.chunks = new Map(); X.scen = new Map(); X.lastE = null;
   X.matT = new THREE.MeshLambertMaterial({ vertexColors: true });
-  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null; X.brGrp = null; X.verkehr = null; X.brSkip = null; X.brSkipM = null; X.nv = null; X.rad = null; X.wGrid = null; X.zug = null;
+  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null; X.brGrp = null; X.verkehr = null; X.brSkip = null; X.nv = null; X.rad = null; X.wGrid = null; X.zug = null;
   X.haefen = (X.idx.haefen || []).map(h => Object.assign({}, h, { st: null, z: null, m: null, teile: null, grp: null }));
   revStrLoad(); revSchiffeInit();
   try { revTuerme(); } catch (e) { console.error('Leuchttürme', e); }
@@ -2187,23 +2188,13 @@ function revCarLightMat() {
   return REV_CARLIGHT;
 }
 /* A38-Bogenbrücke „Neue Harth“ (drei rote Stahlbögen) auf die OSM-Brücke setzen */
-/* Fahrbahnhöhe einer Dammbrücke: Dammkrone 20–45 m hinter den Brückenenden (nicht das Tal an den Enden) */
-function revDeckH(P, n, grund) {
-  let m = -1e9;
-  for (const [i, j] of [[0, 1], [n - 1, n - 2]]) {
-    const dx = P[i][0] - P[j][0], dy = P[i][1] - P[j][1], L = Math.hypot(dx, dy) || 1;
-    for (const t of [14, 24, 34, 44]) m = Math.max(m, grund(P[i][0] + dx / L * t, P[i][1] + dy / L * t));
-    m = Math.max(m, grund(P[i][0], P[i][1]));
-  }
-  return m;
-}
 function revBogen(grp, M, sc, cands) {
   const m0 = Math.min(...cands.map(c => c.bd)), cs = cands.filter(c => c.bd < m0 + 70);
   let E = 0, N = 0, dx = 0, dy = 0, h = 0; const d0 = cs[0].d;
   for (const c of cs) { const sg = (c.d[0] * d0[0] + c.d[1] * d0[1]) < 0 ? -1 : 1; E += c.E; N += c.N; dx += c.d[0] * sg; dy += c.d[1] * sg; h += c.h; }
   E /= cs.length; N /= cs.length; h /= cs.length; const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
-  const SPAN = cs[0].span || 62, RISE = 19, HS = SPAN / 2, W = cs.length > 1 ? Math.max(15, Math.min(22, Math.hypot(cs[0].E - cs[1].E, cs[0].N - cs[1].N) / 2 + 8)) : 15;
-  const g = new THREE.Group(), p = sc(E, N), p2 = sc(E + dx * 10, N + dy * 10); g.position.set(p[0], 0, p[1]); g.rotation.y = Math.atan2(-(p2[1] - p[1]), p2[0] - p[0]);
+  const SPAN = 62, RISE = 19, HS = SPAN / 2, W = cs.length > 1 ? Math.max(15, Math.min(22, Math.hypot(cs[0].E - cs[1].E, cs[0].N - cs[1].N) / 2 + 8)) : 15;
+  const g = new THREE.Group(), p = sc(E, N); g.position.set(p[0], 0, p[1]); g.rotation.y = Math.atan2(dy, dx);
   const red = M('#b4484f', 0.3), hang = M('#d9d3b0', 0.3);
   const box = (w, hh, d, x, y, z, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(d, hh, w), m); b.position.set(x, y, z); g.add(b); };
   for (const z of [-W, W]) box(0.8, 1.7, SPAN, 0, h - 0.85, z, red);
@@ -2299,20 +2290,10 @@ function revBrueckenBuild() {
       const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lv, 3)); grp.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#f4f6f8' })));
       for (let i = i0; i <= i1; i++) if (b.nass[i] && hArr[i] - 3.2 < 14) for (let o = -8; o <= 8; o += 2) solid(P[i][0] - dir[i][1] * o, P[i][1] + dir[i][0] * o);
       for (let sv = sb + 20; sv < se; sv += 36) { const q = at(sv), ii = q.i; for (const o of [-6.8, 6.8]) { const p = sc(q.E - q.d[1] * o, q.N + q.d[0] * o); lampe(p[0], hArr[ii] + 9, p[1], 9); } }
-    } else if (b.art === 'platte') {
-      /* Autobahnbrücke (Beton) über Tal/Straße/Fluss: Fahrbahnplatte auf Höhe der Dammkrone an den Enden, Pfeiler, Leitplanken */
-      vmax = 33; spur = 6; const hw = b.hw || 14; hwStr = hw;
-      const hE = revDeckH(P, n, grund) + 0.15;
-      for (let i = 0; i < n; i++) { hArr[i] = hE; deck[i] = 1; }
-      band(0, n - 1, i => hArr[i], hw, 2.4, '#55585d', '#a3a7aa', '#7b7f83');
-      band(0, n - 1, i => hArr[i] + 0.55, 0.18, 0.5, '#b9bdc1', '#b9bdc1', '#b9bdc1', 0.4, hw);
-      band(0, n - 1, i => hArr[i] + 0.55, 0.18, 0.5, '#b9bdc1', '#b9bdc1', '#b9bdc1', 0.4, -hw);
-      markierung(0, n - 1, hArr, hw);
-      for (let sv = 22; sv < s[n - 1] - 12; sv += 26) { const q = at(sv); saeulen.push([q.E, q.N, 0, Math.min(grund(q.E, q.N), hE - 1) - 0.5, hE - 2.3, q.d, hw * 1.7]); }
     } else if (b.art === 'bogen') {
       /* A 38: Fahrbahnplatte (beide Richtungsfahrbahnen) auf Höhe der Talränder; Bögen kommen aus revBogen() */
       vmax = 33; spur = 7.5; hwStr = 15;
-      const hE = revDeckH(P, n, grund) + 0.15;
+      const hE = Math.max(grund(P[0][0], P[0][1]), grund(P[n - 1][0], P[n - 1][1])) + 0.6;
       for (let i = 0; i < n; i++) { hArr[i] = hE; deck[i] = 1; }
       band(0, n - 1, i => hArr[i], 15, 1.9, '#55585d', '#9a9fa4', '#6e7378');
       band(0, n - 1, i => hArr[i] + 0.55, 0.18, 0.5, '#b9bdc1', '#b9bdc1', '#b9bdc1', 0.4, 15);
@@ -2431,8 +2412,8 @@ function revBrueckenBuild() {
     if (pfosten.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pfosten, 3)); grp.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: '#f4f4f0' }))); }
     if (dalben.length) { const cg = new THREE.CylinderGeometry(0.85, 0.85, 1, 12); cg.translate(0, 0.5, 0); const im = new THREE.InstancedMesh(cg, M('#23262a', 0.1), dalben.length), ik = new THREE.InstancedMesh(cg, M('#f2f2ee', 0.6), dalben.length), m4 = new THREE.Matrix4();
       dalben.forEach((q, i) => { const p = sc(q[0], q[1]); m4.makeScale(1, 6.5, 1).setPosition(p[0], -3, p[1]); im.setMatrixAt(i, m4); m4.makeScale(1.04, 0.9, 1.04).setPosition(p[0], 3.5, p[1]); ik.setMatrixAt(i, m4); }); im.frustumCulled = ik.frustumCulled = false; grp.add(im, ik); }
-    const SKS = (b.art === 'bogen' || b.art === 'platte') ? (X.brSkipM || (X.brSkipM = new Set())) : (X.brSkip || (X.brSkip = new Set())); for (const q of P) for (let a = -1; a <= 1; a++) for (let c2 = -1; c2 <= 1; c2++) SKS.add((Math.floor(q[0] / 16) + a) + ',' + (Math.floor(q[1] / 16) + c2));
-    if (X.bogenPt) { let bi = -1, bd = 1e9; for (let i = 0; i < n; i++) { const dd = Math.hypot(P[i][0] - X.bogenPt[0], P[i][1] - X.bogenPt[1]); if (dd < bd) { bd = dd; bi = i; } } if (b.art === 'bogen') { bi = (n - 1) >> 1; bd = 0; } if (bi >= 0 && bd < 160) X.bogenCand.push({ E: P[bi][0], N: P[bi][1], d: dir[bi], h: hArr[bi], bd, span: b.art === 'bogen' ? Math.max(40, Math.min(75, (b.laenge || 82) - 22)) : 62 }); }
+    if (!X.brSkip) X.brSkip = new Set(); for (const q of P) for (let a = -1; a <= 1; a++) for (let c2 = -1; c2 <= 1; c2++) X.brSkip.add((Math.floor(q[0] / 16) + a) + ',' + (Math.floor(q[1] / 16) + c2));
+    if (X.bogenPt) { let bi = -1, bd = 1e9; for (let i = 0; i < n; i++) { const dd = Math.hypot(P[i][0] - X.bogenPt[0], P[i][1] - X.bogenPt[1]); if (dd < bd) { bd = dd; bi = i; } } if (bi >= 0 && bd < 160) X.bogenCand.push({ E: P[bi][0], N: P[bi][1], d: dir[bi], h: hArr[bi], bd }); }
     X.strassen.push({ name: b.n, P, s, dir, h: hArr, L: s[n - 1], vmax, spur, klappen: X.klappen.filter(k => k.strasse === X.strassen.length) });
   }
   if (X.bogenCand && X.bogenCand.length) { try { revBogen(grp, M, sc, X.bogenCand); } catch (e) { console.error('Bogenbrücke', e); } }
@@ -2556,7 +2537,6 @@ var REV_STR = {               /* Breite, Farbe, Markierung (0 keine, 1 Mitte, 2 
   cycleway: [3.2, '#7a7c7f', 0], path: [2.4, '#b3a583', 0], track: [3.6, '#a19474', 0], footway: [2.2, '#b8aa8a', 0]
 };
 var REV_RAD = { cycleway: 1, path: 1, track: 1, footway: 1 };
-function revSkipAny(k) { const X = REVX; return !!((X.brSkip && X.brSkip.has(k)) || (X.brSkipM && X.brSkipM.has(k))); }
 function revWegNah(E, N) {
   const X = REVX; if (!X || !X.netz) return false;
   if (!X.wGrid) {
@@ -2584,7 +2564,7 @@ function revStrLoad() {
 function revStrZelle(ci, cj) {
   const X = REVX, N_ = X.netz, F = SHORE.fwd, C = N_.C, x0 = ci * C, y0 = cj * C, x1 = x0 + C, y1 = y0 + C, grp = new THREE.Group();
   const v = [], col = [], ix = [], mv = [], sv = [], lampen = [], masten = [], tmp = new THREE.Color();
-  const skip = X.brSkip || new Set(), skipM = X.brSkipM || new Set();
+  const skip = X.brSkip || new Set();
   const sc = (E, N) => { const q = F(E, N); return [q[0], -q[1]]; };
   for (const wi of N_.cells.get(ci + ',' + cj) || []) {
     const w = N_.wege[wi], kl = N_.kl[w[0]], D = REV_STR[kl]; if (!D) continue;
@@ -2595,7 +2575,7 @@ function revStrZelle(ci, cj) {
       const ax = w[k], ay = w[k + 1], bx = w[k + 2], by = w[k + 3], L = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(L / 10));
       for (let s = (k === 1 ? 0 : 1); s <= n; s++) P.push([ax + (bx - ax) * s / n, ay + (by - ay) * s / n]);
     }
-    const drin = q => q[0] >= x0 - 10 && q[0] < x1 + 10 && q[1] >= y0 - 10 && q[1] < y1 + 10 && !skip.has(Math.floor(q[0] / 16) + ',' + Math.floor(q[1] / 16)) && !((kl === 'motorway' || kl === 'trunk') && skipM.has(Math.floor(q[0] / 16) + ',' + Math.floor(q[1] / 16))) && revZ(q[0], q[1]) > -2.5;
+    const drin = q => q[0] >= x0 - 10 && q[0] < x1 + 10 && q[1] >= y0 - 10 && q[1] < y1 + 10 && !skip.has(Math.floor(q[0] / 16) + ',' + Math.floor(q[1] / 16)) && revZ(q[0], q[1]) > -2.5;
     let run = [];
     const flush = () => {
       if (run.length >= 2) {
@@ -2718,15 +2698,24 @@ function revGfGruppe() {
   g.traverse(o => { o.userData.sznSkip = 1; });
   g.userData.segel = segel; return g;
 }
+/* Höchstes Gebäude je Geländezelle (aus den Häusern der Kachel, einmal pro Kachel berechnet) – für die Windabdeckung */
+function revGebH(gi, gj) {
+  const X = REVX; if (gi < 0 || gj < 0 || gi >= X.nx || gj >= X.ny) return 0;
+  const t = X.tiles.get(((gi / X.T) | 0) + ',' + ((gj / X.T) | 0)); if (!t || t.st !== 'da' || !t.hs) return 0;
+  if (!t.bh) { const cs = X.cs, b = new Uint8Array(t.kx * t.ky), h6 = t.hs;
+    for (let k = 0; k + 5 < h6.length; k += 6) { const i = Math.floor(h6[k] / cs), j = t.ky - 1 - Math.floor(h6[k + 1] / cs); if (i < 0 || j < 0 || i >= t.kx || j >= t.ky) continue; const c = j * t.kx + i, hh = Math.min(255, Math.round(h6[k + 5] / 10)); if (hh > b[c]) b[c] = hh; }
+    t.bh = b; }
+  return t.bh[(gj - t.j1) * t.kx + (gi - t.i1)];
+}
 /* Wind unter Land: Abdeckung hinter Steilufer, Wald und Stadt, Dreher an der Küste, Düse an Kaps.
    Abdeckung reicht etwa 20-mal so weit wie das Hindernis hoch ist; im Windschatten wird der Wind böig und dreht. */
 var REV_WL = { key: '', map: new Map() };
 function revWindLand(x, y, W0) {
   const X = REVX; if (!X || !X.idx) return null;
-  const kk = Math.round(W0) + '|' + (S.windFrom || 0); if (REV_WL.key !== kk || REV_WL.map.size > 40000) { REV_WL.key = kk; REV_WL.map.clear(); }
+  const kk = Math.round(W0) + '|' + (S.windFrom || 0) + '|' + (X.tileVer || 0); if (REV_WL.key !== kk || REV_WL.map.size > 60000) { REV_WL.key = kk; REV_WL.map.clear(); }
   const ck = Math.round(x / 30) + ',' + Math.round(y / 30); let r = REV_WL.map.get(ck); if (r !== undefined) return r;
   const uw = dirv(W0), lat = [uw[1], -uw[0]];
-  const hoehe = (gx, gy) => { const q = SHORE.realOf(gx, gy), z = revZ(q[0], q[1]); if (z <= 0.3) return 0; const lu = revCellLu(Math.floor(q[0] / X.cs), Math.floor((X.H - q[1]) / X.cs)); return z + (lu === 1 ? 9 : lu === 2 ? 7 : lu === 6 ? 3 : 1); };
+  const hoehe = (gx, gy) => { const q = SHORE.realOf(gx, gy), z = revZ(q[0], q[1]); if (z <= 0.3) return 0; const gi = Math.floor(q[0] / X.cs), gj = Math.floor((X.H - q[1]) / X.cs), lu = revCellLu(gi, gj); return z + Math.max(revGebH(gi, gj), lu === 1 ? 14 : lu === 2 ? 7 : lu === 6 ? 4 : lu === 5 ? 1.5 : 0.8); };
   let sh = 0, land = 1e9;
   for (let t = 15; t < 2200; t += t < 200 ? 15 : t < 800 ? 40 : 100) {
     const h = hoehe(x + uw[0] * t, y + uw[1] * t); if (h <= 0) continue;
@@ -3149,7 +3138,7 @@ function revNvSpawn(E, N) {
     const n = (w.length - 1) / 2; if (n < 2) continue;
     const i = Math.floor(Math.random() * (n - 1)), x = w[1 + 2 * i], y = w[2 + 2 * i];
     if (Math.hypot(x - E, y - N) > 3500 || Math.hypot(x - E, y - N) < 250) continue;
-    if (revSkipAny(Math.floor(x / 16) + ',' + Math.floor(y / 16))) continue;
+    if (X.brSkip && X.brSkip.has(Math.floor(x / 16) + ',' + Math.floor(y / 16))) continue;
     const d = Math.random() < 0.5 ? 1 : -1;
     return { wi, i: d > 0 ? i : i + 1, d, f: 0, v: REV_NV_V[kl] * (0.8 + Math.random() * 0.25), lkw: Math.random() < 0.1 };
   }
@@ -3190,7 +3179,7 @@ function revRadTick(E0, N0) {
     }
     const j = Math.max(0, Math.min(n - 1, a.i + a.d)), ax = w[1 + 2 * a.i], ay = w[2 + 2 * a.i], bx = w[1 + 2 * j], by = w[2 + 2 * j], L = Math.hypot(bx - ax, by - ay) || 1;
     const dx = (bx - ax) / L, dy = (by - ay) / L, E = ax + (bx - ax) * a.f + dy * 0.5, N = ay + (by - ay) * a.f - dx * 0.5;
-    if (Math.hypot(E - E0, N - N0) > 2600 || revSkipAny(Math.floor(E / 16) + ',' + Math.floor(N / 16))) { R.cars.splice(ci, 1); continue; }
+    if (Math.hypot(E - E0, N - N0) > 2600 || (X.brSkip && X.brSkip.has(Math.floor(E / 16) + ',' + Math.floor(N / 16)))) { R.cars.splice(ci, 1); continue; }
     const z = revZ(E, N); if (z < 0.3) continue;
     const p0 = F(E, N), p1 = F(E + dx, N + dy); q.setFromAxisAngle(up, Math.atan2(p1[0] - p0[0], -(p1[1] - p0[1]))); pv.set(p0[0], z + 0.42, -p0[1]); m4.compose(pv, q, sv);
     R.bike.setMatrixAt(k, m4); R.body.setMatrixAt(k, m4); R.head.setMatrixAt(k, m4); k++;
@@ -3223,7 +3212,7 @@ function revNvTick(E0, N0) {
       const j = Math.max(0, Math.min(n - 1, a.i + a.d)), ax = w[1 + 2 * a.i], ay = w[2 + 2 * a.i], bx = w[1 + 2 * j], by = w[2 + 2 * j], L = Math.hypot(bx - ax, by - ay) || 1;
       const dx = (bx - ax) / L, dy = (by - ay) / L, kl = N_.kl[w[0]], off = (REV_STR[kl] ? REV_STR[kl][0] : 6) * 0.22;
       const E = ax + (bx - ax) * a.f + dy * off, N = ay + (by - ay) * a.f - dx * off;
-      if (Math.hypot(E - E0, N - N0) > 4200 || revSkipAny(Math.floor(E / 16) + ',' + Math.floor(N / 16))) weg = true;
+      if (Math.hypot(E - E0, N - N0) > 4200 || (X.brSkip && X.brSkip.has(Math.floor(E / 16) + ',' + Math.floor(N / 16)))) weg = true;
       else {
         const z = revZ(E, N); if (z < -2.5) continue;   /* im Tunnel */
         const h = z < 0.2 ? 1.8 : z + 0.42, p0 = F(E, N), p1 = F(E + dx, N + dy), fx = p1[0] - p0[0], fz = -(p1[1] - p0[1]);
@@ -4087,7 +4076,7 @@ RIGS.gorchfock = RIGS.viking; HSHAPE.gorchfock = HSHAPE.viking;
 const RIG=()=>RIGS[CL.key];
 
 /* ================= Einstellungen ================= */
-const DEFAULTS={tws:10,shiftAmp:8,shiftPeriod:70,puffs:2,puffStrength:25,dirtyAir:true,waveH:0,legLength:450,laps:2,startTime:60,zone:3,
+const DEFAULTS={tws:10,shiftAmp:8,shiftPeriod:70,puffs:2,puffStrength:25,dirtyAir:true,landAbdeckung:true,abdeckKarte:'aus',waveH:0,legLength:450,laps:2,startTime:60,zone:3,
   boatClass:'jolle',sailNo:'GER 1',headsail:'fock',autoTrim:true,gameSpeed:1.5,laylines:true,showZone:true,roundArrow:true,vectors:true,cpuCount:6,lineScale:100,cpuSkill:1,
   rules:true,cpuCalm:true,markRules:true,markTouch:true,ocs:true,penaltyMode:'one',allMsgs:false,gfx:isTouch?'mittel':'hoch',courseType:'wl',finishUp:false,series:1,revier:'cospu_neu',revKurs:'bb',mapNord:'nord',mapTrack:false,ladder:true,count10:true,startSound:'horn',rowBoat:'zk10',courseFan:true,windFrom:225,rowDist:500,current:0,currentDir:'lee',coach:true,ghost:true,touchMode:'slider',wxCloud:25,wxPrecip:'none',wxUseWind:true,wxUseWx:true,wxUseTime:true,season:'auto'};
 let S=Object.assign({},DEFAULTS),S_main=null;
@@ -4106,7 +4095,9 @@ const SCHEMA=[
   {k:'shiftPeriod',label:'Dreher-Periode',min:20,max:180,step:5,unit:'s',hint:'Zeit für einen vollen Pendel-Dreher links–rechts–links'},
   {k:'puffs',label:'Böenfelder',type:'select',num:true,options:[[0,'keine'],[1,'wenige'],[2,'mittel'],[3,'viele']]},
   {k:'puffStrength',label:'Böen-Stärke',min:5,max:50,step:5,unit:'%'},
-  {k:'dirtyAir',label:'Abdeckung (Windschatten anderer Boote)',type:'check'}]},
+  {k:'dirtyAir',label:'Abdeckung (Windschatten anderer Boote)',type:'check'},
+  {k:'landAbdeckung',label:'Windabdeckung durch Ufer, Wald und Häuser',type:'check',hint:'Hinter Wald, Häusern und Steilufern ist der Wind schwächer und dreht, bis etwa zum 20-Fachen der Hindernishöhe. Aus: überall gleichmäßiger Wind ohne Störfelder am Ufer'},
+  {k:'abdeckKarte',label:'Abdeckungskarte',type:'select',options:[['aus','aus'],['karte','auf der Karte'],['wasser','auf Karte und Wasser']],hint:'Zeigt die Windabdeckung als Ampel: grün voller Wind, gelb abgeschwächt, rot Abdeckung. Berechnet aus Höhenprofil, Wald, Häusern und der Windrichtung'}]},
  {group:'Live-Wetter & Tageszeit',items:[
   {type:'button',label:'Live-Daten vom gewählten See',btn:'Laden',act:'liveWx',hint:'Holt Wind, Wolken, Niederschlag und die aktuelle Tageszeit (Sonnenstand) für das gewählte Revier: Cospudener See oder Rangsdorfer See (bei anderen Revieren den Cospudener See). Das Regattafeld richtet sich nach der echten Windrichtung aus. Dafür wird einmalig eine Anfrage an Open-Meteo gesendet.'},
   {k:'wxUseWind',label:'Wind übernehmen (Richtung, Stärke, Böen)',type:'check'},
@@ -4125,7 +4116,7 @@ const SCHEMA=[
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
-  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 14'],['lehalle','Leipzig–Halle · alle Seen, Elster, Luppe, Saale (neu, groß)'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 11'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
   {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
   {k:'bruecke',label:'Klappbrücken (Ziegelgraben, Wolgast)',type:'select',options:[['echt','Öffnen zu den echten Zeiten'],['offen','Immer offen']],hint:'Ziegelgrabenbrücke im Rügendamm: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 Uhr je 20 min. Peenebrücke Wolgast: 5:45, 7:45, 12:45, 17:45, 20:45 Uhr je 15 min, Juni–September auch 23:45 Uhr. Es zählt die Uhrzeit deines Geräts. Unter der Rügenbrücke passt du mit 42 m immer durch – die Klappe daneben musst du abwarten. Autos halten vor der offenen Klappe.'},
   {k:'schiffsverkehr',label:'Schiffsverkehr',type:'select',options:[['an','Fähren, Ausflugsschiffe und Kutter fahren'],['aus','Alle bleiben im Hafen']],hint:'Hiddensee-Fähre Schaprode–Vitte, Ausflugsschiff Sassnitz–Königsstuhl, Bäderschiff Binz–Sellin und ein Fischkutter aus Sassnitz. Sie weichen Regattabahnen aus und warten vor Start und Ziel einer laufenden Regatta – nach den Ausweichregeln musst du ihnen aber trotzdem Platz lassen.'},
@@ -4217,7 +4208,7 @@ const WX_TXT={none:'kein Niederschlag',r1:'leichter Regen',r2:'mäßiger Regen',
 const WX_COMP=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 const LIGHT_TXT={mittag:'Mittag',nachmittag:'Nachmittag',gold:'Goldene Stunde',daemmerung:'Dämmerung',nacht:'Nacht'};
 let wxBusy=false;
-function wxSite(){revMigrate();if(S.revier==='cospu_neu')return {lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};if(S.revier==='rostock')return {lat:54.18,lon:12.08,name:'Warnemünde'};if(S.revier==='lehalle')return {lat:51.36,lon:12.20,name:'Leipzig–Halle'};if(S.revier==='usedom'){const k=S.revKurs||'';if(/haff/.test(k))return {lat:53.78,lon:14.02,name:'Stettiner Haff'};if(/heringsdorf|gfu/.test(k))return {lat:53.98,lon:14.17,name:'Heringsdorf'};if(/achter/.test(k))return {lat:54.0,lon:13.97,name:'Achterwasser'};return {lat:54.1,lon:13.8,name:'Peenestrom'};}if(REVIERE_K[S.revier]){const k=S.revKurs||'bb';if(/bahn_gfs|bahn_pr/.test(k))return {lat:54.50,lon:13.66,name:'Sassnitz/Binz'};if(k==='bahn_gft')return {lat:54.62,lon:13.45,name:'Tromper Wiek'};if(k==='bahn_gb')return {lat:54.20,lon:13.55,name:'Greifswalder Bodden'};if(k==='bb'||k==='rund'||k==='bahn')return {lat:54.53,lon:13.10,name:'Hiddensee'};return {lat:54.42,lon:13.35,name:'Rügen'};}return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
+function wxSite(){revMigrate();if(S.revier==='cospu_neu')return {lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};if(S.revier==='rostock')return {lat:54.18,lon:12.08,name:'Warnemünde'};if(S.revier==='usedom'){const k=S.revKurs||'';if(/haff/.test(k))return {lat:53.78,lon:14.02,name:'Stettiner Haff'};if(/heringsdorf|gfu/.test(k))return {lat:53.98,lon:14.17,name:'Heringsdorf'};if(/achter/.test(k))return {lat:54.0,lon:13.97,name:'Achterwasser'};return {lat:54.1,lon:13.8,name:'Peenestrom'};}if(REVIERE_K[S.revier]){const k=S.revKurs||'bb';if(/bahn_gfs|bahn_pr/.test(k))return {lat:54.50,lon:13.66,name:'Sassnitz/Binz'};if(k==='bahn_gft')return {lat:54.62,lon:13.45,name:'Tromper Wiek'};if(k==='bahn_gb')return {lat:54.20,lon:13.55,name:'Greifswalder Bodden'};if(k==='bb'||k==='rund'||k==='bahn')return {lat:54.53,lon:13.10,name:'Hiddensee'};return {lat:54.42,lon:13.35,name:'Rügen'};}return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
 async function loadLiveWx(){if(wxBusy)return;wxBusy=true;const say=t=>{S.wxInfo=t;const st=document.getElementById('wxStatus');if(st)st.textContent=t;saveS();};
   try{say('Lade Live-Daten …');const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),9000);
     if(S.revier!=='rangs'&&S.revier!=='cospu'&&!REVIERE_K[S.revier]&&!(G&&G.running&&!G.over))S.revier='cospu';const site=wxSite();const r=await fetch(WX_URL.replace('latitude='+WX_LAT,'latitude='+site.lat).replace('longitude='+WX_LON,'longitude='+site.lon),{signal:ctl.signal,cache:'no-store'});clearTimeout(to);if(!r.ok)throw new Error('HTTP '+r.status);
@@ -4268,9 +4259,10 @@ class Wind{
     const tow=dirv(this.cur+180),sp=S.tws*KN*0.55;
     for(let i=0;i<this.puffs.length;i++){const p=this.puffs[i];p.x+=tow[0]*sp*dt;p.y+=tow[1]*sp*dt;p.age+=dt;p.env=Math.sin(Math.PI*clamp(p.age/p.life,0,1));if(p.age>p.life)this.puffs[i]=this.newPuff();}}
   sample(x,y){let f=1,d=this.cur;for(const p of this.puffs){const dd=Math.hypot(x-p.x,y-p.y);if(dd>p.r)continue;const k=(1-smooth(p.r*0.35,p.r,dd))*p.env;f+=p.str*k;d+=p.shift*k;}
-    if(SHORE.kind==='poly'){const [t,h]=shoreRay(x,y,this.cur);const sh=1-smooth(0,22*h,t);f*=1-0.48*sh;d+=sh*(8*Math.sin(this.t*0.08+x*0.011+y*0.007)+3*Math.sin(this.t*0.23+y*0.02));}
-    if(SHORE.kind==='revier'&&typeof revWindLand==='function'){const r=revWindLand(x,y,this.W0);if(r){this.lastSh=r.sh;f*=1-0.55*r.sh+0.14*r.acc;d+=r.sh*(7*Math.sin(this.t*0.08+x*0.011+y*0.007)+3*Math.sin(this.t*0.23+y*0.02))+r.bend;}}
-    if(SHORE.kind==='small'){const uw=dirv(this.cur);const rx=x-SHORE.c[0],ry=y-SHORE.c[1];const b=rx*uw[0]+ry*uw[1],cc=rx*rx+ry*ry-SHORE.R*SHORE.R;const t=-b+Math.sqrt(Math.max(b*b-cc,0));const sh=1-smooth(0,480,t);f*=1-0.42*sh;d+=sh*9*Math.sin(this.t*0.07+x*0.012);}
+    const LA=S.landAbdeckung!==false;
+    if(LA&&SHORE.kind==='poly'){const [t,h]=shoreRay(x,y,this.cur);const sh=1-smooth(0,22*h,t);f*=1-0.48*sh;d+=sh*(8*Math.sin(this.t*0.08+x*0.011+y*0.007)+3*Math.sin(this.t*0.23+y*0.02));}
+    if(LA&&SHORE.kind==='revier'&&typeof revWindLand==='function'){const r=revWindLand(x,y,this.W0);if(r){this.lastSh=r.sh;f*=1-0.55*r.sh+0.14*r.acc;d+=r.sh*(7*Math.sin(this.t*0.08+x*0.011+y*0.007)+3*Math.sin(this.t*0.23+y*0.02))+r.bend;}}
+    if(LA&&SHORE.kind==='small'){const uw=dirv(this.cur);const rx=x-SHORE.c[0],ry=y-SHORE.c[1];const b=rx*uw[0]+ry*uw[1],cc=rx*rx+ry*ry-SHORE.R*SHORE.R;const t=-b+Math.sqrt(Math.max(b*b-cc,0));const sh=1-smooth(0,480,t);f*=1-0.42*sh;d+=sh*9*Math.sin(this.t*0.07+x*0.012);}
     const ls=this.lastSh||0;this.lastSh=0;return {dir:d,tws:Math.max(1,S.tws*f),land:ls};}
 }
 
@@ -8139,6 +8131,51 @@ $('mapBeam').addEventListener('click',e=>{e.stopPropagation();beamToggle();});
 function laylines(b){const C=G.course;let m=b.started?C.seq[b.leg]:C.wm;if(!isMark(m)||C.lesson||(m.kind!=='wind'&&m.kind!=='lee'&&m.kind!=='gate'))return null;
   const W=G.wind.sample(m.x,m.y).dir;const o=opt(b.twsL,m.kind!=='wind'?(b.spiWant||b.spi>0.5):false,b.headsail);const ang=m.kind==='wind'?o.up:o.down;
   return {m,b1:W-ang+180,b2:W+ang+180};}
+/* ================= Abdeckungskarte: Windabdeckung als Ampel auf Karte und Wasser =================
+   Grün = voller Wind, gelb = abgeschwächt, rot = Abdeckung. Gerechnet mit demselben Modell wie der Wind im Spiel
+   (Höhenprofil + Wald + Häuser gegen die Windrichtung), schrittweise über mehrere Bilder, damit nichts ruckelt. */
+var AK={key:'',n:0,res:25,x0:0,y0:0,cv:null,cx:null,img:null,i:0,mesh:null,tex:null,ver:0,texVer:-1,t:0};
+function akZeigen(){return S.abdeckKarte&&S.abdeckKarte!=='aus'&&S.landAbdeckung!==false&&G&&G.wind&&!(G.course&&G.course.lesson);}
+function akZelle(x,y,W0,dir){
+  if(SHORE.kind==='revier'){const q=SHORE.realOf(x,y);if(revZ(q[0],q[1])>-0.3)return null;const r=revWindLand(x,y,W0);return r?clamp(0.55*r.sh-0.14*r.acc,-0.2,1):0;}
+  if(SHORE.kind==='poly'){if(!polyInside(SHORE.P,x,y)||inShoal(x,y))return null;const [t,h]=shoreRay(x,y,dir);return 0.48*(1-smooth(0,22*h,t));}
+  if(SHORE.kind==='small'){const rx=x-SHORE.c[0],ry=y-SHORE.c[1];if(rx*rx+ry*ry>SHORE.R*SHORE.R)return null;const uw=dirv(dir);const b=rx*uw[0]+ry*uw[1],cc=rx*rx+ry*ry-SHORE.R*SHORE.R;const t=-b+Math.sqrt(Math.max(b*b-cc,0));return 0.42*(1-smooth(0,480,t));}
+  return 0;}
+function akFarbe(v,D,k){if(v===null){D[k+3]=0;return;}const t=clamp(v/0.5,0,1);let r,g,b;
+  if(t<0.5){const u=t/0.5;r=60+u*(240-60);g=190+u*(205-190);b=90-u*30;}else{const u=(t-0.5)/0.5;r=240-u*10;g=205-u*150;b=60-u*10;}
+  D[k]=r;D[k+1]=g;D[k+2]=b;D[k+3]=Math.round(34+t*130);}
+function akNeu(pl){const W0=G.wind.W0,dir=Math.round(G.wind.cur/5)*5;let x0,y0,size;
+  if(SHORE.kind==='poly'){const P=SHORE.P;let a=1e9,b=-1e9,c=1e9,d=-1e9;for(const p of P){a=Math.min(a,p.x);b=Math.max(b,p.x);c=Math.min(c,p.y);d=Math.max(d,p.y);}size=Math.max(b-a,d-c)+60;x0=(a+b)/2-size/2;y0=(c+d)/2-size/2;}
+  else if(SHORE.kind==='small'){size=SHORE.R*2+40;x0=SHORE.c[0]-size/2;y0=SHORE.c[1]-size/2;}
+  else{const klein=REVX&&REVX.W<20000&&REVX.H<20000;size=S.gfx==='niedrig'?3200:klein?5400:4200;x0=pl.x-size/2;y0=pl.y-size/2;}
+  const n=Math.min(S.gfx==='niedrig'?160:240,Math.max(60,Math.round(size/22)));
+  if(!AK.cv||AK.n!==n){AK.cv=document.createElement('canvas');AK.cv.width=AK.cv.height=n;AK.cx=AK.cv.getContext('2d');AK.img=AK.cx.createImageData(n,n);if(AK.tex){AK.tex.dispose();AK.tex=null;}}
+  else AK.img.data.fill(0);
+  Object.assign(AK,{n,res:size/n,x0,y0,i:0,W0,dir,kind:SHORE.kind,tv:SHORE.kind==='revier'&&REVX?(REVX.tileVer||0):0,t:performance.now()});}
+function akTick(){
+  if(AK.err>3||!akZeigen()){if(AK.mesh)AK.mesh.visible=false;return;}
+  const pl=P();if(!pl)return;const n=AK.n;
+  const soll=SHORE.kind+'|'+(SHORE.key||'')+'|'+Math.round(G.wind.W0)+'|'+(SHORE.kind==='revier'?'':Math.round(G.wind.cur/5)*5);
+  const weg=SHORE.kind==='revier'&&n&&Math.hypot(pl.x-(AK.x0+n*AK.res/2),pl.y-(AK.y0+n*AK.res/2))>n*AK.res*0.28;
+  const kachelnNeu=SHORE.kind==='revier'&&REVX&&(REVX.tileVer||0)!==AK.tv&&AK.i>=n*n&&performance.now()-AK.t>4000;
+  if(soll!==AK.key||weg||kachelnNeu||!AK.cv){AK.key=soll;akNeu(pl);}
+  if(AK.i<AK.n*AK.n){const D=AK.img.data,t0=performance.now(),N=AK.n;
+    while(AK.i<N*N&&performance.now()-t0<4){const i=AK.i%N,j=(AK.i/N)|0;const x=AK.x0+(i+0.5)*AK.res,y=AK.y0+(N-j-0.5)*AK.res;
+      akFarbe(akZelle(x,y,AK.W0,AK.dir),D,AK.i*4);AK.i++;}
+    if(AK.i>=N*N||(AK.i%(N*12))<40){AK.cx.putImageData(AK.img,0,0);AK.ver++;}}
+  akWasser();}
+function akWasser(){
+  const an=S.abdeckKarte==='wasser'&&AK.cv&&AK.i>0;
+  if(!an){if(AK.mesh)AK.mesh.visible=false;return;}
+  if(!AK.tex||AK.tex.image!==AK.cv){if(AK.tex)AK.tex.dispose();AK.tex=new THREE.CanvasTexture(AK.cv);AK.tex.minFilter=THREE.LinearFilter;AK.tex.magFilter=THREE.LinearFilter;AK.tex.generateMipmaps=false;AK.texVer=-1;if(AK.mesh)AK.mesh.material.map=AK.tex,AK.mesh.material.needsUpdate=true;}
+  if(!AK.mesh){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(12),3));g.setAttribute('uv',new THREE.Float32BufferAttribute([0,1,1,1,1,0,0,0],2));g.setIndex([0,3,2,0,2,1]);
+    AK.mesh=new THREE.Mesh(g,new THREE.MeshBasicMaterial({map:AK.tex,transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:false,opacity:0.85}));AK.mesh.renderOrder=6;AK.mesh.frustumCulled=false;scene.add(AK.mesh);}
+  const m=AK.mesh,L=AK.n*AK.res,a=m.geometry.attributes.position,h=0.32,x0=AK.x0,y0=AK.y0;
+  a.setXYZ(0,x0,h,-(y0+L));a.setXYZ(1,x0+L,h,-(y0+L));a.setXYZ(2,x0+L,h,-y0);a.setXYZ(3,x0,h,-y0);a.needsUpdate=true;
+  if(AK.texVer!==AK.ver){AK.tex.needsUpdate=true;AK.texVer=AK.ver;}m.visible=true;}
+function akMapDraw(x,mp,dpr){if(!akZeigen()||!AK.cv||!AK.i)return;const n=AK.n,L=n*AK.res;
+  const p0=mp(AK.x0,AK.y0+L),p1=mp(AK.x0+L,AK.y0+L),p2=mp(AK.x0,AK.y0);
+  x.save();x.setTransform(dpr*(p1[0]-p0[0])/n,dpr*(p1[1]-p0[1])/n,dpr*(p2[0]-p0[0])/n,dpr*(p2[1]-p0[1])/n,dpr*p0[0],dpr*p0[1]);x.imageSmoothingEnabled=true;x.drawImage(AK.cv,0,0);x.restore();}
 var MAPROT=0;
 function drawMap(){
   const dpr=Math.min(2,window.devicePixelRatio||1);const W=mapCv.clientWidth,H=mapCv.clientHeight;if(!W)return;
@@ -8156,7 +8193,7 @@ function drawMap(){
     else if(Z>1){const [bx,by]=mp(pl.x,pl.y);fx=bx-mz.px/Z;fy=by-mz.py/Z;}else{fx=W/2;fy=H/2;}
     mz._fx=fx;mz._fy=fy;
     if(Z!==1||fx!==W/2||fy!==H/2){const mp0=mp;mp=(wx,wy)=>{const [a,b]=mp0(wx,wy);return [W/2+(a-fx)*Z,H/2+(b-fy)*Z];};sc*=Z;}}
-  mapAff(mp);x.fillStyle='rgba(14,52,70,.55)';x.fillRect(0,0,W,H);if(S.ladder&&!C.lesson&&!G.row&&!C.wps)drawLadderMap(x,mp);drawShoreMap(x,mp,W,H);revMapDraw(x,mp,W,H);hbMapDraw(x,mp);
+  mapAff(mp);x.fillStyle='rgba(14,52,70,.55)';x.fillRect(0,0,W,H);if(S.ladder&&!C.lesson&&!G.row&&!C.wps)drawLadderMap(x,mp);drawShoreMap(x,mp,W,H);revMapDraw(x,mp,W,H);akMapDraw(x,mp,dpr);hbMapDraw(x,mp);
   for(const p of G.wind.puffs){if(p.env<0.05)continue;const [px,py]=mp(p.x,p.y);x.beginPath();x.arc(px,py,p.r*sc,0,Math.PI*2);x.fillStyle=p.str>0?'rgba(2,14,26,'+(0.45*p.env*Math.min(1,p.str*3))+')':'rgba(210,235,245,'+(0.22*p.env)+')';x.fill();}
   if(S.laylines){const ll=laylines(pl);if(ll){const [mx,my]=mp(ll.m.x,ll.m.y);[[ll.b1,'#3fd08a'],[ll.b2,'#ff4f5f']].forEach(([bb,c])=>{const d=dirv(bb);const [ex,ey]=mp(ll.m.x+d[0]*1500,ll.m.y+d[1]*1500);x.strokeStyle=c;x.globalAlpha=0.6;x.lineWidth=1;x.beginPath();x.moveTo(mx,my);x.lineTo(ex,ey);x.stroke();x.globalAlpha=1;});}}
   if(!C.lesson){const [ax,ay]=mp(C.pin.x,C.pin.y),[bx,by]=mp(C.cb.x,C.cb.y);x.setLineDash(G.t<0?[]:[3,3]);x.strokeStyle=G.t<0?'#ff4f5f':'#3fd08a';x.lineWidth=G.t<0?2:1.5;x.beginPath();x.moveTo(ax,ay);x.lineTo(bx,by);x.stroke();x.setLineDash([]);
@@ -8318,7 +8355,7 @@ function render(dt,now){try{revTick();revFeuerTick();revNachtTick();revBrueckenT
   if(C3.line){C3.line.position.y=WAMP*0.8;if(C3.lineMat){const pre=G.t<0&&!(G.flags&&G.flags.ap&&false);C3.lineMat.color.setHex(pre?0xff3b30:0x31d07a);C3.lineMat.opacity=pre&&G.t>-10&&G.running?0.6+0.35*Math.abs(Math.sin(now*Math.PI)):0.85;}}
   const t=pl.finished?null:(pl.started?G.course.seq[pl.leg]:G.course.wm);
   C3.beacon.visible=!!(isMark(t)&&G.running&&!G.course.lesson);if(C3.beacon.visible)C3.beacon.position.set(t.x,12,-t.y);
-  updateRoundArrow(now);updateVectors();updateFan(dt);updateLadder();
+  updateRoundArrow(now);updateVectors();updateFan(dt);updateLadder();try{akTick();}catch(e){console.error('Abdeckungskarte',e);AK.err=(AK.err||0)+1;}
   updateCam(dt,now);
   camera.getWorldDirection(_c);_c.y=0;if(_c.lengthSq()>1e-6)_c.normalize();const sx=camera.position.x+_c.x*14,sz=camera.position.z+_c.z*14;waterNear.position.set(sx,0,sz);waterFar.position.set(camera.position.x,-0.04,camera.position.z);{const wf=HELI.an?Math.max(1,Math.min(12,camera.position.y/22)):1;if(waterNear.scale.x!==wf){waterNear.scale.set(wf,1,wf);waterFar.scale.set(wf,1,wf);}}
   sky.position.copy(camera.position);astroTick(now);camera.updateMatrixWorld();wxUpdate(dt,now);navUpdate();glare.position.copy(camera.position).addScaledVector(SUN_DIR,5000);
@@ -8424,7 +8461,7 @@ function hudRib(b){const C=G.course;
 const MP={on:false,host:false,room:null,lib:null,self:null,peers:{},act:{},name:'',code:'',rib:true,sendAcc:0,windAcc:0,hostId:null,eng:null};
 const MP_LIB='https://cdn.jsdelivr.net/npm/trystero@0.25.4/+esm';
 const MPCOL=['#ffd23f','#e5484d','#2bb3a3','#f29d4b','#9b8cff','#3d8bff','#7bd148','#ff6fb5','#21c7e8','#c9a227','#ff8a5c','#8fd694','#b38cff','#4fd1c5'];
-const MP_LOCAL=['gfx','touchMode','sailNo','autoTrim','laylines','showZone','roundArrow','vectors','coach','ghost','allMsgs','series'];
+const MP_LOCAL=['abdeckKarte','gfx','touchMode','sailNo','autoTrim','laylines','showZone','roundArrow','vectors','coach','ghost','allMsgs','series'];
 function mpSpot(ri,lineLen,U,R,W0,rib,C){
   if(rib)return [C.cb.x+R[0]*24-U[0]*14,C.cb.y+R[1]*24-U[1]*14,wrap360(W0+180)];
   const lat=(((ri*0.6180339)%1)-0.5)*lineLen*1.1,al=-38-(ri%4)*13;return [U[0]*al+R[0]*lat,U[1]*al+R[1]*lat,wrap360(W0+(ri%2?90:-90))];}
@@ -8437,6 +8474,7 @@ function openMP(){if(G){G.running=false;G.paused=false;}hideAllOv();hudEl.hidden
   let nm='';try{nm=localStorage.getItem('regattakoje.mpname')||'';}catch(e){}
   if(!$('mpName').value)$('mpName').value=nm||(S.boatClass==='zk10'?'HEXE':S.sailNo);
   if(!$('mpRoom').value){let rc='';try{rc=localStorage.getItem('regattakoje.mproom')||'';}catch(e){}$('mpRoom').value=rc||'LSC';}
+  if(!$('mpServer').value)$('mpServer').value=mpServerGespeichert();
   mpRoleUi();mpRender();}
 function mpRoleUi(){const h=$('mpRole').value==='host';document.querySelectorAll('.mphost').forEach(e=>e.hidden=!h);$('mpFillO').textContent=$('mpFill').value;}
 function mpSummary(){return (CLASSES[S.boatClass]||CL).name+' · '+S.tws+' kn · '+{wl:'Up-and-Down',gate:'mit Leetor',offset:'mit Ablauftonne',tri:'Dreieck'}[S.courseType]+' · '+S.laps+' Runde'+(S.laps>1?'n':'')+' · Start '+S.startTime+' s';}
@@ -8449,15 +8487,49 @@ function mpRender(){const ul=$('mpList');ul.innerHTML='';
   for(const [n,h] of items){const li=document.createElement('li');li.textContent=(h?'⚑ ':coachN.has(n)?'👁 ':'')+n;if(h)li.className='host';ul.appendChild(li);}
   const hosts=items.filter(i=>i[1]).length;
   mpStatus('Raum „'+MP.code+'“ · '+items.length+(items.length===1?' Teilnehmer':' Teilnehmende')+(MP.host?' · '+mpSummary():(hosts?' · Warte auf den Start durch die Wettfahrtleitung.':' · Noch keine Wettfahrtleitung im Raum.'))+(hosts>1?' · Achtung: mehr als eine Wettfahrtleitung!':''));}
+/* ---- Vereinsserver (Raspberry Pi, WebSocket) ----
+   Feste Adresse für alle: hier eintragen, z. B. 'wss://regattakoje.tail1234.ts.net'.
+   Jeder kann sie im Mehrspieler-Menü überschreiben; ?server=… in der Adresse geht auch. */
+const MP_SERVER_DEFAULT='';
+function mpServerGespeichert(){let u='';try{u=new URLSearchParams(location.search).get('server')||'';if(!u){const v=localStorage.getItem('regattakoje.mpserver');if(v!==null)return v;}}catch(e){}return u||MP_SERVER_DEFAULT;}
+function mpServerUrl(raw){let u=String(raw||'').trim();if(!u)return '';u=u.replace(/^https:\/\//i,'wss://').replace(/^http:\/\//i,'ws://');if(!/^wss?:\/\//i.test(u))u='wss://'+u;return u.replace(/\/+$/,'');}
+function mpWsRoom(url,app,code){return new Promise((res,rej)=>{let ws;try{ws=new WebSocket(url);}catch(e){rej(new Error('Adresse ungültig'));return;}
+  const acts={},joinCb=[],leaveCb=[];let done=false;
+  const fail=t=>{if(done)return;done=true;clearTimeout(tm);try{ws.close();}catch(e){}rej(new Error(t));};
+  const tm=setTimeout(()=>fail('keine Antwort'),7000);
+  const tx=o=>{if(ws.readyState===1)ws.send(JSON.stringify(o));};
+  const deliver=(a,d,f)=>{const h=acts[a];if(h){try{h(d,f);}catch(e){console.error('MP',a,e);}}};
+  const room={selfId:null,viaServer:true,
+    makeAction(name){return [(d,to)=>{if(Array.isArray(to)){for(const t of to)tx({t:'m',a:name,d,to:t});}else if(to)tx({t:'m',a:name,d,to});else tx({t:'m',a:name,d});},cb=>{acts[name]=cb;}];},
+    onPeerJoin(fn){joinCb.push(fn);},onPeerLeave(fn){leaveCb.push(fn);},
+    leave(){room.left=true;try{ws.close(1000);}catch(e){}}};
+  ws.onopen=()=>tx({t:'join',app,room:code,v:1});
+  ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data);}catch(e){return;}
+    if(m.t==='welcome'){room.selfId=m.id;if(!done){done=true;clearTimeout(tm);res(room);}const ps=m.peers||[];setTimeout(()=>{for(const id of ps)for(const f of joinCb)f(id);},0);}
+    else if(m.t==='join'){for(const f of joinCb)f(m.id);}
+    else if(m.t==='leave'){for(const f of leaveCb)f(m.id);}
+    else if(m.t==='m')deliver(m.a,m.d,m.f);
+    else if(m.t==='b'){for(const it of m.l||[])deliver('st',it[1],it[0]);}
+    else if(m.t==='err'){if(!done)fail(m.m||'Server lehnt ab');else mpStatus('Vereinsserver: '+(m.m||'Fehler'));}};
+  ws.onerror=()=>fail('nicht erreichbar');
+  ws.onclose=()=>{if(!done){fail('Verbindung abgelehnt');return;}
+    if(!room.left&&MP.room===room){const ids=Object.keys(MP.peers);for(const id of ids)for(const f of leaveCb)f(id);MP.on=false;MP.room=null;mpRender();mpStatus('Verbindung zum Vereinsserver verloren. Tippe auf „Verbinden“, um es erneut zu versuchen.');}};});}
 async function mpConnect(){
   MP.name=($('mpName').value.trim()||'Boot').slice(0,14);MP.code=($('mpRoom').value.trim().toUpperCase()||'LSC').slice(0,16);MP.host=$('mpRole').value==='host';MP.coach=$('mpRole').value==='coach';MP.rib=$('mpRib').checked;
-  try{localStorage.setItem('regattakoje.mpname',MP.name);localStorage.setItem('regattakoje.mproom',MP.code);}catch(e){}
-  if(typeof window.RTCPeerConnection!=='function'){mpStatus('In dieser Ansicht ist die Direktverbindung (WebRTC) gesperrt – das ist z. B. in der Claude-App so. Öffne Regattakoje im normalen Browser (Chrome, Firefox, Safari) über die GitHub-Pages-Adresse, dann klappt der Mehrspieler.');return;}
-  mpStatus('Lade Verbindungsmodul …');
-  try{if(!MP.lib)MP.lib=await import(MP_LIB);}catch(e){mpStatus('Das Verbindungsmodul ließ sich nicht laden. In manchen Vorschaufenstern ist das gesperrt – öffne die Seite direkt (z. B. über GitHub Pages).');return;}
+  const srvRaw=$('mpServer').value.trim();
+  try{localStorage.setItem('regattakoje.mpname',MP.name);localStorage.setItem('regattakoje.mproom',MP.code);localStorage.setItem('regattakoje.mpserver',srvRaw);}catch(e){}
   mpLeave(true);
-  let room;try{room=MP.lib.joinRoom({appId:'regattakoje-seesport-lsc'},'rk-'+MP.code.toLowerCase());}catch(e){mpStatus('Raum konnte nicht geöffnet werden: '+e.message);return;}
-  MP.room=room;MP.self=MP.lib.selfId;MP.on=true;MP.peers={};
+  const APPID='regattakoje-seesport-lsc',rcode='rk-'+MP.code.toLowerCase();let room=null,srvFehler='';
+  if(srvRaw){mpStatus('Verbinde mit dem Vereinsserver …');
+    try{room=await mpWsRoom(mpServerUrl(srvRaw),APPID,rcode);}catch(e){srvFehler=e.message;room=null;}}
+  if(!room){
+    const vor=srvRaw?'Vereinsserver '+srvFehler+'. ':'';
+    if(typeof window.RTCPeerConnection!=='function'){mpStatus(vor+'In dieser Ansicht ist die Direktverbindung (WebRTC) gesperrt – das ist z. B. in der Claude-App so. Öffne Regattakoje im normalen Browser (Chrome, Firefox, Safari) über die GitHub-Pages-Adresse, dann klappt der Mehrspieler.');return;}
+    mpStatus(vor+'Lade Direktverbindung …');
+    try{if(!MP.lib)MP.lib=await import(MP_LIB);}catch(e){mpStatus(vor+'Das Verbindungsmodul ließ sich nicht laden. In manchen Vorschaufenstern ist das gesperrt – öffne die Seite direkt (z. B. über GitHub Pages).');return;}
+    try{room=MP.lib.joinRoom({appId:APPID},rcode);}catch(e){mpStatus('Raum konnte nicht geöffnet werden: '+e.message);return;}
+    if(srvRaw)msg('Vereinsserver nicht erreichbar – Direktverbindung statt Server.','warn');}
+  MP.room=room;MP.self=room.viaServer?room.selfId:MP.lib.selfId;MP.on=true;MP.peers={};MP.via=room.viaServer?'server':'direkt';
   for(const n of ['hi','go','st','wd','sg','ch'])MP.act[n]=mpAction(room,n);
   MP.act.ch.on((d,id)=>chatRecv(d,id));
   MP.act.sg.on((d,id)=>{if(id===MP.hostId&&!MP.host)wlApply(d);});
@@ -8469,7 +8541,8 @@ async function mpConnect(){
   mpHook(room,'onPeerJoin',id=>{if(!MP.peers[id])MP.peers[id]={name:'…',host:false};MP.act.hi.send(hello(),id);mpRender();});
   mpHook(room,'onPeerLeave',id=>{const p=MP.peers[id];delete MP.peers[id];mpRender();mpGone(id,p);});
   MP.act.hi.send(hello());mpRender();
-  setTimeout(()=>{if(MP.on&&MP.room===room&&!Object.keys(MP.peers).length)mpStatus('Raum „'+MP.code+'“ ist offen, aber noch niemand da. Die anderen brauchen denselben Raumcode. Bleibt es leer, blockiert evtl. das Netz (Firmen-WLAN, manche Mobilfunknetze) die Direktverbindung.');},15000);}
+  mpStatus(room.viaServer?'Mit dem Vereinsserver verbunden – Raum „'+MP.code+'“.':'Direktverbindung – Raum „'+MP.code+'“.');
+  setTimeout(()=>{if(MP.on&&MP.room===room&&!Object.keys(MP.peers).length)mpStatus(room.viaServer?'Raum „'+MP.code+'“ ist offen (Vereinsserver), aber noch niemand da. Die anderen brauchen denselben Raumcode und dieselbe Serveradresse.':'Raum „'+MP.code+'“ ist offen, aber noch niemand da. Die anderen brauchen denselben Raumcode. Bleibt es leer, blockiert evtl. das Netz (Firmen-WLAN, manche Mobilfunknetze) die Direktverbindung – dann hilft der Vereinsserver.');},15000);}
 function mpLeave(silent){if(MP.room){try{MP.room.leave();}catch(e){}}MP.room=null;MP.on=false;MP.peers={};MP.hostId=null;if(!silent){mpStatus('Raum verlassen.');mpRender();}}
 function mpStart(){if(!MP.on||!MP.host)return;
   const roster=[MP.rib?[MP.self,$('mpFree').checked?'Trainer':'Wettfahrtleitung','#ff6a1a',1]:[MP.self,MP.name,MPCOL[0],0,DESIGN.hull||'',mpDesignOut()]];
