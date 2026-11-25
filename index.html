@@ -755,7 +755,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
    Grundberührung nach Tiefgang der Bootsklasse. KEINE Navigationskarte.
    ===================================================================== */
 var REV_BASES = ['../See-Editor/', ''];           /* erst die See-Editor-Seite, dann der eigene Ordner */
-var REVIERE_K = { ruegen: { datei: 'ruegen-spiel.json', name: 'Rügen · Bodden · Peenestrom' }, usedom: { datei: 'usedom-spiel.json', name: 'Usedom · Haff · Peenestrom' }, rostock: { datei: 'rostock-spiel.json', name: 'Rostock · Warnemünde' }, cospu_neu: { datei: 'cospu-spiel.json', lage: 'cospu-lage.json', name: 'Cospudener See · echte Daten (neu)' } };
+var REVIERE_K = { ruegen: { datei: 'ruegen-spiel.json', name: 'Rügen · Bodden · Peenestrom' }, usedom: { datei: 'usedom-spiel.json', name: 'Usedom · Haff · Peenestrom' }, rostock: { datei: 'rostock-spiel.json', name: 'Rostock · Warnemünde' }, cospu_neu: { datei: 'cospu-spiel.json', lage: 'cospu-lage.json', name: 'Cospudener See · echte Daten (neu)' }, lehalle: { datei: 'lehalle-spiel.json', name: 'Leipzig–Halle · alle Seen, Flüsse, Auwald' } };
 var REVX = null, REVH = null, REVH_LOAD = null, REVH_ERR = null;
 var REV_DRAFT = { gorchfock: 4.8, jolle: 1.0, opti: 0.75, topcat: 0.7, viking: 1.0, imoca: 4.5, zk10: 1.0, ixylon: 0.9, k6: 0.9, moth: 1.0 };
 var REV_ORIG_ALT = { hiddensee: [366520, 6016000] };  /* Strecken aus der ersten Hiddensee-Version umrechnen */
@@ -885,7 +885,7 @@ function revBuild() {
   try { MZ_MIN = 0.01; } catch (e) {}
   X.chunks = new Map(); X.scen = new Map(); X.lastE = null;
   X.matT = new THREE.MeshLambertMaterial({ vertexColors: true });
-  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null; X.brGrp = null; X.verkehr = null; X.brSkip = null; X.nv = null; X.rad = null; X.wGrid = null; X.zug = null;
+  REV_MAT = {}; X.feuerPts = null; X.feuer = null; X.wz = null; X.wzIdx = null; X.wzN = null; X.brGrp = null; X.verkehr = null; X.brSkip = null; X.brSkipM = null; X.brDeckM = null; X.nv = null; X.rad = null; X.wGrid = null; X.zug = null;
   X.haefen = (X.idx.haefen || []).map(h => Object.assign({}, h, { st: null, z: null, m: null, teile: null, grp: null }));
   revStrLoad(); revSchiffeInit();
   try { revTuerme(); } catch (e) { console.error('Leuchttürme', e); }
@@ -2188,13 +2188,23 @@ function revCarLightMat() {
   return REV_CARLIGHT;
 }
 /* A38-Bogenbrücke „Neue Harth“ (drei rote Stahlbögen) auf die OSM-Brücke setzen */
+/* Fahrbahnhöhe einer Dammbrücke: Dammkrone 20–45 m hinter den Brückenenden (nicht das Tal an den Enden) */
+function revDeckH(P, n, grund) {
+  let m = -1e9;
+  for (const [i, j] of [[0, 1], [n - 1, n - 2]]) {
+    const dx = P[i][0] - P[j][0], dy = P[i][1] - P[j][1], L = Math.hypot(dx, dy) || 1;
+    for (const t of [14, 24, 34, 44]) m = Math.max(m, grund(P[i][0] + dx / L * t, P[i][1] + dy / L * t));
+    m = Math.max(m, grund(P[i][0], P[i][1]));
+  }
+  return m;
+}
 function revBogen(grp, M, sc, cands) {
   const m0 = Math.min(...cands.map(c => c.bd)), cs = cands.filter(c => c.bd < m0 + 70);
   let E = 0, N = 0, dx = 0, dy = 0, h = 0; const d0 = cs[0].d;
   for (const c of cs) { const sg = (c.d[0] * d0[0] + c.d[1] * d0[1]) < 0 ? -1 : 1; E += c.E; N += c.N; dx += c.d[0] * sg; dy += c.d[1] * sg; h += c.h; }
   E /= cs.length; N /= cs.length; h /= cs.length; const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
-  const SPAN = 62, RISE = 19, HS = SPAN / 2, W = cs.length > 1 ? Math.max(15, Math.min(22, Math.hypot(cs[0].E - cs[1].E, cs[0].N - cs[1].N) / 2 + 8)) : 15;
-  const g = new THREE.Group(), p = sc(E, N); g.position.set(p[0], 0, p[1]); g.rotation.y = Math.atan2(dy, dx);
+  const SPAN = cs[0].span || 62, RISE = 19, HS = SPAN / 2, W = cs.length > 1 ? Math.max(15, Math.min(22, Math.hypot(cs[0].E - cs[1].E, cs[0].N - cs[1].N) / 2 + 8)) : 15;
+  const g = new THREE.Group(), p = sc(E, N), p2 = sc(E + dx * 10, N + dy * 10); g.position.set(p[0], 0, p[1]); g.rotation.y = Math.atan2(-(p2[1] - p[1]), p2[0] - p[0]);
   const red = M('#b4484f', 0.3), hang = M('#d9d3b0', 0.3);
   const box = (w, hh, d, x, y, z, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(d, hh, w), m); b.position.set(x, y, z); g.add(b); };
   for (const z of [-W, W]) box(0.8, 1.7, SPAN, 0, h - 0.85, z, red);
@@ -2213,7 +2223,8 @@ function revBrueckenBuild() {
   const X = REVX, F = SHORE.fwd, list = X.idx.bruecken || [];
   const altAutos = X.verkehr ? X.verkehr.cars : null;
   if (X.brGrp) revDispose(X.brGrp); if (X.verkehr) { revDispose(X.verkehr.im); revDispose(X.verkehr.pp); }
-  X.brGrp = null; X.brSig = revBrSig(); X.bogenCand = [];
+  X.brGrp = null; X.brSig = revBrSig(); X.bogenCand = []; X.brDeckM = null;
+  if (X.netzG && X.netzG.size) { for (const g of X.netzG.values()) revStrWeg(g); X.netzG.clear(); }   /* Straßen neu: Anschluss an die Brücken */
   X.brSolid = new Set(); X.brKlMap = new Map(); X.brMats = []; X.klappen = []; X.strassen = []; X.brBB = null; X.feuerExtra = []; X.verkehr = null;
   if (!list.length) return;
   const grp = new THREE.Group(), CS = 4, key = (E, N) => Math.floor(E / CS) + ',' + Math.floor(N / CS);
@@ -2290,10 +2301,18 @@ function revBrueckenBuild() {
       const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lv, 3)); grp.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#f4f6f8' })));
       for (let i = i0; i <= i1; i++) if (b.nass[i] && hArr[i] - 3.2 < 14) for (let o = -8; o <= 8; o += 2) solid(P[i][0] - dir[i][1] * o, P[i][1] + dir[i][0] * o);
       for (let sv = sb + 20; sv < se; sv += 36) { const q = at(sv), ii = q.i; for (const o of [-6.8, 6.8]) { const p = sc(q.E - q.d[1] * o, q.N + q.d[0] * o); lampe(p[0], hArr[ii] + 9, p[1], 9); } }
+    } else if (b.art === 'platte') {
+      /* Autobahnbrücke (Beton) über Tal/Straße/Fluss: Fahrbahnplatte auf Höhe der Dammkrone an den Enden, Pfeiler, Leitplanken */
+      vmax = 33; spur = 6; const hw = b.hw || 14; hwStr = hw;
+      let hE = revDeckH(P, n, grund) + 0.15; const ub = revUeberAutobahn(P, n, hw); if (ub !== null) hE = Math.max(hE, ub + 6.8);  /* Überführung: 4,7 m Durchfahrt + Platte */
+      for (let i = 0; i < n; i++) { hArr[i] = hE; deck[i] = 1; }
+      /* Fahrbahn, Markierung, Leitplanken und Autos kommen vom Straßennetz (folgt der echten Trasse); hier nur der Betonüberbau darunter */
+      band(0, n - 1, i => hArr[i] - 0.35, hw + 0.4, 2.2, '#8e9295', '#a3a7aa', '#7b7f83');
+      for (let sv = 22; sv < s[n - 1] - 12; sv += 26) { const q = at(sv); saeulen.push([q.E, q.N, 0, Math.min(grund(q.E, q.N), hE - 1) - 0.5, hE - 2.3, q.d, hw * 1.7]); }
     } else if (b.art === 'bogen') {
       /* A 38: Fahrbahnplatte (beide Richtungsfahrbahnen) auf Höhe der Talränder; Bögen kommen aus revBogen() */
       vmax = 33; spur = 7.5; hwStr = 15;
-      const hE = Math.max(grund(P[0][0], P[0][1]), grund(P[n - 1][0], P[n - 1][1])) + 0.6;
+      const hE = revDeckH(P, n, grund) + 0.15;
       for (let i = 0; i < n; i++) { hArr[i] = hE; deck[i] = 1; }
       band(0, n - 1, i => hArr[i], 15, 1.9, '#55585d', '#9a9fa4', '#6e7378');
       band(0, n - 1, i => hArr[i] + 0.55, 0.18, 0.5, '#b9bdc1', '#b9bdc1', '#b9bdc1', 0.4, 15);
@@ -2412,9 +2431,9 @@ function revBrueckenBuild() {
     if (pfosten.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pfosten, 3)); grp.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: '#f4f4f0' }))); }
     if (dalben.length) { const cg = new THREE.CylinderGeometry(0.85, 0.85, 1, 12); cg.translate(0, 0.5, 0); const im = new THREE.InstancedMesh(cg, M('#23262a', 0.1), dalben.length), ik = new THREE.InstancedMesh(cg, M('#f2f2ee', 0.6), dalben.length), m4 = new THREE.Matrix4();
       dalben.forEach((q, i) => { const p = sc(q[0], q[1]); m4.makeScale(1, 6.5, 1).setPosition(p[0], -3, p[1]); im.setMatrixAt(i, m4); m4.makeScale(1.04, 0.9, 1.04).setPosition(p[0], 3.5, p[1]); ik.setMatrixAt(i, m4); }); im.frustumCulled = ik.frustumCulled = false; grp.add(im, ik); }
-    if (!X.brSkip) X.brSkip = new Set(); for (const q of P) for (let a = -1; a <= 1; a++) for (let c2 = -1; c2 <= 1; c2++) X.brSkip.add((Math.floor(q[0] / 16) + a) + ',' + (Math.floor(q[1] / 16) + c2));
-    if (X.bogenPt) { let bi = -1, bd = 1e9; for (let i = 0; i < n; i++) { const dd = Math.hypot(P[i][0] - X.bogenPt[0], P[i][1] - X.bogenPt[1]); if (dd < bd) { bd = dd; bi = i; } } if (bi >= 0 && bd < 160) X.bogenCand.push({ E: P[bi][0], N: P[bi][1], d: dir[bi], h: hArr[bi], bd }); }
-    X.strassen.push({ name: b.n, P, s, dir, h: hArr, L: s[n - 1], vmax, spur, klappen: X.klappen.filter(k => k.strasse === X.strassen.length) });
+    const SKS = (b.art === 'bogen' || b.art === 'platte') ? (X.brSkipM || (X.brSkipM = new Set())) : (X.brSkip || (X.brSkip = new Set())); const mS = SKS === X.brSkipM; if (mS && n > 1) { const ux = P[n - 1][0] - P[0][0], uy = P[n - 1][1] - P[0][1], Lb = Math.hypot(ux, uy) || 1; (X.brDeckM || (X.brDeckM = [])).push({ a: P[0], u: [ux / Lb, uy / Lb], L: Lb, hw: b.art === 'bogen' ? 15 : (b.hw || 14), h: hArr[(n - 1) >> 1], bb: [Math.min(P[0][0], P[n - 1][0]) - 80, Math.min(P[0][1], P[n - 1][1]) - 80, Math.max(P[0][0], P[n - 1][0]) + 80, Math.max(P[0][1], P[n - 1][1]) + 80] }); } for (let iq = 0; iq < n; iq++) { if (mS && (s[iq] < 18 || s[iq] > s[n - 1] - 18)) continue; const q = P[iq]; for (let a = -1; a <= 1; a++) for (let c2 = -1; c2 <= 1; c2++) SKS.add((Math.floor(q[0] / 16) + a) + ',' + (Math.floor(q[1] / 16) + c2)); }  /* Autobahn bis an die Brückenenden heranführen, keine Lücke */
+    if (X.bogenPt) { let bi = -1, bd = 1e9; for (let i = 0; i < n; i++) { const dd = Math.hypot(P[i][0] - X.bogenPt[0], P[i][1] - X.bogenPt[1]); if (dd < bd) { bd = dd; bi = i; } } if (b.art === 'bogen') { bi = (n - 1) >> 1; bd = 0; } if (bi >= 0 && bd < 160) X.bogenCand.push({ E: P[bi][0], N: P[bi][1], d: dir[bi], h: hArr[bi], bd, span: b.art === 'bogen' ? Math.max(40, Math.min(75, (b.laenge || 82) - 22)) : 62 }); }
+    if (b.art !== 'platte' && b.art !== 'bogen') X.strassen.push({ name: b.n, P, s, dir, h: hArr, L: s[n - 1], vmax, spur, klappen: X.klappen.filter(k => k.strasse === X.strassen.length) });   /* Autobahnbrücken: Autos fahren auf dem Straßennetz durch */
   }
   if (X.bogenCand && X.bogenCand.length) { try { revBogen(grp, M, sc, X.bogenCand); } catch (e) { console.error('Bogenbrücke', e); } }
   if (markV.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(markV, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(markC, 3)); g.computeVertexNormals(); const m = new THREE.MeshBasicMaterial({ vertexColors: true }); grp.add(new THREE.Mesh(g, m)); }
@@ -2432,13 +2451,13 @@ function revBrueckenBuild() {
 }
 /* Welche Geländedaten um die Brücken schon geladen sind – ändert sich das, werden Straßen neu auf den Boden gesetzt */
 function revBrSig() {
-  const X = REVX, L = X.idx.bruecken || []; if (!L.length) return '';
+  const X = REVX, L = X.idx.bruecken || []; if (!L.length) return ''; const netzK = X.netz ? 'N' : '-';
   if (!X.brRects) X.brRects = L.map(b => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (let k = 0; k < b.pts.length; k += 2) { x0 = Math.min(x0, b.pts[k]); x1 = Math.max(x1, b.pts[k]); y0 = Math.min(y0, b.pts[k + 1]); y1 = Math.max(y1, b.pts[k + 1]); } return [x0 - 200, y0 - 200, x1 + 200, y1 + 200]; });
   const hit = (a0, b0, a1, b1) => X.brRects.some(r => a1 > r[0] && a0 < r[2] && b1 > r[1] && b0 < r[3]);
   const r = [];
   for (const [k, t] of X.tiles) if (t.st === 'da') { const x0 = t.i1 * X.cs, y1 = X.H - t.j1 * X.cs; if (hit(x0, y1 - t.ky * X.cs, x0 + t.kx * X.cs, y1)) r.push(k); }
   for (const h of X.haefen || []) if (h.st === 'da' && hit(h.x0, h.y0, h.x0 + revHW(h), h.y0 + revHH(h))) r.push(h.name);
-  return r.sort().join('|');
+  return netzK + r.sort().join('|');
 }
 /* ---------- Verkehr: Autos in beiden Richtungen, halten vor offener Klappe ---------- */
 function revVerkehrInit(alt) {
@@ -2537,6 +2556,43 @@ var REV_STR = {               /* Breite, Farbe, Markierung (0 keine, 1 Mitte, 2 
   cycleway: [3.2, '#7a7c7f', 0], path: [2.4, '#b3a583', 0], track: [3.6, '#a19474', 0], footway: [2.2, '#b8aa8a', 0]
 };
 var REV_RAD = { cycleway: 1, path: 1, track: 1, footway: 1 };
+/* Kreuzt diese schmale Brücke eine Autobahn (Überführung)? Liefert die Höhe der Autobahn darunter, sonst null */
+function revUeberAutobahn(P, n, hw) {
+  const X = REVX, N_ = X.netz; if (!N_ || hw > 9.5 || n < 2) return null;
+  const m = P[(n - 1) >> 1], ux = P[n - 1][0] - P[0][0], uy = P[n - 1][1] - P[0][1], ul = Math.hypot(ux, uy) || 1, C = N_.C;
+  for (let a = -1; a <= 1; a++) for (let c = -1; c <= 1; c++) for (const wi of N_.cells.get((Math.floor(m[0] / C) + a) + ',' + (Math.floor(m[1] / C) + c)) || []) {
+    const w = N_.wege[wi], kl = N_.kl[w[0]]; if (kl !== 'motorway' && kl !== 'trunk') continue;
+    for (let k = 1; k < w.length - 3; k += 2) {
+      const ax = w[k], ay = w[k + 1], dx = w[k + 2] - ax, dy = w[k + 3] - ay, L2 = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((m[0] - ax) * dx + (m[1] - ay) * dy) / L2));
+      if (Math.hypot(m[0] - ax - dx * t, m[1] - ay - dy * t) > 16) continue;
+      if (Math.abs((dx * ux + dy * uy) / (Math.sqrt(L2) * ul)) > 0.6) continue;     /* läuft parallel, ist keine Kreuzung */
+      return Math.max(1.8, revZ(ax + dx * t, ay + dy * t) + 0.42);
+    }
+  }
+  return null;
+}
+/* Autobahn an Fahrbahnplatte/Bogenbrücke: liegt der Punkt (mit Fahrtrichtung rx,ry) auf dem Brückendeck oder kurz davor? */
+function revDeckTest(E, N, rx, ry) {
+  const L = REVX.brDeckM; if (!L) return null;
+  for (const d of L) {
+    if (E < d.bb[0] || E > d.bb[2] || N < d.bb[1] || N > d.bb[3]) continue;
+    if (Math.abs(rx * d.u[0] + ry * d.u[1]) < 0.85) continue;          /* Straße kreuzt die Brücke (z. B. darunter) */
+    const qx = E - d.a[0], qy = N - d.a[1], sv = qx * d.u[0] + qy * d.u[1], lat = Math.abs(qx * d.u[1] - qy * d.u[0]);
+    if (lat > d.hw + 10) continue;
+    if (sv >= 0 && sv <= d.L) return { drauf: true, h: d.h };
+    const dist = sv < 0 ? -sv : sv - d.L; if (dist < 70) return { drauf: false, d: dist, h: d.h };
+  }
+  return null;
+}
+/* Höhe der Fahrbahn (Straßen und Autos): Gelände, auf Autobahnbrücken die Brückenhöhe, davor eine Rampe */
+function revStrH(E, N, rx, ry, z, dk) {
+  let h = z < 0.2 ? 1.8 : z + 0.42;
+  if (dk === undefined) dk = revDeckTest(E, N, rx, ry);
+  if (!dk) return h;
+  if (dk.drauf) return dk.h + 0.12;
+  const t = Math.min(1, dk.d / 70), w = t * t * (3 - 2 * t); return Math.max(h, (dk.h + 0.12) * (1 - w) + h * w);
+}
+function revSkipAny(k) { const X = REVX; return !!(X.brSkip && X.brSkip.has(k)); }   /* Autobahnbrücken werden befahren */
 function revWegNah(E, N) {
   const X = REVX; if (!X || !X.netz) return false;
   if (!X.wGrid) {
@@ -2564,7 +2620,7 @@ function revStrLoad() {
 function revStrZelle(ci, cj) {
   const X = REVX, N_ = X.netz, F = SHORE.fwd, C = N_.C, x0 = ci * C, y0 = cj * C, x1 = x0 + C, y1 = y0 + C, grp = new THREE.Group();
   const v = [], col = [], ix = [], mv = [], sv = [], lampen = [], masten = [], tmp = new THREE.Color();
-  const skip = X.brSkip || new Set();
+  const skip = X.brSkip || new Set(), skipM = X.brSkipM || new Set();
   const sc = (E, N) => { const q = F(E, N); return [q[0], -q[1]]; };
   for (const wi of N_.cells.get(ci + ',' + cj) || []) {
     const w = N_.wege[wi], kl = N_.kl[w[0]], D = REV_STR[kl]; if (!D) continue;
@@ -2576,13 +2632,14 @@ function revStrZelle(ci, cj) {
       for (let s = (k === 1 ? 0 : 1); s <= n; s++) P.push([ax + (bx - ax) * s / n, ay + (by - ay) * s / n]);
     }
     const drin = q => q[0] >= x0 - 10 && q[0] < x1 + 10 && q[1] >= y0 - 10 && q[1] < y1 + 10 && !skip.has(Math.floor(q[0] / 16) + ',' + Math.floor(q[1] / 16)) && revZ(q[0], q[1]) > -2.5;
+    if (X.brDeckM) for (let i = 0; i < P.length; i++) { const a = P[Math.max(0, i - 1)], c = P[Math.min(P.length - 1, i + 1)], l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1; P[i].dk = revDeckTest(P[i][0], P[i][1], (c[0] - a[0]) / l, (c[1] - a[1]) / l); }
     let run = [];
     const flush = () => {
       if (run.length >= 2) {
         const base = v.length / 3, hs = [];
         run.forEach((q, i) => {
           const a = run[Math.max(0, i - 1)], b = run[Math.min(run.length - 1, i + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / l, ny = (b[0] - a[0]) / l;
-          let z = revZ(q[0], q[1]); const h = z < 0.2 ? 1.8 : z + 0.42; hs.push(h);
+          let z = revZ(q[0], q[1]); const h = revStrH(q[0], q[1], 0, 0, z, q.dk || null); hs.push(h);  /* auf Autobahnbrücken: Brückenhöhe, davor Rampe */
           for (const [o, dy] of [[-hw - 0.6, -1.4], [-hw, 0], [hw, 0], [hw + 0.6, -1.4]]) { const p = sc(q[0] + nx * o, q[1] + ny * o); v.push(p[0], h + dy, p[1]); col.push(tmp.r, tmp.g, tmp.b); }
           q.nx = nx; q.ny = ny;
         });
@@ -3138,7 +3195,7 @@ function revNvSpawn(E, N) {
     const n = (w.length - 1) / 2; if (n < 2) continue;
     const i = Math.floor(Math.random() * (n - 1)), x = w[1 + 2 * i], y = w[2 + 2 * i];
     if (Math.hypot(x - E, y - N) > 3500 || Math.hypot(x - E, y - N) < 250) continue;
-    if (X.brSkip && X.brSkip.has(Math.floor(x / 16) + ',' + Math.floor(y / 16))) continue;
+    if (revSkipAny(Math.floor(x / 16) + ',' + Math.floor(y / 16))) continue;
     const d = Math.random() < 0.5 ? 1 : -1;
     return { wi, i: d > 0 ? i : i + 1, d, f: 0, v: REV_NV_V[kl] * (0.8 + Math.random() * 0.25), lkw: Math.random() < 0.1 };
   }
@@ -3179,7 +3236,7 @@ function revRadTick(E0, N0) {
     }
     const j = Math.max(0, Math.min(n - 1, a.i + a.d)), ax = w[1 + 2 * a.i], ay = w[2 + 2 * a.i], bx = w[1 + 2 * j], by = w[2 + 2 * j], L = Math.hypot(bx - ax, by - ay) || 1;
     const dx = (bx - ax) / L, dy = (by - ay) / L, E = ax + (bx - ax) * a.f + dy * 0.5, N = ay + (by - ay) * a.f - dx * 0.5;
-    if (Math.hypot(E - E0, N - N0) > 2600 || (X.brSkip && X.brSkip.has(Math.floor(E / 16) + ',' + Math.floor(N / 16)))) { R.cars.splice(ci, 1); continue; }
+    if (Math.hypot(E - E0, N - N0) > 2600 || revSkipAny(Math.floor(E / 16) + ',' + Math.floor(N / 16))) { R.cars.splice(ci, 1); continue; }
     const z = revZ(E, N); if (z < 0.3) continue;
     const p0 = F(E, N), p1 = F(E + dx, N + dy); q.setFromAxisAngle(up, Math.atan2(p1[0] - p0[0], -(p1[1] - p0[1]))); pv.set(p0[0], z + 0.42, -p0[1]); m4.compose(pv, q, sv);
     R.bike.setMatrixAt(k, m4); R.body.setMatrixAt(k, m4); R.head.setMatrixAt(k, m4); k++;
@@ -3212,10 +3269,10 @@ function revNvTick(E0, N0) {
       const j = Math.max(0, Math.min(n - 1, a.i + a.d)), ax = w[1 + 2 * a.i], ay = w[2 + 2 * a.i], bx = w[1 + 2 * j], by = w[2 + 2 * j], L = Math.hypot(bx - ax, by - ay) || 1;
       const dx = (bx - ax) / L, dy = (by - ay) / L, kl = N_.kl[w[0]], off = (REV_STR[kl] ? REV_STR[kl][0] : 6) * 0.22;
       const E = ax + (bx - ax) * a.f + dy * off, N = ay + (by - ay) * a.f - dx * off;
-      if (Math.hypot(E - E0, N - N0) > 4200 || (X.brSkip && X.brSkip.has(Math.floor(E / 16) + ',' + Math.floor(N / 16)))) weg = true;
+      if (Math.hypot(E - E0, N - N0) > 4200 || revSkipAny(Math.floor(E / 16) + ',' + Math.floor(N / 16))) weg = true;
       else {
         const z = revZ(E, N); if (z < -2.5) continue;   /* im Tunnel */
-        const h = z < 0.2 ? 1.8 : z + 0.42, p0 = F(E, N), p1 = F(E + dx, N + dy), fx = p1[0] - p0[0], fz = -(p1[1] - p0[1]);
+        const h = revStrH(E, N, dx, dy, z), p0 = F(E, N), p1 = F(E + dx, N + dy), fx = p1[0] - p0[0], fz = -(p1[1] - p0[1]);
         q.setFromAxisAngle(up, Math.atan2(fx, fz)); sv.set(a.lkw ? 1.3 : 1, a.lkw ? 2.2 : 1, a.lkw ? 2.6 : 1); pv.set(p0[0], h, -p0[1]); m4.compose(pv, q, sv); V.im.setMatrixAt(k, m4);
         const lx = -fz * 0.65, lz = fx * 0.65, Lh = a.lkw ? 5.95 : 2.45, o = k * 12;
         pa[o] = p0[0] + fx * Lh + lx; pa[o + 1] = h + 0.7; pa[o + 2] = -p0[1] + fz * Lh + lz; pa[o + 3] = p0[0] + fx * Lh - lx; pa[o + 4] = h + 0.7; pa[o + 5] = -p0[1] + fz * Lh - lz;
@@ -4116,7 +4173,7 @@ const SCHEMA=[
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
-  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 11'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
+  {k:'revier',label:'Revier',type:'select',options:[['cospu_neu','Cospudener See (Leipzig) · Stand 14'],['lehalle','Leipzig–Halle · alle Seen, Elster, Luppe, Saale (neu, groß)'],['rangs','Rangsdorfer See (Brandenburg)'],['small','Kleiner See mit Uferabdeckung'],['ruegen','Rügen · Hiddensee · Bodden · Peenestrom (Ostsee)'],['usedom','Usedom · Stettiner Haff · Peenestrom ab dem Ruden (Ostsee)'],['rostock','Rostock · Warnemünde · Unterwarnow (Ostsee)']],hint:'Am kleinen See wird der Wind nahe dem Luvufer schwächer und drehiger'},
   {k:'revKurs',label:'Kurs im Küstenrevier Rügen',type:'select',get options(){return revKursOptions();},hint:'Nur im Küstenrevier Rügen. Langstrecken führen durch Tore entlang der Fahrrinnen; mit dem Knopf ⏩ oben stellst du das Tempo bis 20× ein. Tiefgang zählt: wo es zu flach ist, läufst du auf Grund.'},
   {k:'bruecke',label:'Klappbrücken (Ziegelgraben, Wolgast)',type:'select',options:[['echt','Öffnen zu den echten Zeiten'],['offen','Immer offen']],hint:'Ziegelgrabenbrücke im Rügendamm: 5:20, 8:20, 12:20, 15:20, 17:20, 21:30 Uhr je 20 min. Peenebrücke Wolgast: 5:45, 7:45, 12:45, 17:45, 20:45 Uhr je 15 min, Juni–September auch 23:45 Uhr. Es zählt die Uhrzeit deines Geräts. Unter der Rügenbrücke passt du mit 42 m immer durch – die Klappe daneben musst du abwarten. Autos halten vor der offenen Klappe.'},
   {k:'schiffsverkehr',label:'Schiffsverkehr',type:'select',options:[['an','Fähren, Ausflugsschiffe und Kutter fahren'],['aus','Alle bleiben im Hafen']],hint:'Hiddensee-Fähre Schaprode–Vitte, Ausflugsschiff Sassnitz–Königsstuhl, Bäderschiff Binz–Sellin und ein Fischkutter aus Sassnitz. Sie weichen Regattabahnen aus und warten vor Start und Ziel einer laufenden Regatta – nach den Ausweichregeln musst du ihnen aber trotzdem Platz lassen.'},
@@ -4208,7 +4265,7 @@ const WX_TXT={none:'kein Niederschlag',r1:'leichter Regen',r2:'mäßiger Regen',
 const WX_COMP=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 const LIGHT_TXT={mittag:'Mittag',nachmittag:'Nachmittag',gold:'Goldene Stunde',daemmerung:'Dämmerung',nacht:'Nacht'};
 let wxBusy=false;
-function wxSite(){revMigrate();if(S.revier==='cospu_neu')return {lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};if(S.revier==='rostock')return {lat:54.18,lon:12.08,name:'Warnemünde'};if(S.revier==='usedom'){const k=S.revKurs||'';if(/haff/.test(k))return {lat:53.78,lon:14.02,name:'Stettiner Haff'};if(/heringsdorf|gfu/.test(k))return {lat:53.98,lon:14.17,name:'Heringsdorf'};if(/achter/.test(k))return {lat:54.0,lon:13.97,name:'Achterwasser'};return {lat:54.1,lon:13.8,name:'Peenestrom'};}if(REVIERE_K[S.revier]){const k=S.revKurs||'bb';if(/bahn_gfs|bahn_pr/.test(k))return {lat:54.50,lon:13.66,name:'Sassnitz/Binz'};if(k==='bahn_gft')return {lat:54.62,lon:13.45,name:'Tromper Wiek'};if(k==='bahn_gb')return {lat:54.20,lon:13.55,name:'Greifswalder Bodden'};if(k==='bb'||k==='rund'||k==='bahn')return {lat:54.53,lon:13.10,name:'Hiddensee'};return {lat:54.42,lon:13.35,name:'Rügen'};}return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
+function wxSite(){revMigrate();if(S.revier==='cospu_neu')return {lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};if(S.revier==='rostock')return {lat:54.18,lon:12.08,name:'Warnemünde'};if(S.revier==='lehalle')return {lat:51.36,lon:12.20,name:'Leipzig–Halle'};if(S.revier==='usedom'){const k=S.revKurs||'';if(/haff/.test(k))return {lat:53.78,lon:14.02,name:'Stettiner Haff'};if(/heringsdorf|gfu/.test(k))return {lat:53.98,lon:14.17,name:'Heringsdorf'};if(/achter/.test(k))return {lat:54.0,lon:13.97,name:'Achterwasser'};return {lat:54.1,lon:13.8,name:'Peenestrom'};}if(REVIERE_K[S.revier]){const k=S.revKurs||'bb';if(/bahn_gfs|bahn_pr/.test(k))return {lat:54.50,lon:13.66,name:'Sassnitz/Binz'};if(k==='bahn_gft')return {lat:54.62,lon:13.45,name:'Tromper Wiek'};if(k==='bahn_gb')return {lat:54.20,lon:13.55,name:'Greifswalder Bodden'};if(k==='bb'||k==='rund'||k==='bahn')return {lat:54.53,lon:13.10,name:'Hiddensee'};return {lat:54.42,lon:13.35,name:'Rügen'};}return S.revier==='rangs'?{lat:52.2875,lon:13.405,name:'Rangsdorfer See'}:{lat:WX_LAT,lon:WX_LON,name:'Cospudener See'};}
 async function loadLiveWx(){if(wxBusy)return;wxBusy=true;const say=t=>{S.wxInfo=t;const st=document.getElementById('wxStatus');if(st)st.textContent=t;saveS();};
   try{say('Lade Live-Daten …');const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),9000);
     if(S.revier!=='rangs'&&S.revier!=='cospu'&&!REVIERE_K[S.revier]&&!(G&&G.running&&!G.over))S.revier='cospu';const site=wxSite();const r=await fetch(WX_URL.replace('latitude='+WX_LAT,'latitude='+site.lat).replace('longitude='+WX_LON,'longitude='+site.lon),{signal:ctl.signal,cache:'no-store'});clearTimeout(to);if(!r.ok)throw new Error('HTTP '+r.status);
