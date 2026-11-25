@@ -4140,7 +4140,7 @@ let S=Object.assign({},DEFAULTS),S_main=null;
 try{const raw=localStorage.getItem('regattakoje.v1');if(raw)Object.assign(S,JSON.parse(raw));}catch(e){}
 if(['open','coast','cospu','gpx'].includes(S.revier))S.revier='cospu_neu';
 if(!CLASSES[S.boatClass])S.boatClass='jolle';
-function saveS(){if(S_main)return;try{localStorage.setItem('regattakoje.v1',JSON.stringify(S));}catch(e){}}
+function saveS(){if(S_main)return;try{localStorage.setItem('regattakoje.v1',JSON.stringify(S._legUser!=null?Object.assign({},S,{legLength:S._legUser,_legUser:null}):S));}catch(e){}}
 let lessonDone={};try{lessonDone=JSON.parse(localStorage.getItem('regattakoje.lessons')||'{}')||{};}catch(e){}
 function saveLessons(){try{localStorage.setItem('regattakoje.lessons',JSON.stringify(lessonDone));}catch(e){}}
 
@@ -4221,7 +4221,7 @@ const SCHEMA=[
   {k:'season',label:'Jahreszeit',type:'select',options:[['auto','automatisch (nach Datum)'],['fruehling','Frühling'],['sommer','Sommer'],['herbst','Herbst'],['winter','Winter']],hint:'Frühling: frisches Grün und Blüten · Herbst: buntes Laub · Winter: kahle Laubbäume, Schnee auf Wiesen und im Wald, Eisrand am Ufer. Schneefall stellst du beim Niederschlag ein'}]}
 ];
 const form=document.getElementById('setForm');
-function onSetting(k){if(k==='revier'&&S.wxSite&&(S.revier==='cospu'||S.revier==='rangs')&&wxSite().name!==S.wxSite&&!(G&&G.running&&!G.over))setTimeout(()=>loadLiveWx(),0);if(k==='season'){applyLight();buildShore();if(G&&!G.running)newRace(null);return;}if(k==='licht')S.sunLive=null;if(k==='licht'||k==='wxCloud'||k==='wxPrecip'||k==='windFrom'||k==='revier'||k==='gfx')applyLight();if(k==='gfx'&&(S.revier==='cospu'||isGL())&&G&&!G.running){buildShore();}if(!G)return;
+function onSetting(k){if(k==='legLength')S._legUser=null;if(k==='revier'&&S.wxSite&&(S.revier==='cospu'||S.revier==='rangs')&&wxSite().name!==S.wxSite&&!(G&&G.running&&!G.over))setTimeout(()=>loadLiveWx(),0);if(k==='season'){applyLight();buildShore();if(G&&!G.running)newRace(null);return;}if(k==='licht')S.sunLive=null;if(k==='licht'||k==='wxCloud'||k==='wxPrecip'||k==='windFrom'||k==='revier'||k==='gfx')applyLight();if(k==='gfx'&&(S.revier==='cospu'||isGL())&&G&&!G.running){buildShore();}if(!G)return;
   if((k==='tws'||k==='waveH')&&!G.running)setupWaves();
   if(k==='boatClass')gfKlasseWechsel();
   if((k==='boatClass'||k==='courseType'||k==='finishUp'||k==='legLength'||k==='laps')&&!G.running){newRace(null);}
@@ -7001,6 +7001,14 @@ function newRace(lesson,opts){
   const C={W0,U,R,lineLen,lesson:!!lesson};
   C.pin={x:-R[0]*lineLen/2,y:-R[1]*lineLen/2};C.cb={x:R[0]*lineLen/2,y:R[1]*lineLen/2};
   const mk=(x,y,kind,name)=>({x,y,kind,name});
+  /* Tonnen nur mit sinnvollem Abstand zum Ufer: passt die gewünschte Kreuzlänge nicht aufs Wasser, wird die Bahn gekürzt */
+  {const soll=S._legUser!=null?S._legUser:S.legLength;S.legLength=soll;S._legUser=null;
+   if(!lesson&&soll>150){const ctx=S.courseType,r=clamp(Math.max(L,3.5)*9,45,90),LO=Math.max(55,L*4);
+    const frei=(x,y)=>{if(!onWater(x,y))return false;for(let k=0;k<12;k++){const a=k*Math.PI/6;if(!onWater(x+Math.cos(a)*r,y+Math.sin(a)*r)||!onWater(x+Math.cos(a)*r*0.5,y+Math.sin(a)*r*0.5))return false;}return true;};
+    const passt=lg=>{const P=[[U[0]*lg,U[1]*lg]];if(ctx==='offset')P.push([U[0]*lg-R[0]*LO,U[1]*lg-R[1]*LO]);if(ctx==='tri')P.push([U[0]*lg*0.5-R[0]*lg*0.45,U[1]*lg*0.5-R[1]*lg*0.45]);if(S.finishUp)P.push([U[0]*(lg-40)+R[0]*40,U[1]*(lg-40)+R[1]*40]);
+      for(const q of P)if(!frei(q[0],q[1]))return false;for(let t=40;t<lg;t+=30){if(!onWater(U[0]*t,U[1]*t))return false;if(!onWater(U[0]*t-R[0]*25,U[1]*t-R[1]*25)||!onWater(U[0]*t+R[0]*25,U[1]*t+R[1]*25))return false;}return true;};
+    let lg=soll;while(lg>150&&!passt(lg))lg=Math.max(150,Math.floor(lg*0.95/10)*10);
+    if(lg<soll){S._legUser=soll;S.legLength=lg;const t='Kreuz auf '+lg+' m gekürzt – mit '+soll+' m läge eine Tonne zu nah am Ufer oder an Land.';setTimeout(()=>{try{msg(t,'warn');}catch(e){}},400);}}}
   C.wm=mk(U[0]*S.legLength,U[1]*S.legLength,'wind','Luvtonne');C.wm.d=U.slice();
   C.lm=mk(-U[0]*75,-U[1]*75,'lee','Leetonne');C.lm.d=[-U[0],-U[1]];
   const ct=lesson?'wl':S.courseType;
