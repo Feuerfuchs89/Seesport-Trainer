@@ -6968,6 +6968,7 @@ function buildBoat(b){
   if(CL.key==='topcat'){try{skuaApply(b,g,b.m);}catch(e){console.error('Skua V1',e);}}
   if(CL.key==='zk10'){try{zkApply(b,g,b.m);}catch(e){console.error('ZK 10 GFK',e);}}
   if(CL.key==='ixylon'&&!G.row){try{ixyApply(b,g,b.m);}catch(e){console.error('Ixylon',e);}}
+  if(CL.key==='imoca'&&!G.row){try{imoApply(b,g,b.m);}catch(e){console.error('IMOCA',e);}}
   if(CL.key==='gorchfock'){try{gfBoatApply(b,g);}catch(e){console.error('Gorch Fock',e);}}
   if(G.row&&ROWCFG[CL.key]){rowInit(b);rowGear(b);}
   labelCanvas(b);
@@ -8335,6 +8336,7 @@ function renderBoats(dt,now){
     if(m.mizP){m.mizRot=(m.mizRot||0)+(-ss*(4+b.trim*70)*DEG-(m.mizRot||0))*Math.min(1,dt*4);m.mizP.rotation.y=m.mizRot;m.mizMain.scale.x=(m.mizRot<0?-1:1)*flut;}
     if(m.zk)zkUpd(b,m);
     if(m.ixy)ixyUpd(b,m);
+    if(m.imo)imoUpd(b,m);
     m.wlMat.uniforms.uT.value=now;m.wlMat.uniforms.uA.value=b.ghost?0:clamp(b.v/3,0,1)*0.85*(1-(b.foil||0))*(CL.key==='imoca'?1-clamp((b.v/KN-14)/10,0,1)*0.6:1);
     if(m.keelG){m.keelG.rotation.z+=(-m.side*0.55*clamp(b.twsL/12,0.3,1)-m.keelG.rotation.z)*Math.min(1,dt*0.8);
       m.foils.forEach((fl,i)=>{const sd=i===0?1:-1;const down=sd===-ss?1:0;fl.userData.k+=(down-fl.userData.k)*Math.min(1,dt*0.8);const r=1-fl.userData.k;fl.position.set(-sd*1.75*r,1.0*r,0);});}
@@ -9963,7 +9965,7 @@ function achimPhysics(b,dt){playerControl(b,dt);
    Topcat K2 = Skua V1, Kutter ZK 10 = ZK 10 GFK, Motordingi „Achim“. Die Dateien liegen neben der index.html und werden
    erst bei Bedarf geladen. Fehlen sie (z. B. Seite lokal geöffnet), wird von GitHub Pages geladen; geht das auch nicht,
    bleiben die einfachen Spielmodelle. Streifen, Schriftzüge und Unterwasserfarbe stecken als Bild im GLB. */
-const MODEL_FILES={skua:'skua-v1.glb',zk:'zk10-gfk.glb',achim:'achim.glb',ixy:'ixylon.glb'},MODEL_WEB='https://feuerfuchs89.github.io/Seesport-Trainer/';
+const MODEL_FILES={skua:'skua-v1.glb',zk:'zk10-gfk.glb',achim:'achim.glb',ixy:'ixylon.glb',imoca:'imoca.glb'},MODEL_WEB='https://feuerfuchs89.github.io/Seesport-Trainer/';
 const MODELS={},MODEL_P={},MODEL_FAIL={};
 /* GLB lesen: Netze je Knoten, Materialien mit Farbe, Textur, Transparenz und Ein-/Zweiseitigkeit */
 async function glbRead(buf){const dv=new DataView(buf);if(buf.byteLength<20||dv.getUint32(0,true)!==0x46546C67)throw new Error('keine GLB-Datei');
@@ -9994,8 +9996,9 @@ function modelReady(k){if(!G||!G.boats)return;const list=G.ghostB?G.boats.concat
     if(k==='skua'&&CL.key==='topcat'&&!b.rib&&!m.skua)skuaApply(b,m.g,m);
     else if(k==='zk'&&CL.key==='zk10'&&!b.rib&&!m.zk&&!G.row)zkApply(b,m.g,m);
     else if(k==='ixy'&&CL.key==='ixylon'&&!b.rib&&!m.ixy&&!G.row)ixyApply(b,m.g,m);
+    else if(k==='imoca'&&CL.key==='imoca'&&!b.rib&&!m.imo&&!G.row)imoApply(b,m.g,m);
     else if(k==='achim'&&b.achim&&!m.achim){raceRoot.remove(m.g);raceRoot.remove(m.label);raceRoot.remove(m.wake);buildAchim(b);}}}
-function modelPrefetch(){const want=[];const cls=(S&&S.boatClass)||'';if(cls==='topcat')want.push('skua');if(cls==='zk10')want.push('zk');if(cls==='ixylon')want.push('ixy');for(const k of ['skua','zk','ixy','achim'])if(!want.includes(k))want.push(k);
+function modelPrefetch(){const want=[];const cls=(S&&S.boatClass)||'';if(cls==='topcat')want.push('skua');if(cls==='zk10')want.push('zk');if(cls==='ixylon')want.push('ixy');if(cls==='imoca')want.push('imoca');for(const k of ['skua','zk','ixy','achim','imoca'])if(!want.includes(k))want.push(k);
   let p=Promise.resolve();for(const k of want)p=p.then(()=>modelLoad(k));}
 /* Hilfen: Punkte eines Teils, Drehachsen (Mast unten->oben, Vorstag Hals->Kopf), Wölbungsseite eines Segels */
 function mdlPts(T,n){const o=[],nd=T.nodes.find(x=>x.name===n);if(nd)for(const p of nd.prims){const a=p.g.attributes.position;for(let i=0;i<a.count;i++)o.push(new THREE.Vector3().fromBufferAttribute(a,i));}return o;}
@@ -10124,6 +10127,53 @@ function ixyGeo(o){const sh=HSHAPE.ixylon;const zOf=u=>-sh.len/2+u*sh.len;const 
     box(0.03,0.05,0.42,sd*0.47,Y(0.46)+0.045,zOf(0.46),'cock');
     box(0.045,0.012,1.6,sd*0.17,Y(0.62)+0.02,zOf(0.62),'dark');box(0.016,0.016,3.0,sd*0.71,Y(0.55)+0.03,zOf(0.55),'dark');}
   box(1.0,0.12,0.05,0,Y(0.355)+0.06,zOf(0.355),'cock');box(0.5,0.012,0.34,0,Y(0.27)+0.012,zOf(0.27),'dark');box(1.3,0.02,0.04,0,Y(0.9)+0.02,zOf(0.9),'dark');}
+
+/* ---------- IMOCA 60 = Werftkoje-Modell (Rumpf nach Kouyoumdjian-Linienriss, Kajüte nach Malizia-RC-Modell) ----------
+   Lackierung (schwarzer Rumpf, hellblaues und gelbes Feld, weißes Deck mit roter Raute), Segelstreifen der J2 und
+   Batten stecken als gebackene Textur im GLB. Großsegel dreht um den Flügelmast (der Mast dreht ein Stück mit), J2 um das
+   Vorstag; Schwenkkiel, Foils und Doppelruder folgen dem Spiel. Gegnerboote bekommen eigene Farben für Rumpf und Felder. */
+const IMO_GROSS='Großsegel (Square-Top, 2 Reffreihen)',IMO_J2='Vorsegel J2 (Vorstag)',IMO_MAST='Flügelmast (drehbar, Carbon)',IMO_A3='A3 – Masttopp-Gennaker (Bugspriet)',
+  IMO_LACK=['#17191d','#2f9bd6','#f4b400'],
+  IMO_PAL=[['#17191d','#2f9bd6','#f4b400'],['#f4f5f2','#d62828','#1d3557'],['#0b3d91','#f4f5f2','#e63946'],['#2b2d31','#7ac143','#f4f5f2'],['#c8102e','#17191d','#f4f5f2'],['#f4f5f2','#00a6a6','#f28c28'],['#17191d','#e4007c','#f4f5f2'],['#1d4f2f','#f4b400','#f4f5f2']],
+  IMO_RIG=[IMO_MAST,'Deflektor Stb. (Salingausleger)','Deflektor Bb. (Salingausleger)','Want Stb. oben (Topp → Deflektor)','Want Bb. oben (Topp → Deflektor)','Want Stb. unten (Deflektor → Pütting)','Want Bb. unten (Deflektor → Pütting)','Kutterstag (J3, innen)','Vorstag (J2)','Läufer Stb. (Backstag)','Läufer Bb. (Backstag)',IMO_GROSS,IMO_J2,'Vorsegel J3 (Kutterstag, innen)','FR0 – Fractional Code 0 (Bugspriet)',IMO_A3,'Windgeber-Stab'],
+  IMO_TEX={};
+function imoPal(b){if(b.isPlayer||(G.mp&&b.human&&b.hullColor)){const P0=IMO_PAL[0].slice();if(b.hullColor)P0[0]=b.hullColor;return P0;}return IMO_PAL[((b.i||0)%(IMO_PAL.length-1))+1];}
+/* Lack umfärben: die gebackene Textur hat harte Kanten, also genau die drei Lackfarben austauschen */
+function imoLackTex(tex,pal){const key=tex.uuid+'|'+pal.join(',');if(IMO_TEX[key])return IMO_TEX[key];if(pal.every((c,i)=>c===IMO_LACK[i]))return IMO_TEX[key]=tex;
+  const img=tex.image,W=Math.max(256,img.width>>1),H=Math.max(256,img.height>>1),cv=document.createElement('canvas');cv.width=W;cv.height=H;const cx=cv.getContext('2d');cx.imageSmoothingEnabled=false;cx.drawImage(img,0,0,W,H);   // halbe Auflösung spart Grafikspeicher bei vielen Gegnern
+  const id=cx.getImageData(0,0,W,H),d=id.data;
+  const from=IMO_LACK.map(h=>new THREE.Color(h)).map(c=>[c.r*255,c.g*255,c.b*255]),to=pal.map(h=>new THREE.Color(h)).map(c=>[c.r*255,c.g*255,c.b*255]);
+  for(let i=0;i<d.length;i+=4){for(let k=0;k<3;k++){const f=from[k];if(Math.abs(d[i]-f[0])<7&&Math.abs(d[i+1]-f[1])<7&&Math.abs(d[i+2]-f[2])<7){d[i]=to[k][0];d[i+1]=to[k][1];d[i+2]=to[k][2];break;}}}
+  cx.putImageData(id,0,0);const t=new THREE.CanvasTexture(cv);t.flipY=false;t.anisotropy=4;return IMO_TEX[key]=t;}
+function imoApply(b,g,m){const T=MODELS.imoca;if(!T){modelLoad('imoca');return;}
+  if(!T.ax){const piv={};piv[IMO_GROSS]=mdlMastAx(T,IMO_MAST);piv[IMO_MAST]=piv[IMO_GROSS];piv[IMO_J2]=mdlStayAx(T,IMO_J2);
+    const kb=mdlBox(T,'Schwenkkiel-Flosse'),rb=s=>{const B=mdlBox(T,'Ruder '+s);return B.isEmpty()?null:new THREE.Vector3((B.min.x+B.max.x)/2,0,B.min.z+0.12);};
+    T.ax={piv,kiel:kb.isEmpty()?null:new THREE.Vector3(0,kb.max.y,(kb.min.z+kb.max.z)/2),rS:rb('Stb.'),rB:rb('Bb.'),cm:{},mask:ixyMaske(T)};for(const n of [IMO_GROSS,IMO_J2])T.ax.cm[n]=mdlCamb(T,n,piv[n]);
+    // Crew aufs Seitendeck des Modells (1,6 m), Füße in die abgesenkten Cockpit-Gänge; Pinnen wie im Modell
+    const R=RIGS.imoca;Object.assign(R.seats[0],{z:7.95,gx:2.05,sitY:1.66,footX:1.4,footY:1.34});if(R.seats[1])Object.assign(R.seats[1],{gx:2.05,sitY:1.66,footX:1.4,footY:1.34});Object.assign(R.tiller,{y:1.68,z:8.84,len:0.66});}
+  // Spielteile ausblenden – Crew, Schaumlinie, Lichter, Bugname, Gennaker, Windfahne und Großschot bleiben
+  const keep=new Set([m.spiG,m.vane,m.sheet,m.jibR&&m.jibR.parent,...m.rud]);for(const c of m.crew)for(const v of Object.values(c.p))if(v&&v.isObject3D)keep.add(v);
+  for(const o of g.children){if(keep.has(o)||(o.userData.mask&&!T.ax.mask)||o.userData.wl||o.userData.nav||o.renderOrder===6)continue;o.visible=false;}
+  if(T.ax.mask){const mk=new THREE.Mesh(T.ax.mask,MASK);mk.renderOrder=5;mk.userData.mask=true;g.add(mk);}
+  for(const r of m.rud)for(const c of r.children)c.visible=false;
+  if(m.fock){m.fock.material=m.fock.material.clone();m.fock.material.visible=false;}
+  if(m.jibR&&m.jibR.userData.furl)m.jibR.userData.furl.material=new THREE.MeshBasicMaterial({visible:false});
+  const pal=imoPal(b),own=new Map();
+  const mat=(n,mt)=>{if(!mt.map||!/^Rumpf/.test(mt.name))return null;if(!own.has(mt)){const k=mt.clone();k.map=imoLackTex(mt.map,pal);own.set(mt,k);}return own.get(mt);};
+  const root=new THREE.Group();root.name='imoca';g.add(root);
+  const grp={fS:{test:n=>n==='Foil Stb. (C-Form, Schwert nach Plan)',o:new THREE.Vector3()},fB:{test:n=>n==='Foil Bb. (C-Form, Schwert nach Plan)',o:new THREE.Vector3()}};
+  if(T.ax.kiel)grp.kiel={test:n=>n.startsWith('Schwenkkiel')||n.startsWith('Kielbombe'),o:T.ax.kiel};
+  if(T.ax.rS)grp.rS={test:n=>n==='Ruder Stb.'||n==='Pinne Stb.',o:T.ax.rS};if(T.ax.rB)grp.rB={test:n=>n==='Ruder Bb.'||n==='Pinne Bb.',o:T.ax.rB};
+  const S=mdlBuild(T,root,{piv:T.ax.piv,grp,mat,rig:IMO_RIG});for(const n in S.piv)S.piv[n].g.userData.rig=1;
+  const a3=root.children.filter(o=>o.name===IMO_A3);
+  m.imo={S,a3,cm:T.ax.cm,sgM:m.main?mdlMeanX(m.main.geometry):1,sgJ:m.fock?mdlMeanX(m.fock.geometry):1};}
+function imoUpd(b,m){const K=m.imo;if(!K)return;const S=K.S;
+  if(m.main){mdlSail(S.piv[IMO_GROSS],m.boomRot,m.main.scale.x*K.sgM*(K.cm[IMO_GROSS]||1));const mp=S.piv[IMO_MAST];if(mp)mp.g.quaternion.setFromAxisAngle(mp.d,clamp(m.boomRot*0.6,-0.6,0.6));}
+  const fp=S.piv[IMO_J2];if(fp&&m.fock){mdlSail(fp,m.jibRot,m.fock.scale.x*K.sgJ*(K.cm[IMO_J2]||1),Math.max(0.02,m.fock.scale.z));fp.g.visible=m.fock.visible;}
+  if(S.grp.rS&&m.rud[0])S.grp.rS.rotation.y=m.rud[0].rotation.y;if(S.grp.rB&&m.rud[1])S.grp.rB.rotation.y=m.rud[1].rotation.y;
+  if(S.grp.kiel&&m.keelG)S.grp.kiel.rotation.z=m.keelG.rotation.z;
+  if(m.foils){if(S.grp.fS)S.grp.fS.position.copy(m.foils[0].position);if(S.grp.fB)S.grp.fB.position.copy(m.foils[1].position);}
+  const gv=!!(m.spiG&&m.spiG.visible);for(const o of K.a3)o.visible=!gv;}
 
 hbInitUi();
 newRace(null);applyGfx();renderBest();updateTouch();
