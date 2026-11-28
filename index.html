@@ -179,7 +179,7 @@ table.rk td.up{color:var(--stb)}table.rk td.dn{color:var(--port)}table.rk th,tab
 .overlay{position:fixed;inset:0;overflow:auto;background:linear-gradient(180deg,rgba(6,20,28,.35),rgba(6,20,28,.85));display:flex;justify-content:center;align-items:flex-start;padding-block:calc(env(safe-area-inset-top,0px) + 24px) calc(env(safe-area-inset-bottom,0px) + 24px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));touch-action:pan-y;-webkit-user-select:text;user-select:text;box-sizing:border-box}
 .card{background:var(--plate-hi);border:1px solid var(--rule);border-radius:14px;max-width:1000px;width:100%;padding:24px 26px;box-sizing:border-box;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 .card.narrow{max-width:600px}
-.lvov{padding:0!important;align-items:stretch}.lvwrap{background:#0c1820;width:100%;min-height:100%;display:flex;flex-direction:column;color:var(--ink);box-sizing:border-box;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px calc(env(safe-area-inset-bottom,0px) + 10px)}
+.lvov{padding:0!important;align-items:flex-start}.lvwrap{background:#0c1820;width:100%;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;color:var(--ink);box-sizing:border-box;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px calc(env(safe-area-inset-bottom,0px) + 10px)}
 .lvtop{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:8px}.lvtop h2{margin:0;font-size:20px}.lvtbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .lvtbar .seg{display:flex}.lvtbar .seg[hidden]{display:none}.lvtbar .seg .optb{border-radius:0;margin-left:-1px}.lvtbar .seg .optb:first-child{border-radius:8px 0 0 8px}.lvtbar .seg .optb:last-child{border-radius:0 8px 8px 0;margin-left:-1px}
 .lvtbar select{background:#0b2531;color:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}
@@ -197,8 +197,13 @@ table.rk td.up{color:var(--stb)}table.rk td.dn{color:var(--port)}table.rk th,tab
 .lvnum input{background:#0b2531;color:var(--ink);border:1px solid var(--rule);border-radius:7px;padding:5px 26px 5px 7px;font:inherit;font-size:13px;width:100%;box-sizing:border-box}.lvnum em{position:absolute;right:8px;bottom:6px;font-style:normal;font-size:11px}
 .lvopt{display:flex;flex-wrap:wrap;gap:5px}.lvopt .optb{font-size:12px;padding:5px 8px}.lvtxt{width:100%;box-sizing:border-box;background:#0b2531;color:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:7px 9px;font:inherit;font-size:15px;margin-bottom:6px}
 .lvbtns{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0 6px}.lvbtns .btn{padding:6px 10px;font-size:12px}.lvdel{color:#ff8f8f!important}.lvmini{background:none;border:1px solid var(--rule);color:var(--ink-dim);border-radius:6px;font-size:11px;padding:1px 6px;cursor:pointer}
-.lvtip{padding:4px 2px;line-height:1.5}.lvcvw{position:relative}.lvzoom{position:absolute;right:8px;bottom:8px;display:flex;gap:4px}.lvzoom button{width:32px;height:32px;border-radius:8px;border:1px solid var(--rule);background:#0b2531cc;color:var(--ink);font-size:17px;cursor:pointer}
-@media (max-width:860px){.lvmain{grid-template-columns:1fr}.lvside{max-height:none}#lvCv{height:42vh}#lv3d{height:30vh}}
+.lvtip{padding:4px 2px;line-height:1.5}.lvcvw{position:relative}.lvzoom{position:absolute;right:8px;bottom:8px;display:flex;gap:4px}.lvzoom{z-index:3}.lvzoom button{width:36px;height:36px;border-radius:8px;border:1px solid var(--rule);background:#0b2531cc;color:var(--ink);font-size:17px;cursor:pointer}
+@media (max-width:860px){.lvwrap{padding-left:8px;padding-right:8px}.lvmain{grid-template-columns:1fr;gap:8px}.lvside{max-height:none;overflow:visible;padding-right:0}
+  .lvstage{position:sticky;top:0;z-index:5;background:#0c1820;padding:4px 0 6px;margin:0 -2px}
+  .lvcvw{position:relative}#lvCv{height:36vh}.lvwrap.segel #lvCv{height:46vh}.lvwrap.segel #lv3d{top:calc(46vh - 38% + 2px)}
+  #lv3d{position:absolute;left:8px;top:calc(36vh - 38% + 2px);width:44%;height:36%;z-index:2;box-shadow:0 4px 14px rgba(0,0,0,.5)}.lvstage.no3d #lv3d{display:none}
+  .lvtop{margin-bottom:4px}.lvtop h2{font-size:17px}.lvtbar .optb{padding:6px 9px;font-size:13px}.lvadd{grid-template-columns:repeat(6,1fr)}.lvadd button{font-size:9.5px}}
+.lv3dbtn{display:none}@media (max-width:860px){.lv3dbtn{display:block}}
 .dslv{background:#10232d;border:1px solid var(--rule);border-radius:12px;padding:12px;margin:12px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap}.dslv p{margin:0;flex:1;min-width:200px;font-size:13px;color:var(--ink-dim)}
 #flagBar{display:flex;flex-direction:column;gap:3px;margin-top:4px}#flagBar .flg{display:flex;align-items:center;gap:6px;background:rgba(8,26,36,.66);border-radius:6px;padding:3px 7px;font-size:12px;color:#fff;width:max-content}
 #specBar,#wlBar{position:absolute;top:calc(env(safe-area-inset-top,0px) + 52px);left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:min(560px,72vw);pointer-events:auto}
@@ -661,7 +666,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
       <div class="lvtbar"><div class="seg"><button type="button" id="lvAr" class="optb">Rumpf</button><button type="button" id="lvAd" class="optb">Deck</button><button type="button" id="lvAs" class="optb">Segel</button></div><div class="seg" id="lvSeite"><button type="button" id="lvSb" class="optb">Steuerbord</button><button type="button" id="lvBb" class="optb">Backbord</button></div><div class="seg" id="lvSegelW" hidden></div>
       <select id="lvTpl" aria-label="Vorlage"></select><button type="button" class="optb" id="lvUndo" title="Rückgängig (Strg+Z)">↶</button><button type="button" class="optb" id="lvRedo" title="Wiederholen (Strg+Umschalt+Z)">↷</button>
       <button type="button" class="btn" id="lvDone">Fertig</button></div></div>
-    <div class="lvmain"><div class="lvstage"><div class="lvcvw"><canvas id="lvCv" aria-label="Seitenansicht des Rumpfes zum Gestalten"></canvas><div class="lvzoom"><button type="button" id="lvZin" title="Vergrößern (Mausrad)">+</button><button type="button" id="lvZout" title="Verkleinern">−</button><button type="button" id="lvZfit" title="Ganzer Rumpf">⤢</button></div></div><div id="lvMsg" class="lvdim"></div><canvas id="lv3d" aria-label="3D-Vorschau, ziehen zum Drehen"></canvas></div>
+    <div class="lvmain"><div class="lvstage"><div class="lvcvw"><canvas id="lvCv" aria-label="Seitenansicht des Rumpfes zum Gestalten"></canvas><div class="lvzoom"><button type="button" id="lvZin" title="Vergrößern (Mausrad)">+</button><button type="button" id="lvZout" title="Verkleinern">−</button><button type="button" id="lvZfit" title="Ganzer Rumpf">⤢</button><button type="button" id="lv3dT" class="lv3dbtn" title="3D-Vorschau ein/aus">3D</button></div></div><div id="lvMsg" class="lvdim"></div><canvas id="lv3d" aria-label="3D-Vorschau, ziehen zum Drehen"></canvas></div>
       <div id="lvSide" class="lvside"></div></div>
   </div>
 </div>
@@ -10482,7 +10487,7 @@ function livDraw2D(){const cv=$('lvCv');if(!cv)return;const dpr=Math.min(2,windo
   c.restore();
   c.fillStyle='rgba(255,255,255,.55)';c.font='600 12px system-ui,sans-serif';c.textAlign='center';
   const lab=LV.area==='rumpf'?(LV.side==='stb'?'Steuerbord (rechte Seite) · Bug rechts':'Backbord (linke Seite) · Bug links'):LV.area==='deck'?'Deck von oben · Bug rechts, Backbord oben':(LIV_SEGEL[LV.sail].n+' von Steuerbord'+(lv.segel[LV.sail].on?'':' · Original – Element hinzufügen oder „eigenes Design“ einschalten'));
-  c.fillText(lab,W/2,14);
+  if(c.measureText(lab).width>W-16){const t=lab.split(' · ');c.fillText(t[0],W/2,14);c.fillText(t.slice(1).join(' · '),W/2,29);}else c.fillText(lab,W/2,14);
   const e=livSel();if(!e)return;const mir=livMir(),box=livBox(e);c.save();c.setTransform(dpr,0,0,dpr,0,0);
   const sp=box.map(q=>livS(...livL2V(e,mir,q[0],q[1])));c.strokeStyle='#6fe3ff';c.lineWidth=1.5;c.setLineDash([5,4]);c.beginPath();sp.forEach((q,i)=>c[i?'lineTo':'moveTo'](q[0],q[1]));c.closePath();c.stroke();c.setLineDash([]);
   for(const h of livHandles(e)){const [sx,sy]=livS(...livL2V(e,mir,h.l[0],h.l[1]));c.beginPath();if(h.k==='rot'){c.arc(sx,sy,7,0,Math.PI*2);c.fillStyle='#ffd23f';}else if(h.k==='pt'){c.arc(sx,sy,h.i===LV.pt?7:5.5,0,Math.PI*2);c.fillStyle=h.i===LV.pt?'#ff7a1a':'#fff';}else{c.rect(sx-6,sy-6,12,12);c.fillStyle='#6fe3ff';}c.fill();c.strokeStyle='#0c1820';c.lineWidth=1.5;c.stroke();}
@@ -10495,7 +10500,12 @@ function livHit(X,Y){const els=livEls(),mir=livMir();for(let i=els.length-1;i>=0
   LIV_MC.setTransform(1,0,0,1,0,0);livShape(LIV_MC,e);if(LIV_MC.isPointInPath(lx,ly,'evenodd'))return i;}
   for(let i=els.length-1;i>=0;i--){const e=els[i];if(!livVis(e))continue;const [lx,ly]=livV2L(e,mir,X,Y),B=livBox(e);if(lx>=B[0][0]&&lx<=B[2][0]&&ly>=B[0][1]&&ly<=B[2][1])return i;}return -1;}
 function livPtr(){const cv=$('lvCv');const pos=ev=>{const r=cv.getBoundingClientRect();return [ev.clientX-r.left,ev.clientY-r.top];};
-  cv.onpointerdown=ev=>{if(!LV.view)return;const [sx,sy]=pos(ev),[X,Y]=livW(sx,sy);const e=livSel(),mir=livMir();cv.setPointerCapture(ev.pointerId);
+  const PT=new Map();let pinch=null;const pinchStart=()=>{const a=[...PT.values()];pinch={d:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),m:[(a[0][0]+a[1][0])/2,(a[0][1]+a[1][1])/2]};};
+  cv.addEventListener('pointerdown',ev=>{PT.set(ev.pointerId,pos(ev));if(PT.size===2){if(LV.drag&&LV.drag.k!=='pan'){LV.drag=null;livUndo(false);LV.redo.pop();}LV.drag=null;pinchStart();}},true);
+  cv.addEventListener('pointermove',ev=>{if(!PT.has(ev.pointerId))return;PT.set(ev.pointerId,pos(ev));if(pinch&&PT.size===2){const a=[...PT.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),m=[(a[0][0]+a[1][0])/2,(a[0][1]+a[1][1])/2];
+    livZoom(d/Math.max(1,pinch.d),m[0],m[1]);if(LV.zoom>1){LV.pan[0]-=(m[0]-pinch.m[0])/LV.view.k;LV.pan[1]+=(m[1]-pinch.m[1])/LV.view.k;livDraw2D();}pinch={d,m};ev.stopImmediatePropagation();}},true);
+  const ptUp=ev=>{PT.delete(ev.pointerId);if(PT.size<2)pinch=null;};cv.addEventListener('pointerup',ptUp,true);cv.addEventListener('pointercancel',ptUp,true);
+  cv.onpointerdown=ev=>{if(!LV.view||PT.size>1)return;const [sx,sy]=pos(ev),[X,Y]=livW(sx,sy);const e=livSel(),mir=livMir();cv.setPointerCapture(ev.pointerId);
     if(e){for(const h of livHandles(e)){const [hx,hy]=livS(...livL2V(e,mir,h.l[0],h.l[1]));if(Math.hypot(hx-sx,hy-sy)<11){livSnap();LV.drag={k:h.k,i:h.i,e0:JSON.parse(JSON.stringify(e)),X,Y};if(h.k==='pt')LV.pt=h.i;livDraw2D();return;}}}
     const i=livHit(X,Y);if(i!==LV.sel){LV.sel=i;LV.pt=-1;livPanel();}
     if(i>=0){livSnap();const s=livSel();LV.drag={k:'mv',e0:JSON.parse(JSON.stringify(s)),X,Y};}else LV.drag=LV.zoom>1?{k:'pan',sx,sy,p0:LV.pan.slice()}:null;livDraw2D();};
@@ -10534,7 +10544,7 @@ function livPanel(){const lv=DESIGN.liv,box=$('lvSide');if(!box)return;const esc
     h+='<div class="lvsec lvprop"><div class="lvh">'+LIV_ICON[e.t]+' '+LIV_TYPEN[e.t]+'</div>';
     if(e.t==='text')h+='<input type="text" class="lvtxt" data-txt="1" maxlength="24" value="'+esc(e.txt||'')+'"><div class="lvopt">'+Object.keys(LIV_FONT).map(f=>'<button type="button" class="optb'+(e.font===f?' sel':'')+'" data-font="'+f+'">'+LIV_FONTN[f]+'</button>').join('')+'</div>';
     h+='<div class="lvl">Farbe</div>'+sw('col',e.col);
-    h+='<div class="lvgrid">'+num('x','ab Bug',-15,25,0.05,'m')+num('y',LV.area==='deck'?'von Mitte (Bb +)':'Höhe',-6,32,0.05,'m');
+    h+='<div class="lvgrid">'+num('x','ab Bug',-15,25,0.05,'m')+num('y',LV.area==='deck'?'von Mitte (Bb +)':'über Wasserlinie',-6,32,0.05,'m');
     if(e.t!=='poly')h+=(e.t==='text'?num('h','Schrifthöhe',0.05,8,0.05,'m')+num('sx','Breite ×',0.2,4,0.05,''):num('w','Breite',0.05,30,0.05,'m')+num('h','Höhe',0.05,20,0.05,'m'));
     h+=num('rot','Drehung',-180,180,1,'°');if(e.t==='rect'||e.t==='streifen')h+=num('skew','Schräge',-75,75,1,'°');if(['ring','pfeil','welle'].includes(e.t))h+=num('d','Stärke',0.02,5,0.02,'m');if(e.t==='welle')h+=num('n','Wellen',0.5,12,0.5,'');
     if(e.t==='text')h+=num('rand','Kontur',0,0.3,0.01,'m');h+='</div>';
@@ -10544,7 +10554,7 @@ function livPanel(){const lv=DESIGN.liv,box=$('lvSide');if(!box)return;const esc
     h+='<div class="lvbtns"><button type="button" class="btn ghost" data-act="dup">Duplizieren</button><button type="button" class="btn ghost" data-act="flip">↔ Spiegeln</button><button type="button" class="btn ghost" data-act="up">nach vorn</button><button type="button" class="btn ghost" data-act="down">nach hinten</button>'+
       (e.t==='poly'&&LV.pt>=0&&e.pts.length>3?'<button type="button" class="btn ghost" data-act="ptdel">Punkt löschen</button>':'')+'<button type="button" class="btn ghost lvdel" data-act="del">Löschen</button></div>';
     if(e.t==='poly')h+='<div class="lvdim">Punkte ziehen · Doppelklick auf eine Kante fügt einen Punkt ein.</div>';h+='</div>';}
-  else h+='<div class="lvdim lvtip">Element antippen zum Bearbeiten · ziehen = verschieben · <b>■</b> = Größe · <b style="color:#ffd23f">●</b> = drehen · Umschalt = einrasten · Entf = löschen · Strg+Z = zurück · Mausrad/＋ = zoomen, dann leere Fläche ziehen = verschieben</div>';
+  else h+='<div class="lvdim lvtip">Element antippen zum Bearbeiten · ziehen = verschieben · <b>■</b> = Größe · <b style="color:#ffd23f">●</b> = drehen · Umschalt = einrasten · Entf = löschen · Strg+Z = zurück · Mausrad, ＋ oder zwei Finger = zoomen, dann leere Fläche ziehen = verschieben</div>';
   box.innerHTML=h;
   box.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>livNeu(b.dataset.add));
   box.querySelectorAll('.lvrow').forEach(r=>r.onclick=()=>{LV.sel=+r.dataset.i;LV.pt=-1;livRender();});
@@ -10571,7 +10581,7 @@ function livAct(a){const lv=DESIGN.liv;
   else if(a==='flip'){if(e.t==='poly')e.pts=e.pts.map(q=>[-q[0],q[1]]).reverse();else{e.rot=-(e.rot||0)+(e.t==='dreieck'||e.t==='pfeil'?180:0);if(e.skew)e.skew=-e.skew;}}
   else if(a==='ptdel'&&e.t==='poly'&&LV.pt>=0&&e.pts.length>3){e.pts.splice(LV.pt,1);LV.pt=-1;}
   saveDesign();livRender(true);}
-function livRender(full){livDraw2D();livPanel();for(const [id,v] of [['lvAr','rumpf'],['lvAd','deck'],['lvAs','segel']])$(id).classList.toggle('sel',LV.area===v);
+function livRender(full){const wr=document.querySelector('.lvwrap');if(wr){const seg=wr.classList.contains('segel');wr.classList.toggle('segel',LV.area==='segel');if(seg!==(LV.area==='segel'))requestAnimationFrame(livDraw2D);}livDraw2D();livPanel();for(const [id,v] of [['lvAr','rumpf'],['lvAd','deck'],['lvAs','segel']])$(id).classList.toggle('sel',LV.area===v);
   $('lvSb').classList.toggle('sel',LV.side==='stb');$('lvBb').classList.toggle('sel',LV.side==='bb');$('lvSegelW').querySelectorAll('button').forEach(x=>x.classList.toggle('sel',x.dataset.s===LV.sail));
   $('lvSeite').hidden=LV.area!=='rumpf';$('lvSegelW').hidden=LV.area!=='segel';if(full)livQueue3D(true);}
 /* ---------- 3D-Vorschau ---------- */
@@ -10601,6 +10611,7 @@ function livInit(){const sel=$('lvTpl');sel.innerHTML='<option value="">Rumpf-Vo
   $('lvSegelW').querySelectorAll('button').forEach(x=>x.onclick=()=>{LV.sail=x.dataset.s;LV.sel=-1;LV.zoom=1;LV.pan=[0,0];livRender(true);});
   $('lvAr').onclick=()=>livArea('rumpf');$('lvAd').onclick=()=>livArea('deck');$('lvAs').onclick=()=>livArea('segel');
   $('lvZin').onclick=()=>livZoom(1.4);$('lvZout').onclick=()=>livZoom(1/1.4);$('lvZfit').onclick=()=>{LV.zoom=1;LV.pan=[0,0];livDraw2D();};
+  $('lv3dT').onclick=()=>{const st=document.querySelector('.lvstage');st.classList.toggle('no3d');if(!st.classList.contains('no3d'))livQueue3D(true);};
   $('lvUndo').onclick=()=>livUndo(false);$('lvRedo').onclick=()=>livUndo(true);$('lvDone').onclick=livClose;
   livPtr();window.addEventListener('resize',()=>{if(!$('lvOv').hidden)livDraw2D();});
   document.addEventListener('keydown',ev=>{if($('lvOv').hidden||/INPUT|SELECT|TEXTAREA/.test(document.activeElement&&document.activeElement.tagName))return;const e=livSel();
