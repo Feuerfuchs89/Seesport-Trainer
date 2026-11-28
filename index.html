@@ -182,7 +182,7 @@ table.rk td.up{color:var(--stb)}table.rk td.dn{color:var(--port)}table.rk th,tab
 .lvov{padding:0!important;align-items:flex-start}.lvwrap{background:#0c1820;width:100%;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;color:var(--ink);box-sizing:border-box;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px calc(env(safe-area-inset-bottom,0px) + 10px)}
 .lvtop{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:8px}.lvtop h2{margin:0;font-size:20px}.lvtbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .lvtbar .seg{display:flex}.lvtbar .seg[hidden]{display:none}.lvtbar .seg .optb{border-radius:0;margin-left:-1px}.lvtbar .seg .optb:first-child{border-radius:8px 0 0 8px}.lvtbar .seg .optb:last-child{border-radius:0 8px 8px 0;margin-left:-1px}
-.lvtbar select{background:#0b2531;color:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}
+.lvtbar select,#lvKl{background:#0b2531;color:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}
 .lvmain{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px;min-height:0}.lvstage{display:flex;flex-direction:column;gap:8px;min-width:0}
 #lvCv{width:100%;height:min(46vh,380px);background:radial-gradient(ellipse at 50% 40%,#16303d,#0a161d);border:1px solid var(--rule);border-radius:12px;touch-action:none;cursor:crosshair}
 #lv3d{width:100%;height:min(34vh,300px);background:linear-gradient(180deg,#203d4c,#0d2029);border:1px solid var(--rule);border-radius:12px;touch-action:none;cursor:grab}
@@ -203,7 +203,8 @@ table.rk td.up{color:var(--stb)}table.rk td.dn{color:var(--port)}table.rk th,tab
   .lvcvw{position:relative}#lvCv{height:36vh}.lvwrap.segel #lvCv{height:46vh}.lvwrap.segel #lv3d{top:calc(46vh - 38% + 2px)}
   #lv3d{position:absolute;left:8px;top:calc(36vh - 38% + 2px);width:44%;height:36%;z-index:2;box-shadow:0 4px 14px rgba(0,0,0,.5)}.lvstage.no3d #lv3d{display:none}
   .lvtop{margin-bottom:4px}.lvtop h2{font-size:17px}.lvtbar .optb{padding:6px 9px;font-size:13px}.lvadd{grid-template-columns:repeat(6,1fr)}.lvadd button{font-size:9.5px}}
-.lv3dbtn{display:none}@media (max-width:860px){.lv3dbtn{display:block}}
+.lv3dbtn{display:none}#bnCv{width:100%;height:min(74vh,720px);border:1px solid var(--rule);border-radius:12px;touch-action:none;cursor:grab;background:#10202a}.bnsel{width:100%;background:#0b2531;color:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:7px;font:inherit}.bnrot{display:flex;gap:8px;align-items:center}.bnrot input{flex:1}
+@media (max-width:860px){#bnCv{height:52vh}}@media (max-width:860px){.lv3dbtn{display:block}}
 .dslv{background:#10232d;border:1px solid var(--rule);border-radius:12px;padding:12px;margin:12px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap}.dslv p{margin:0;flex:1;min-width:200px;font-size:13px;color:var(--ink-dim)}
 #flagBar{display:flex;flex-direction:column;gap:3px;margin-top:4px}#flagBar .flg{display:flex;align-items:center;gap:6px;background:rgba(8,26,36,.66);border-radius:6px;padding:3px 7px;font-size:12px;color:#fff;width:max-content}
 #specBar,#wlBar{position:absolute;top:calc(env(safe-area-inset-top,0px) + 52px);left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:min(560px,72vw);pointer-events:auto}
@@ -454,6 +455,7 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
       <button class="btn" id="startBtn" type="button">Regatta starten</button>
       <button class="btn blue" id="drillBtn" type="button">Startübung</button>
       <button class="btn blue" id="freeBtn" type="button">Freies Training</button>
+      <button class="btn blue" id="bahnBtn" type="button">Bahn setzen</button>
       <button class="btn blue" id="mpBtn" type="button">Mehrspieler</button>
       <button class="btn blue" id="schoolBtn" type="button">Seesportschule</button>
       <button class="btn blue" id="hbBtn" type="button" hidden>Hafen &amp; MOB</button>
@@ -660,10 +662,18 @@ h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;fo
     <div class="actions"><button class="btn" id="dsDone" type="button">Fertig</button><button class="btn ghost" id="dsReset" type="button">Zurücksetzen</button></div>
   </div>
 </div>
+<div id="bnOv" class="overlay lvov" hidden>
+  <div class="lvwrap bnwrap">
+    <div class="lvtop"><h2>Bahn setzen <span class="lvdim" id="bnRev"></span></h2>
+      <div class="lvtbar"><button type="button" class="optb" id="bnWind">Nach Wind ausrichten</button><button type="button" class="optb" id="bnStd">Automatisch legen</button><button type="button" class="btn ghost" id="bnCancel">Abbrechen</button><button type="button" class="btn" id="bnOk">Übernehmen</button></div></div>
+    <div class="lvmain"><div class="lvstage"><div class="lvcvw"><canvas id="bnCv" aria-label="Karte mit der Regattabahn – ziehen zum Verschieben"></canvas><div class="lvzoom"><button type="button" id="bnZin">+</button><button type="button" id="bnZout">−</button><button type="button" id="bnZfit">⤢</button></div></div></div>
+      <div id="bnSide" class="lvside"></div></div>
+  </div>
+</div>
 <div id="lvOv" class="overlay lvov" hidden>
   <div class="lvwrap">
-    <div class="lvtop"><h2>Lackierung <span class="lvdim">· IMOCA 60</span></h2>
-      <div class="lvtbar"><div class="seg"><button type="button" id="lvAr" class="optb">Rumpf</button><button type="button" id="lvAd" class="optb">Deck</button><button type="button" id="lvAs" class="optb">Segel</button></div><div class="seg" id="lvSeite"><button type="button" id="lvSb" class="optb">Steuerbord</button><button type="button" id="lvBb" class="optb">Backbord</button></div><div class="seg" id="lvSegelW" hidden></div>
+    <div class="lvtop"><h2>Lackierung <span class="lvdim" id="lvTitel">· IMOCA 60</span></h2>
+      <div class="lvtbar"><select id="lvKl" aria-label="Boot"></select><div class="seg"><button type="button" id="lvAr" class="optb">Rumpf</button><button type="button" id="lvAd" class="optb">Deck</button><button type="button" id="lvAs" class="optb">Segel</button></div><div class="seg" id="lvSeite"><button type="button" id="lvSb" class="optb">Steuerbord</button><button type="button" id="lvBb" class="optb">Backbord</button></div><div class="seg" id="lvSegelW" hidden></div>
       <select id="lvTpl" aria-label="Vorlage"></select><button type="button" class="optb" id="lvUndo" title="Rückgängig (Strg+Z)">↶</button><button type="button" class="optb" id="lvRedo" title="Wiederholen (Strg+Umschalt+Z)">↷</button>
       <button type="button" class="btn" id="lvDone">Fertig</button></div></div>
     <div class="lvmain"><div class="lvstage"><div class="lvcvw"><canvas id="lvCv" aria-label="Seitenansicht des Rumpfes zum Gestalten"></canvas><div class="lvzoom"><button type="button" id="lvZin" title="Vergrößern (Mausrad)">+</button><button type="button" id="lvZout" title="Verkleinern">−</button><button type="button" id="lvZfit" title="Ganzer Rumpf">⤢</button><button type="button" id="lv3dT" class="lv3dbtn" title="3D-Vorschau ein/aus">3D</button></div></div><div id="lvMsg" class="lvdim"></div><canvas id="lv3d" aria-label="3D-Vorschau, ziehen zum Drehen"></canvas></div>
@@ -800,7 +810,7 @@ function revDraft() { return REV_DRAFT[CL.key] || 1.0; }
 function revMigrate() { if (S.revier === 'hiddensee') { S.revier = 'ruegen'; try { saveS(); } catch (e) {} } }
 function revIsBahn() { const k = revK(S.revKurs || 'bb'); return !k || !!k.bahn; }
 function revKursName() { const k = REVX && revK(S.revKurs || 'bb'); return k ? k.name : ''; }
-function revKey() { const ku = S.revKurs || 'bb', cu = ku.indexOf('u:') === 0 ? (revStrecken().find(q => 'u:' + q.id === ku) || {}).t : ''; return ['kue', S.revier, !!REVX, S.windFrom, ku, cu, S.gfx === 'niedrig' ? 'lo' : 'hi', seasonNow()].join('|'); }
+function revKey() { const ku = S.revKurs || 'bb', cu = ku.indexOf('u:') === 0 ? (revStrecken().find(q => 'u:' + q.id === ku) || {}).t : ''; return ['kue', S.revier, !!REVX, S.windFrom, ku, cu, bahnSig(), S.gfx === 'niedrig' ? 'lo' : 'hi', seasonNow()].join('|'); }
 function revFmt(v, d) { return v.toFixed(d).replace('.', ','); }
 
 /* ---------- Laden ---------- */
@@ -832,7 +842,7 @@ function revLoad() {
     REVX = REVH = X;
     if (REVIERE_K[S.revier]) {
       /* Kacheln rund um den Start vorab laden, dann bauen */
-      const k = revK(S.revKurs || 'bb') || idx.courses.bb || idx.courses[Object.keys(idx.courses)[0]], st = k.bahn ? k.center : k.start;
+      const k = revK(S.revKurs || 'bb') || idx.courses.bb || idx.courses[Object.keys(idx.courses)[0]], st = (k.bahn && bahnGet() && bahnGet().E != null) ? [bahnGet().E, bahnGet().N] : k.bahn ? k.center : k.start;
       await Promise.all(revTilesNear(st[0], st[1], 3000).map(t => revTileLoad(t)));
       buildShore(); if (typeof G !== 'undefined' && G && !G.running) newRace(null); try { applyLight(); } catch (e) {}
     }
@@ -910,7 +920,7 @@ function revBuild() {
   const X = REVX; let kurs = S.revKurs || 'bb'; let KK = revK(kurs);
   if (!KK) { kurs = S.revKurs = X.idx.courses.bb ? 'bb' : (Object.keys(X.idx.courses)[0] || 'bb'); KK = revK(kurs) || { bahn: true, name: 'Freies Wasser', center: [X.W / 2, X.H / 2] }; }
   const wf = (Number(S.windFrom) || 0) * DEG, cs = Math.cos(wf), sn = Math.sin(wf);
-  const st = KK.bahn ? KK.center : KK.start;
+  const UPb = KK.bahn ? bahnGet() : null, st = UPb && UPb.E != null ? [UPb.E, UPb.N] : KK.bahn ? KK.center : KK.start;
   const bo = [st[0] * cs - st[1] * sn, st[0] * sn + st[1] * cs];
   const fwd = (E, N) => [E * cs - N * sn - bo[0], E * sn + N * cs - bo[1]];
   const realOf = (x, y) => { const XX = x + bo[0], Y = y + bo[1]; return [XX * cs + Y * sn, -XX * sn + Y * cs]; };
@@ -4190,7 +4200,7 @@ const SCHEMA=[
   {k:'puffStrength',label:'Böen-Stärke',min:5,max:50,step:5,unit:'%'},
   {k:'dirtyAir',label:'Abdeckung (Windschatten anderer Boote)',type:'check'},
   {k:'landAbdeckung',label:'Windabdeckung durch Ufer, Wald und Häuser',type:'check',hint:'Hinter Wald, Häusern und Steilufern ist der Wind schwächer und dreht, bis etwa zum 20-Fachen der Hindernishöhe. Aus: überall gleichmäßiger Wind ohne Störfelder am Ufer'},
-  {k:'abdeckKarte',label:'Abdeckungskarte',type:'select',options:[['aus','aus'],['karte','auf der Karte'],['wasser','auf Karte und Wasser']],hint:'Zeigt die Windabdeckung als Ampel: grün voller Wind, gelb abgeschwächt, rot Abdeckung. Berechnet aus Höhenprofil, Wald, Häusern und der Windrichtung'}]},
+  {k:'abdeckKarte',label:'Abdeckungskarte',type:'select',options:[['aus','aus'],['karte','auf der Karte'],['wasser','auf Karte und Wasser']],hint:'Zeigt die Windabdeckung als Ampel: grün voller Wind, gelb abgeschwächt, rot Abdeckung. Mit „Abdeckung (Windschatten anderer Boote)“ erscheinen auch die Windschatten-Kegel aller Boote. Berechnet aus Höhenprofil, Wald, Häusern und der Windrichtung'}]},
  {group:'Live-Wetter & Tageszeit',items:[
   {type:'button',label:'Live-Daten vom gewählten See',btn:'Laden',act:'liveWx',hint:'Holt Wind, Wolken, Niederschlag und die aktuelle Tageszeit (Sonnenstand) für das gewählte Revier: Cospudener See oder Rangsdorfer See (bei anderen Revieren den Cospudener See). Das Regattafeld richtet sich nach der echten Windrichtung aus. Dafür wird einmalig eine Anfrage an Open-Meteo gesendet.'},
   {k:'wxUseWind',label:'Wind übernehmen (Richtung, Stärke, Böen)',type:'check'},
@@ -4205,7 +4215,8 @@ const SCHEMA=[
   {k:'count10',label:'Countdown in den letzten 10 s',type:'check'},
   {k:'startSound',label:'Startsignal',type:'select',options:[['horn','Horn'],['pfiff','Anpfiff (Pfeife)']]},
   {k:'zone',label:'Zone um die Tonnen',min:2,max:4,step:1,unit:'BL',hint:'in Bootslängen (Regel 18)'},
-  {k:'courseType',label:'Bahnform',type:'select',options:[['wl','Up-and-Down'],['gate','Up-and-Down mit Leetor'],['offset','Up-and-Down mit Ablauftonne'],['tri','Dreieck (olympisch)']]},
+  {type:'button',label:'Bahn auf der Karte verschieben und drehen',btn:'Bahn setzen',act:'bahn'},
+  {k:'courseType',label:'Bahnform',type:'select',options:[['wl','Up-and-Down'],['gate','Up-and-Down mit Leetor'],['offset','Up-and-Down mit Ablauftonne'],['tri','Dreieck (olympisch)'],['trapez','Trapez (olympisch, Außenschleife)']]},
   {k:'finishUp',label:'Ziel in Luv (Zielschiff bei der Luvtonne)',type:'check'},
   {k:'series',label:'Wertung',type:'select',num:true,options:[[1,'Einzelrennen'],[3,'Serie: 3 Wettfahrten'],[5,'Serie: 5 Wettfahrten, 1 Streicher'],[7,'Serie: 7 Wettfahrten, 1 Streicher']]}]},
  {group:'Revier & Strömung',items:[
@@ -4274,7 +4285,7 @@ function buildForm(){
       const row=document.createElement('div');row.className='row';const id='s_'+it.k;
       const lab=document.createElement('label');lab.htmlFor=id;lab.textContent=it.label;
       if(it.type==='check'){const c=document.createElement('input');c.type='checkbox';c.id=id;c.checked=!!S[it.k];c.onchange=()=>{S[it.k]=c.checked;saveS();onSetting(it.k);};row.append(lab,c);}
-      else if(it.type==='button'){const bt=document.createElement('button');bt.type='button';bt.className='btn blue';bt.style.cssText='font-size:15px;padding:7px 16px';bt.textContent=it.btn;bt.onclick=()=>{if(it.act==='liveWx')loadLiveWx();if(it.act==='revEdit')revEditOpen();};row.append(lab,bt);if(it.act==='liveWx'){const st=document.createElement('div');st.className='hint';st.id='wxStatus';st.textContent=S.wxInfo||'';row.appendChild(st);}}
+      else if(it.type==='button'){const bt=document.createElement('button');bt.type='button';bt.className='btn blue';bt.style.cssText='font-size:15px;padding:7px 16px';bt.textContent=it.btn;bt.onclick=()=>{if(it.act==='liveWx')loadLiveWx();if(it.act==='revEdit')revEditOpen();if(it.act==='bahn')bahnOpen();};row.append(lab,bt);if(it.act==='liveWx'){const st=document.createElement('div');st.className='hint';st.id='wxStatus';st.textContent=S.wxInfo||'';row.appendChild(st);}}
       else if(it.type==='select'){const s=document.createElement('select');s.id=id;for(const [v,t] of it.options){const o=document.createElement('option');o.value=v;o.textContent=t;s.appendChild(o);}if(it.live&&!it.options.some(o=>String(o[0])===String(S[it.k]))){const o=document.createElement('option');o.value=S[it.k];o.textContent=it.live(S[it.k]);s.appendChild(o);}s.value=String(S[it.k]);s.onchange=()=>{S[it.k]=it.num?Number(s.value):s.value;saveS();onSetting(it.k);};row.append(lab,s);}
       else if(it.type==='text'){const t=document.createElement('input');t.type='text';t.id=id;t.maxLength=9;t.value=S[it.k];t.oninput=()=>{S[it.k]=t.value.trim().toUpperCase()||'GER 1';saveS();};row.append(lab,t);}
       else{const out=document.createElement('output');out.htmlFor=id;const r=document.createElement('input');r.type='range';r.id=id;r.min=it.min;r.max=it.max;r.step=it.step;r.value=S[it.k];
@@ -4894,7 +4905,7 @@ function edAddIslands(doc,pl,shoreGrp,SH){if(!doc||!doc.isl.length)return;const 
 function cospuReal(){if(isGL()&&GL()&&GL().pts)return GL().pts.map(p=>({E:p[0],N:p[1],s:0,side:0}));
   const cu=EDC&&EDC.pts;return (cu||COSPU_PTS).map((p,i)=>({E:p[0],N:p[1],s:p[2],side:p[3],harb:cu?p[4]===1:i===COSPU_HARB,lsc:cu?p[4]===2:i===COSPU_LSC}));}
 function cospuSectorH(s,side){if(s>0.62)return 25;if(s<-0.72)return side>0?14:9;return side<0?14:16;}
-function cospuKey(){return [(S.revier==='cospu'&&UMLAND?'U'+UMLAND.ver:''),S._mpN||0,(isGL()&&GL()?GL().name+GL().pts.length:'')+'~'+edSig(),S.revier,S.windFrom,S.legLength,S.lineScale,S.courseType,S.finishUp?1:0,S.cpuCount,S.boatClass,HBMODE?'hb':'',S.gfx==='niedrig'?'lo':'hi',seasonNow()].join('|');}
+function cospuKey(){return [bahnSig(),(S.revier==='cospu'&&UMLAND?'U'+UMLAND.ver:''),S._mpN||0,(isGL()&&GL()?GL().name+GL().pts.length:'')+'~'+edSig(),S.revier,S.windFrom,S.legLength,S.lineScale,S.courseType,S.finishUp?1:0,S.cpuCount,S.boatClass,HBMODE?'hb':'',S.gfx==='niedrig'?'lo':'hi',seasonNow()].join('|');}
 function polyInside(P,x,y){let c=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const a=P[i],b=P[j];if(((a.y>y)!==(b.y>y))&&(x<(b.x-a.x)*(y-a.y)/(b.y-a.y)+a.x))c=!c;}return c;}
 function polyDist(P,x,y){let d=1e9,bi=0;for(let i=0,j=P.length-1;i<P.length;j=i++){const e=ptSeg(x,y,P[j].x,P[j].y,P[i].x,P[i].y);if(e<d){d=e;bi=i;}}return [d,bi];}
 function lineLenFor(n,LL){return Math.max(25,(n+1)*LL*1.9*(Number(S.lineScale)||100)/100,LL*6);}
@@ -4903,6 +4914,7 @@ function cospuCourseProbe(){const LL=Math.max(L||4.7,3.5);const n=S._mpN||S.cpuC
   pts.push([0,leg+40],[-30,leg+30],[30,leg+30],[0,-95]);
   if(S.courseType==='offset')pts.push([-Math.max(55,LL*4)-30,leg]);
   if(S.courseType==='tri')pts.push([-leg*0.45-40,leg*0.5]);
+  if(S.courseType==='trapez'){const D=trapezD(leg);pts.push([-D-30,leg-trapezA(leg)],[-D-30,-75],[-D,-110],[-D/2,leg*0.5]);}
   if(S.courseType==='gate')pts.push([-30,-75],[30,-75]);
   if(S.finishUp)pts.push([60,leg-40]);
   return pts;}
@@ -4910,12 +4922,12 @@ function cospuPlace(){const wf=(Number(S.windFrom)||0)*DEG,cs=Math.cos(wf),sn=Ma
   const raw=cospuReal().map(p=>({x:p.E*cs-p.N*sn,y:p.E*sn+p.N*cs,s:p.s,side:p.side,harb:p.harb,lsc:p.lsc}));
   if(HBMODE){const i=raw.findIndex(p=>p.lsc);if(i>=0){const a=raw[(i-1+raw.length)%raw.length],c=raw[(i+1)%raw.length];let nx=-(c.y-a.y),ny=c.x-a.x;const l=Math.hypot(nx,ny)||1;nx/=l;ny/=l;if(!polyInside(raw,raw[i].x+nx*5,raw[i].y+ny*5)){nx=-nx;ny=-ny;}
     const bo=[raw[i].x+nx*90,raw[i].y+ny*90];const P=raw.map(p=>({x:p.x-bo[0],y:p.y-bo[1],s:p.s,side:p.side,harb:p.harb,lsc:p.lsc,h:cospuSectorH(p.s,p.side)}));return {P,fit:90,fwd:(E,N)=>[E*cs-N*sn-bo[0],E*sn+N*cs-bo[1]],realOf:(x,y)=>{const X=x+bo[0],Y=y+bo[1];return [X*cs+Y*sn,-X*sn+Y*cs];}};}}
-  const probe=cospuCourseProbe();let xs=raw.map(p=>p.x),ys=raw.map(p=>p.y);const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const UP=bahnGet();let best=-2,bo=[0,0];if(UP&&isFinite(UP.E)&&UP.E!==null){bo=[UP.E*cs-UP.N*sn,UP.E*sn+UP.N*cs];best=90;}else{const probe=cospuCourseProbe();let xs=raw.map(p=>p.x),ys=raw.map(p=>p.y);const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
   const ic=S.revier!=='cospu'?[]:COSPU_INSELN.map(r=>{let e=0,nn=0;for(const q of r){e+=q[0];nn+=q[1];}e/=r.length;nn/=r.length;return [e*cs-nn*sn,e*sn+nn*cs];});
   const segD=(X,Y,x0,y0,x1,y1)=>{const dx=x1-x0,dy=y1-y0,l=dx*dx+dy*dy||1;const t=clamp(((X-x0)*dx+(Y-y0)*dy)/l,0,1);return Math.hypot(X-x0-dx*t,Y-y0-dy*t);};
   const score=(ox,oy)=>{let m=1e9;for(const c of ic)if(segD(c[0],c[1],ox,oy-110,ox,oy+S.legLength+50)<70)return -1;for(const [px,py] of probe){const X=px+ox,Y=py+oy;if(!polyInside(raw,X,Y))return -1;const d=polyDist(raw,X,Y)[0];if(d<m)m=d;}return m;};
-  let best=-2,bo=[0,0];for(let ox=x0;ox<=x1;ox+=60)for(let oy=y0;oy<=y1;oy+=60){const s=score(ox,oy);if(s>best){best=s;bo=[ox,oy];}}
-  for(let k=0;k<2;k++){const st=k?6:20;const c=bo.slice();for(let dx=-3;dx<=3;dx++)for(let dy=-3;dy<=3;dy++){const s=score(c[0]+dx*st,c[1]+dy*st);if(s>best){best=s;bo=[c[0]+dx*st,c[1]+dy*st];}}}
+  for(let ox=x0;ox<=x1;ox+=60)for(let oy=y0;oy<=y1;oy+=60){const s=score(ox,oy);if(s>best){best=s;bo=[ox,oy];}}
+  for(let k=0;k<2;k++){const st=k?6:20;const c=bo.slice();for(let dx=-3;dx<=3;dx++)for(let dy=-3;dy<=3;dy++){const s=score(c[0]+dx*st,c[1]+dy*st);if(s>best){best=s;bo=[c[0]+dx*st,c[1]+dy*st];}}}}
   const P=raw.map(p=>({x:p.x-bo[0],y:p.y-bo[1],s:p.s,side:p.side,harb:p.harb,lsc:p.lsc,h:cospuSectorH(p.s,p.side)}));
   const realOf=(x,y)=>{const X=x+bo[0],Y=y+bo[1];return [X*cs+Y*sn,-X*sn+Y*cs];};
   return {P,fit:best,fwd:(E,N)=>[E*cs-N*sn-bo[0],E*sn+N*cs-bo[1]],realOf};}
@@ -7057,16 +7069,16 @@ function newRace(lesson,opts){
   clearRoot();
   CL=CLASSES[S.boatClass]||CLASSES.jolle;L=CL.len;BEAM=CL.key==='topcat'?2.3:CL.beam*0.95;
   {const lake=S.revier==='cospu'||isGL();if(REVIERE_K[S.revier]){if(SHORE.key!==revKey())buildShore();}else if(lake&&SHORE.key!==cospuKey())buildShore();else if(!lake&&(SHORE.kind==='poly'||SHORE.kind==='revier'))buildShore();}
-  const W0=0,U=dirv(W0),R=[U[1],-U[0]];
+  const W0=0,BR=lesson?0:bahnRot(),U=dirv(W0+BR),R=[U[1],-U[0]];   // BR: Bahn gegen den Wind gedreht (Bahn-Editor)
   const n=lesson?2:(opts&&opts.mp?opts.mp.total:Math.min(S.cpuCount+1,CL.gross?10:99));const lineLen=lesson?Math.max(60,(n+1)*Math.max(L,3.5)*1.9):lineLenFor(n,Math.max(L,3.5));
-  const C={W0,U,R,lineLen,lesson:!!lesson};
+  const C={W0,U,R,lineLen,lesson:!!lesson,rot:BR};
   C.pin={x:-R[0]*lineLen/2,y:-R[1]*lineLen/2};C.cb={x:R[0]*lineLen/2,y:R[1]*lineLen/2};
   const mk=(x,y,kind,name)=>({x,y,kind,name});
   /* Tonnen nur mit sinnvollem Abstand zum Ufer: passt die gewünschte Kreuzlänge nicht aufs Wasser, wird die Bahn gekürzt */
   {const soll=S._legUser!=null?S._legUser:S.legLength;S.legLength=soll;S._legUser=null;
    if(!lesson&&soll>150){const ctx=S.courseType,r=clamp(Math.max(L,3.5)*9,45,90),LO=Math.max(55,L*4);
     const frei=(x,y)=>{if(!onWater(x,y))return false;for(let k=0;k<12;k++){const a=k*Math.PI/6;if(!onWater(x+Math.cos(a)*r,y+Math.sin(a)*r)||!onWater(x+Math.cos(a)*r*0.5,y+Math.sin(a)*r*0.5))return false;}return true;};
-    const passt=lg=>{const P=[[U[0]*lg,U[1]*lg]];if(ctx==='offset')P.push([U[0]*lg-R[0]*LO,U[1]*lg-R[1]*LO]);if(ctx==='tri')P.push([U[0]*lg*0.5-R[0]*lg*0.45,U[1]*lg*0.5-R[1]*lg*0.45]);if(S.finishUp)P.push([U[0]*(lg-40)+R[0]*40,U[1]*(lg-40)+R[1]*40]);
+    const passt=lg=>{const P=[[U[0]*lg,U[1]*lg]];if(ctx==='offset')P.push([U[0]*lg-R[0]*LO,U[1]*lg-R[1]*LO]);if(ctx==='tri')P.push([U[0]*lg*0.5-R[0]*lg*0.45,U[1]*lg*0.5-R[1]*lg*0.45]);if(ctx==='trapez'){const D=trapezD(lg);P.push([U[0]*(lg-trapezA(lg))-R[0]*D,U[1]*(lg-trapezA(lg))-R[1]*D],[-U[0]*75-R[0]*D,-U[1]*75-R[1]*D]);}if(S.finishUp)P.push([U[0]*(lg-40)+R[0]*40,U[1]*(lg-40)+R[1]*40]);
       for(const q of P)if(!frei(q[0],q[1]))return false;for(let t=40;t<lg;t+=30){if(!onWater(U[0]*t,U[1]*t))return false;if(!onWater(U[0]*t-R[0]*25,U[1]*t-R[1]*25)||!onWater(U[0]*t+R[0]*25,U[1]*t+R[1]*25))return false;}return true;};
     let lg=soll;while(lg>150&&!passt(lg))lg=Math.max(150,Math.floor(lg*0.95/10)*10);
     if(lg<soll){S._legUser=soll;S.legLength=lg;const t='Kreuz auf '+lg+' m gekürzt – mit '+soll+' m läge eine Tonne zu nah am Ufer oder an Land.';setTimeout(()=>{try{msg(t,'warn');}catch(e){}},400);}}}
@@ -7077,10 +7089,14 @@ function newRace(lesson,opts){
   if(ct==='gate'){const hw=Math.max(10,L*2.2);C.lm.kind='gate';C.lm.name='Leetor';C.lm.hw=hw;C.lm.a={x:C.lm.x-R[0]*hw,y:C.lm.y-R[1]*hw};C.lm.b={x:C.lm.x+R[0]*hw,y:C.lm.y+R[1]*hw};}
   if(ct==='offset')C.om=mk(C.wm.x-R[0]*Math.max(55,L*4)-U[0]*10,C.wm.y-R[1]*Math.max(55,L*4)-U[1]*10,'offset','Ablauftonne');
   if(ct==='tri')C.wing=mk(U[0]*S.legLength*0.5-R[0]*S.legLength*0.45,U[1]*S.legLength*0.5-R[1]*S.legLength*0.45,'wing','Raumtonne');
+  /* Trapez (olympisch, Außenschleife): 1 Luv – Raumschot nach Bb zu 2 – Vorwind zum Leetor 3 – Kreuz zu 2 – Vorwind zu 3 – Raumschot-Ziel an der Startlinie */
+  if(ct==='trapez'){const lg=S.legLength,D=trapezD(lg),hw=Math.max(10,L*2.2);C.wing=mk(U[0]*(lg-trapezA(lg))-R[0]*D,U[1]*(lg-trapezA(lg))-R[1]*D,'wing','Tonne 2');C.wm.name='Tonne 1 (Luv)';
+    C.lm.x=-U[0]*75-R[0]*D;C.lm.y=-U[1]*75-R[1]*D;C.lm.kind='gate';C.lm.name='Leetor 3';C.lm.hw=hw;C.lm.a={x:C.lm.x-R[0]*hw,y:C.lm.y-R[1]*hw};C.lm.b={x:C.lm.x+R[0]*hw,y:C.lm.y+R[1]*hw};}
   C.finishUp=!lesson&&S.finishUp;
   if(C.finishUp){const hl=Math.max(20,L*2.2);const fc={x:C.wm.x-U[0]*Math.max(35,L*2.5)+R[0]*Math.max(30,L*2.5),y:C.wm.y-U[1]*Math.max(35,L*2.5)+R[1]*Math.max(30,L*2.5)};C.fin={c:fc,len:hl*2,a:{x:fc.x-R[0]*hl,y:fc.y-R[1]*hl},b:{x:fc.x+R[0]*hl,y:fc.y+R[1]*hl}};}
   C.seq=[];
   if(lesson){C.seq=lesson.mark==='wind'?[C.wm,'free']:lesson.mark?[C.lm,'free']:['free'];}
+  else if(ct==='trapez'){for(let l=1;l<=S.laps;l++){if(l===1)C.seq.push(C.wm);C.seq.push(C.wing,C.lm);}if(C.finishUp)C.seq.push(C.wing);C.seq.push('finish');}
   else{for(let l=1;l<=S.laps;l++){const last=l===S.laps;C.seq.push(C.wm);if(C.om)C.seq.push(C.om);if(C.wing)C.seq.push(C.wing);if(!last||C.finishUp)C.seq.push(C.lm);}C.seq.push('finish');}
   const ptOf=e=>e==='finish'?(C.finishUp?C.fin.c:{x:0,y:0}):isMark(e)?e:null;
   for(let i=0;i<C.seq.length;i++){const m=C.seq[i];if(!isMark(m)||m.d)continue;const pv=i>0?ptOf(C.seq[i-1]):{x:0,y:0},nx=ptOf(C.seq[i+1]);if(!pv||!nx){m.d=[-U[0],-U[1]];continue;}
@@ -7308,13 +7324,13 @@ function buildCourse3D(){
   for(const m of marks){const o=at(buoy(),m.x,m.y);C3.floats.push({o,x:m.x,y:m.y,bu:m});tag(o,(m.m&&m.m.name)||'Tonne',3.4,'#fdd835');}
   if(!C.lesson){
     const pin=buoy(0.72);const pole=new THREE.Mesh(GEO.unitCyl,MAT.dark);pole.scale.set(0.035,2.6,0.035);pole.position.y=2.9;const fl=new THREE.Mesh(new THREE.PlaneGeometry(0.85,0.57).rotateY(Math.PI/2).translate(0,-0.29,0.44),new THREE.MeshLambertMaterial({map:flagTex('wl'),side:THREE.DoubleSide}));fl.position.y=4.15;pin.add(pole,fl);at(pin,C.pin.x,C.pin.y);C3.floats.push({o:pin,x:C.pin.x,y:C.pin.y});tag(pin,'Pin-Tonne',5.1,'#ff6a1a');
-    const cb=committeeBoat('start');C3.cbFlags=cb.userData.flags;cb.rotation.y=-C.W0*DEG;at(cb,C.cb.x,C.cb.y);C3.floats.push({o:cb,x:C.cb.x,y:C.cb.y,k:0.4});tag(cb,'Startschiff „Achim“',5.0,'#ff6a1a');
+    const cb=committeeBoat('start');C3.cbFlags=cb.userData.flags;cb.rotation.y=-(C.W0+(C.rot||0))*DEG;at(cb,C.cb.x,C.cb.y);C3.floats.push({o:cb,x:C.cb.x,y:C.cb.y,k:0.4});tag(cb,'Startschiff „Achim“',5.0,'#ff6a1a');
     {const dx=C.cb.x-C.pin.x,dy=C.cb.y-C.pin.y,len=Math.hypot(dx,dy);const lm=new THREE.MeshBasicMaterial({color:0xff3b30,transparent:true,opacity:0.85,depthWrite:false,side:THREE.DoubleSide});
       const tube=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,len,8,1,true),lm);tube.rotation.z=Math.PI/2;tube.position.y=0.38;
       const rib=new THREE.Mesh(new THREE.PlaneGeometry(len,0.9),lm);rib.rotation.x=-Math.PI/2;rib.position.y=0.14;
       const line=new THREE.Group();line.add(tube,rib);line.position.set((C.pin.x+C.cb.x)/2,0,-(C.pin.y+C.cb.y)/2);line.rotation.y=Math.atan2(dy,dx);raceRoot.add(line);G.noRefl.push(line);C3.line=line;C3.lineMat=lm;}
     if(C.finishUp){const F=C.fin;const fb=at(buoy(),F.a.x,F.a.y);fb.scale.setScalar(0.8);C3.floats.push({o:fb,x:F.a.x,y:F.a.y});tag(fb,'Zieltonne',3.0,'#2d6cdf');
-      const zs=committeeBoat('finish');zs.rotation.y=-C.W0*DEG;at(zs,F.b.x,F.b.y);C3.floats.push({o:zs,x:F.b.x,y:F.b.y,k:0.4});tag(zs,'Zielschiff „Achim“',5.0,'#2d6cdf');
+      const zs=committeeBoat('finish');zs.rotation.y=-(C.W0+(C.rot||0))*DEG;at(zs,F.b.x,F.b.y);C3.floats.push({o:zs,x:F.b.x,y:F.b.y,k:0.4});tag(zs,'Zielschiff „Achim“',5.0,'#2d6cdf');
       const fl2=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(F.a.x,0.35,-F.a.y),new THREE.Vector3(F.b.x,0.35,-F.b.y)]),new THREE.LineDashedMaterial({color:0x5fb4ff,dashSize:2,gapSize:1.5,transparent:true,opacity:0.6}));fl2.computeLineDistances();raceRoot.add(fl2);G.noRefl.push(fl2);}
   }
   for(const m of marks){if(m.m&&m.m.kind==='wp')continue;const z=new THREE.Mesh(new THREE.RingGeometry(S.zone*L-0.15,S.zone*L+0.15,72).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.28,depthWrite:false}));z.position.set(m.x,0.3,-m.y);raceRoot.add(z);C3.zones.push(z);G.noRefl.push(z);}
@@ -7818,7 +7834,7 @@ function renderLessonList(){const el=document.getElementById('lessonList');el.in
   LESSONS.forEach((l,i)=>{const b=document.createElement('button');b.type='button';b.className='lesson';
     b.innerHTML='<span class="no">'+(i+1)+'</span><span class="rl">'+l.rule+'</span><span class="ck">'+(lessonDone[l.id]?'✓ geschafft':'')+'</span><span class="tt">'+l.title+'</span>';
     b.onclick=()=>openLesson(i);el.appendChild(b);});el.appendChild(qb);}
-function hideAllOv(){for(const id of ['schoolOv','flagOv','freeOv','menu','tutOv','lesOv','lesResOv','pauseOv','resOv','drillOv','anaOv','quizOv','mpOv','dsOv','hbOv','hbResOv','edOv','bmOv','lvOv'])document.getElementById(id).hidden=true;}
+function hideAllOv(){for(const id of ['schoolOv','flagOv','freeOv','menu','tutOv','lesOv','lesResOv','pauseOv','resOv','drillOv','anaOv','quizOv','mpOv','dsOv','hbOv','hbResOv','edOv','bmOv','lvOv','bnOv'])document.getElementById(id).hidden=true;}
 function openTutorial(){restoreS();if(G){G.running=false;G.paused=false;}hideAllOv();hudEl.hidden=true;renderLessonList();tutOv.hidden=false;}
 function openLesson(i){curLesson=i;const l=LESSONS[i];hideAllOv();hudEl.hidden=true;
   document.getElementById('lesNo').textContent='Lektion '+(i+1)+' von '+LESSONS.length+' · '+l.rule;
@@ -8311,7 +8327,7 @@ function drawMap(){
   const C=G.course;const pl=HELI.an?Object.assign(Object.create(P()),{x:HELI.x,y:HELI.y}):P();let sc,mp;
   if(C.lesson){const cx=pl.x*C.R[0]+pl.y*C.R[1],ca=pl.x*C.U[0]+pl.y*C.U[1];sc=Math.min(W,H)/140;mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+(lat-cx)*sc,H/2-(al-ca)*sc];};}
   else if(C.wps||SHORE.kind==='revier'){const RR=1500,s0=Math.min(W,H)/(2*RR);sc=s0;const cx=pl.x*C.R[0]+pl.y*C.R[1],ca=pl.x*C.U[0]+pl.y*C.U[1];mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+(lat-cx)*s0,H/2-(al-ca)*s0];};}
-  else{const LW=Math.max(C.lineLen*1.1,S.legLength*0.5,C.wing||C.om?S.legLength*0.5+60:0);const aMin=-110,aMax=S.legLength+50;const pad=8;sc=Math.min((W-2*pad)/(2*LW),(H-2*pad)/(aMax-aMin));
+  else{const LW=Math.max(C.lineLen*1.1,S.legLength*0.5,C.wing||C.om?S.legLength*0.5+60:0,S.courseType==='trapez'&&!C.lesson?trapezD(S.legLength)+80:0);const aMin=-110,aMax=S.legLength+50;const pad=8;sc=Math.min((W-2*pad)/(2*LW),(H-2*pad)/(aMax-aMin));
     mp=(wx,wy)=>{const lat=wx*C.R[0]+wy*C.R[1],al=wx*C.U[0]+wy*C.U[1];return [W/2+lat*sc,H-pad-(al-aMin)*sc];};}
   MAPROT=0;if(S.mapNord!=='wind'&&!C.lesson&&SHORE.realOf&&SHORE.fwd){const r0=SHORE.realOf(pl.x,pl.y),w1=SHORE.fwd(r0[0],r0[1]+100),a0=mp(pl.x,pl.y),a1=mp(w1[0],w1[1]),al=Math.atan2(a1[0]-a0[0],-(a1[1]-a0[1]));
     if(Math.abs(al)>1e-4){MAPROT=-al;const cs=Math.cos(MAPROT),sn=Math.sin(MAPROT),cx0=W/2,cy0=H/2,mpR=mp;mp=(wx,wy)=>{const [a,b]=mpR(wx,wy),dx=a-cx0,dy=b-cy0;return [cx0+dx*cs-dy*sn,cy0+dx*sn+dy*cs];};}}
@@ -8320,7 +8336,7 @@ function drawMap(){
     else if(Z>1){const [bx,by]=mp(pl.x,pl.y);fx=bx-mz.px/Z;fy=by-mz.py/Z;}else{fx=W/2;fy=H/2;}
     mz._fx=fx;mz._fy=fy;
     if(Z!==1||fx!==W/2||fy!==H/2){const mp0=mp;mp=(wx,wy)=>{const [a,b]=mp0(wx,wy);return [W/2+(a-fx)*Z,H/2+(b-fy)*Z];};sc*=Z;}}
-  mapAff(mp);x.fillStyle='rgba(14,52,70,.55)';x.fillRect(0,0,W,H);if(S.ladder&&!C.lesson&&!G.row&&!C.wps)drawLadderMap(x,mp);drawShoreMap(x,mp,W,H);revMapDraw(x,mp,W,H);akMapDraw(x,mp,dpr);hbMapDraw(x,mp);
+  mapAff(mp);x.fillStyle='rgba(14,52,70,.55)';x.fillRect(0,0,W,H);if(S.ladder&&!C.lesson&&!G.row&&!C.wps)drawLadderMap(x,mp);drawShoreMap(x,mp,W,H);revMapDraw(x,mp,W,H);akMapDraw(x,mp,dpr);akBootMap(x,mp);hbMapDraw(x,mp);
   for(const p of G.wind.puffs){if(p.env<0.05)continue;const [px,py]=mp(p.x,p.y);x.beginPath();x.arc(px,py,p.r*sc,0,Math.PI*2);x.fillStyle=p.str>0?'rgba(2,14,26,'+(0.45*p.env*Math.min(1,p.str*3))+')':'rgba(210,235,245,'+(0.22*p.env)+')';x.fill();}
   if(S.laylines){const ll=laylines(pl);if(ll){const [mx,my]=mp(ll.m.x,ll.m.y);[[ll.b1,'#3fd08a'],[ll.b2,'#ff4f5f']].forEach(([bb,c])=>{const d=dirv(bb);const [ex,ey]=mp(ll.m.x+d[0]*1500,ll.m.y+d[1]*1500);x.strokeStyle=c;x.globalAlpha=0.6;x.lineWidth=1;x.beginPath();x.moveTo(mx,my);x.lineTo(ex,ey);x.stroke();x.globalAlpha=1;});}}
   if(!C.lesson){const [ax,ay]=mp(C.pin.x,C.pin.y),[bx,by]=mp(C.cb.x,C.cb.y);x.setLineDash(G.t<0?[]:[3,3]);x.strokeStyle=G.t<0?'#ff4f5f':'#3fd08a';x.lineWidth=G.t<0?2:1.5;x.beginPath();x.moveTo(ax,ay);x.lineTo(bx,by);x.stroke();x.setLineDash([]);
@@ -8398,6 +8414,7 @@ function renderBoats(dt,now){
     if(m.mizP){m.mizRot=(m.mizRot||0)+(-ss*(4+b.trim*70)*DEG-(m.mizRot||0))*Math.min(1,dt*4);m.mizP.rotation.y=m.mizRot;m.mizMain.scale.x=(m.mizRot<0?-1:1)*flut;}
     if(m.zk)zkUpd(b,m);
     if(m.ixy)ixyUpd(b,m);
+    if(m.lvX&&!m.imo)m.lvX.upd();
     if(m.imo)imoUpd(b,m);
     m.wlMat.uniforms.uT.value=now;m.wlMat.uniforms.uA.value=b.ghost?0:clamp(b.v/3,0,1)*0.85*(1-(b.foil||0))*(CL.key==='imoca'?1-clamp((b.v/KN-14)/10,0,1)*0.6:1);
     if(m.keelG){const kt=ss*IMO_KIEL*clamp(((m.hN||0)-0.12)/0.6,0,1);m.keelG.rotation.z+=(kt-m.keelG.rotation.z)*Math.min(1,dt*0.7);   // IMOCA: Schwenkkiel bis 38° nach Luv, je nach Krängungsdruck
@@ -8484,7 +8501,7 @@ function render(dt,now){try{revTick();revFeuerTick();revNachtTick();revBrueckenT
   if(C3.line){C3.line.position.y=WAMP*0.8;if(C3.lineMat){const pre=G.t<0&&!(G.flags&&G.flags.ap&&false);C3.lineMat.color.setHex(pre?0xff3b30:0x31d07a);C3.lineMat.opacity=pre&&G.t>-10&&G.running?0.6+0.35*Math.abs(Math.sin(now*Math.PI)):0.85;}}
   const t=pl.finished?null:(pl.started?G.course.seq[pl.leg]:G.course.wm);
   C3.beacon.visible=!!(isMark(t)&&G.running&&!G.course.lesson);if(C3.beacon.visible)C3.beacon.position.set(t.x,12,-t.y);
-  updateRoundArrow(now);updateVectors();updateFan(dt);updateLadder();try{akTick();}catch(e){console.error('Abdeckungskarte',e);AK.err=(AK.err||0)+1;}
+  updateRoundArrow(now);updateVectors();updateFan(dt);updateLadder();try{akTick();}catch(e){console.error('Abdeckungskarte',e);AK.err=(AK.err||0)+1;}try{akBooteWasser();}catch(e){}
   updateCam(dt,now);
   camera.getWorldDirection(_c);_c.y=0;if(_c.lengthSq()>1e-6)_c.normalize();const sx=camera.position.x+_c.x*14,sz=camera.position.z+_c.z*14;waterNear.position.set(sx,0,sz);waterFar.position.set(camera.position.x,-0.04,camera.position.z);{const wf=HELI.an?Math.max(1,Math.min(12,camera.position.y/22)):1;if(waterNear.scale.x!==wf){waterNear.scale.set(wf,1,wf);waterFar.scale.set(wf,1,wf);}}
   sky.position.copy(camera.position);astroTick(now);camera.updateMatrixWorld();wxUpdate(dt,now);navUpdate();glare.position.copy(camera.position).addScaledVector(SUN_DIR,5000);
@@ -8691,10 +8708,10 @@ function mpBegin(d,from){if(!d||!Array.isArray(d.R)||!d.R.some(r=>r[0]===MP.self
   msg(pl.rib?(G.free?'Freies Training – Trainer im Motorboot':'Wettfahrtleitung im Schlauchboot')+' · Gas mit W/S bzw. Gas-Knöpfen. '+sailors+' Boote auf dem Wasser.':G.free?CL.name+' · Freies Training – ohne Start und Wertung. Enter = Chat.':CL.name+' · Mehrspieler mit '+(sailors+(d.cpu|0))+' Booten. Tonnen an Backbord runden.','info');}
 /* Bootsdesign und Hafenobjekte im Mehrspieler: nur geprüfte Werte übernehmen */
 const mpHex=v=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v)?v:'';
-function mpDesignOut(){return {s:DESIGN.sail||'',p:DESIGN.spi||'',c:DESIGN.crew||'',b:DESIGN.band||'',dk:DESIGN.deck||'',st:DESIGN.stripe||'none',sc:DESIGN.stripeColor||'',e:DESIGN.emblem||'none',ec:DESIGN.emblemColor||'',lv:livAktiv()||undefined};}
+function mpDesignOut(){return {s:DESIGN.sail||'',p:DESIGN.spi||'',c:DESIGN.crew||'',b:DESIGN.band||'',dk:DESIGN.deck||'',st:DESIGN.stripe||'none',sc:DESIGN.stripeColor||'',e:DESIGN.emblem||'none',ec:DESIGN.emblemColor||'',lv:(typeof livAktivK==='function'&&livAktivK(S.boatClass))||undefined,lvc:S.boatClass};}
 function mpDesignIn(d){if(!d||typeof d!=='object')return null;const ok=(v,l)=>l.includes(v)?v:'none';
-  return {s:mpHex(d.s),p:mpHex(d.p),c:mpHex(d.c),b:mpHex(d.b),st:ok(d.st,['none','single','double','wave','sweep']),sc:mpHex(d.sc)||'#ffffff',e:ok(d.e,['none','anchor','star','gull','compass','flame','wave','heart']),ec:mpHex(d.ec)||'#ffffff',lv:typeof livSan==='function'?livSan(d.lv):null};}
-function mpDesignApply(b,d){if(!d)return;b.liv=d.lv||null;b.spiColor=d.p||'';b.crewColor=d.c||'';b.bandColor=d.b||'';b.deckColor=/^#[0-9a-f]{6}$/i.test(d.dk||'')?d.dk:'';if(d.st!=='none'||d.e!=='none')b.deco={stripe:d.st,stripeColor:d.sc,emblem:d.e,emblemColor:d.ec};}
+  return {s:mpHex(d.s),p:mpHex(d.p),c:mpHex(d.c),b:mpHex(d.b),st:ok(d.st,['none','single','double','wave','sweep']),sc:mpHex(d.sc)||'#ffffff',e:ok(d.e,['none','anchor','star','gull','compass','flame','wave','heart']),ec:mpHex(d.ec)||'#ffffff',lv:typeof livSan==='function'?livSan(d.lv):null,lvc:LIV_PROF&&LIV_PROF[d.lvc]?d.lvc:'imoca'};}
+function mpDesignApply(b,d){if(!d)return;b.liv=d.lv||null;b.livCls=d.lvc||'imoca';b.spiColor=d.p||'';b.crewColor=d.c||'';b.bandColor=d.b||'';b.deckColor=/^#[0-9a-f]{6}$/i.test(d.dk||'')?d.dk:'';if(d.st!=='none'||d.e!=='none')b.deco={stripe:d.st,stripeColor:d.sc,emblem:d.e,emblemColor:d.ec};}
 function mpObjsIn(o){if(!o||typeof o!=='object')return null;const num=v=>typeof v==='number'&&isFinite(v)?Math.max(-5000,Math.min(5000,v)):0,vec=a=>Array.isArray(a)&&a.length===3?a.map(num):[0,0,0],id=v=>typeof v==='string'&&v.length<80?v:null;
   const out={ov:{},cp:[]};if(o.ov&&typeof o.ov==='object')for(const k of Object.keys(o.ov).slice(0,500)){const e=o.ov[k];if(!id(k)||!e)continue;out.ov[k]={d:vec(e.d),r:num(e.r)};if(e.x)out.ov[k].x=true;}
   if(Array.isArray(o.cp))for(const c of o.cp.slice(0,200)){if(!c||!id(c.k)||!id(c.src))continue;const q={k:c.k,src:c.src,d:vec(c.d),r:num(c.r),s:typeof c.s==='number'&&isFinite(c.s)?c.s|0:1};if(Array.isArray(c.t))q.t=c.t.slice(0,150).filter(t=>Array.isArray(t)&&typeof t[2]==='string'&&t[2].length<12).map(t=>[num(t[0]),num(t[1]),t[2]]);out.cp.push(q);}return out;}
@@ -9118,9 +9135,9 @@ function renderDesigner(){const box=$('dsBox');let h='<div class="dsrow"><label 
   const cols=(k)=>{let r='<div class="sws">';for(const c of ['#ffffff','#ffd23f','#ff7a1a','#e5484d','#3d8bff','#1d3557','#2bb3a3','#2b2b2b'])r+='<button type="button" class="swb'+(DESIGN[k]===c?' sel':'')+'" data-k="'+k+'" data-c="'+c+'" style="background:'+c+'" aria-label="Farbe '+c+'"></button>';return r+'<input type="color" data-k="'+k+'" value="'+(DESIGN[k]||'#ffffff')+'" aria-label="eigene Farbe"></div>';};
   h+=opt('stripe','Zierstreifen am Rumpf',[['none','keiner'],['single','einfach'],['double','doppelt'],['wave','Welle'],['sweep','schräg']])+cols('stripeColor');
   h+=opt('emblem','Emblem an beiden Seiten',[['none','keins'],['anchor','Anker'],['star','Stern'],['gull','Möwen'],['compass','Kompass'],['flame','Flammen'],['wave','Wellen'],['heart','Herz']])+cols('emblemColor');
-  {const lv=DESIGN.liv,on=!!(lv&&lv.on);h='<div class="dslv"><p><b style="color:var(--ink)">Lackierung IMOCA 60</b><br>Rumpf, Deck und Segel mit eigenen Linien, Formen, Streifen und Schrift gestalten, Foils, Kiel, Ruder, Bugspriet und Mast einfärben – mit 3D-Vorschau.'+(lv?' Im Rennen: '+(on?'deine Lackierung':'Original-Design')+'.':'')+'</p><button type="button" class="btn blue" id="dsLv">Lackierung gestalten</button>'+(lv?'<button type="button" class="optb'+(on?' sel':'')+'" id="dsLvOn">'+(on?'✓ verwenden':'verwenden')+'</button>':'')+'</div>'+h;}
+  {const lk=LIV_PROF[S.boatClass]?S.boatClass:'imoca',lv=livDataK(lk),on=!!(lv&&lv.on);h='<div class="dslv"><p><b style="color:var(--ink)">Lackierung '+LIV_PROF[lk].name+'</b> <span style="font-size:12px">(auch IMOCA 60, Kutter ZK 10, Ixylon, Topcat K2)</span><br>Rumpf und Segel mit eigenen Linien, Formen, Streifen und Schrift gestalten – bei der IMOCA auch Deck, Foils, Kiel, Ruder, Bugspriet und Mast – mit 3D-Vorschau.'+(lv?' Im Rennen: '+(on?'deine Lackierung':'Original-Design')+'.':'')+'</p><button type="button" class="btn blue" id="dsLv">Lackierung gestalten</button>'+(lv?'<button type="button" class="optb'+(on?' sel':'')+'" id="dsLvOn">'+(on?'✓ verwenden':'verwenden')+'</button>':'')+'</div>'+h;}
   box.innerHTML=h;$('dsPrev').innerHTML=designSvg();
-  $('dsLv').onclick=livOpen;if($('dsLvOn'))$('dsLvOn').onclick=()=>{DESIGN.liv.on=!DESIGN.liv.on;saveDesign();renderDesigner();};
+  {const lk=LIV_PROF[S.boatClass]?S.boatClass:'imoca';$('dsLv').onclick=()=>livOpen(lk);if($('dsLvOn'))$('dsLvOn').onclick=()=>{const L=livDataK(lk);L.on=!L.on;saveDesign();renderDesigner();};}
   box.querySelectorAll('.optb').forEach(b=>b.onclick=()=>{DESIGN[b.dataset.o]=b.dataset.v;saveDesign();renderDesigner();});
   $('dsName').oninput=e=>{DESIGN.name=e.target.value.trim().toUpperCase().slice(0,14);saveDesign();$('dsPrev').innerHTML=designSvg();};
   $('dsNo').oninput=e=>{S.sailNo=e.target.value.trim().toUpperCase()||'GER 1';saveS();$('dsPrev').innerHTML=designSvg();};
@@ -10094,7 +10111,7 @@ function skuaApply(b,g,m){const T=MODELS.skua;if(!T){modelLoad('skua');return;}
   const root=new THREE.Group();root.name='skua';g.add(root);
   {const R=RIG(),a=new THREE.Vector3(0,0.47,-0.30),t=R.genn?V3(R.genn.T):new THREE.Vector3(0,0.62,-3.25),L=a.distanceTo(t);const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.028,0.038,L,10),new THREE.MeshStandardMaterial({color:0x2b3135,roughness:0.45,metalness:0.3}));pole.position.copy(a).add(t).multiplyScalar(0.5);pole.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),t.clone().sub(a).normalize());pole.castShadow=true;pole.name='Gennakerbaum';root.add(pole);}
   const grp={};if(T.ax.rS)grp.rS={test:n=>/^(Ruder|Ruderkopf) Stb\.$/.test(n),o:T.ax.rS};if(T.ax.rB)grp.rB={test:n=>/^(Ruder|Ruderkopf) Bb\.$/.test(n),o:T.ax.rB};
-  const S=mdlBuild(T,root,{hide:SKUA_HIDE,piv:T.ax.piv,grp});
+  const lvt=livFor(b,'topcat'),LXt=lvt?livCtx(T,lvt,LIV_PROF.topcat):null;const S=mdlBuild(T,root,{hide:SKUA_HIDE,piv:T.ax.piv,grp,mat:LXt?LXt.mat:undefined});if(LXt){LXt.post(root,S);LXt.paint(lvt);m.lvX=LXt;}
   m.skua={S,cm:T.ax.cm,sgM:m.main?mdlMeanX(m.main.geometry):1,sgJ:m.fock?mdlMeanX(m.fock.geometry):1};}
 function skuaUpd(b,m){const K=m.skua;if(!K)return;const S=K.S;
   if(m.main)mdlSail(S.piv['Großsegel'],m.boomRot,m.main.scale.x*K.sgM*(K.cm['Großsegel']||1));
@@ -10116,7 +10133,7 @@ function zkApply(b,g,m){const T=MODELS.zk;if(!T){modelLoad('zk');return;}
     if(!c||c===hx)return null;if(!own.has(mt)){const k=mt.clone();k.color.set(c);own.set(mt,k);}return own.get(mt);};
   const root=new THREE.Group();root.name='zk10gfk';g.add(root);
   const grp=T.ax.rud?{rud:{test:n=>n==='Ruder'||n==='Pinne',o:T.ax.rud}}:{};
-  const S=mdlBuild(T,root,{piv:T.ax.piv,grp,mat,rig:ZK_RIG});for(const n in S.piv)S.piv[n].g.userData.rig=1;
+  const lvz=livFor(b,'zk10'),LXz=lvz?livCtx(T,lvz,LIV_PROF.zk10):null;const S=mdlBuild(T,root,{piv:T.ax.piv,grp,mat:LXz?(n,mt)=>LXz.mat(n,mt)||mat(n,mt):mat,rig:ZK_RIG});if(LXz){LXz.post(root,S);LXz.paint(lvz);m.lvX=LXz;}for(const n in S.piv)S.piv[n].g.userData.rig=1;
   m.zk={S,cm:T.ax.cm,sgM:m.main?mdlMeanX(m.main.geometry):1,sgZ:m.mizMain?mdlMeanX(m.mizMain.geometry):1,sgJ:m.fock?mdlMeanX(m.fock.geometry):1};}
 function zkUpd(b,m){const K=m.zk;if(!K)return;const S=K.S;
   if(m.main)mdlSail(S.piv['Großsegel'],m.boomRot,m.main.scale.x*K.sgM*(K.cm['Großsegel']||1));
@@ -10172,7 +10189,7 @@ function ixyApply(b,g,m){const T=MODELS.ixy;if(!T){modelLoad('ixy');return;}
   const root=new THREE.Group();root.name='ixylon';g.add(root);
   const grp={};if(T.ax.rud)grp.rud={test:n=>n==='Senkruder'||n==='Ruderkopf'||n==='Pinne mit Ausleger',o:T.ax.rud};
   if(T.ax.bS)grp.bS={test:n=>n==='Kimmschwert Stb. (Holz)',o:T.ax.bS};if(T.ax.bB)grp.bB={test:n=>n==='Kimmschwert Bb. (Holz)',o:T.ax.bB};
-  const S=mdlBuild(T,root,{hide:IXY_HIDE,piv:T.ax.piv,grp,mat,rig:IXY_RIG});for(const n in S.piv)S.piv[n].g.userData.rig=1;
+  const lvi=livFor(b,'ixylon'),LXi=lvi?livCtx(T,lvi,LIV_PROF.ixylon):null;const S=mdlBuild(T,root,{hide:IXY_HIDE,piv:T.ax.piv,grp,mat:LXi?(n,mt)=>LXi.mat(n,mt)||mat(n,mt):mat,rig:IXY_RIG});if(LXi){LXi.post(root,S);LXi.paint(lvi);m.lvX=LXi;}for(const n in S.piv)S.piv[n].g.userData.rig=1;
   m.ixy={S,cm:T.ax.cm,sgM:m.main?mdlMeanX(m.main.geometry):1,sgJ:m.fock?mdlMeanX(m.fock.geometry):1};}
 function ixyUpd(b,m){const K=m.ixy;if(!K)return;const S=K.S;
   if(m.main)mdlSail(S.piv[IXY_GROSS],m.boomRot,m.main.scale.x*K.sgM*(K.cm[IXY_GROSS]||1));
@@ -10191,6 +10208,129 @@ function ixyGeo(o){const sh=HSHAPE.ixylon;const zOf=u=>-sh.len/2+u*sh.len;const 
     box(0.03,0.05,0.42,sd*0.47,Y(0.46)+0.045,zOf(0.46),'cock');
     box(0.045,0.012,1.6,sd*0.17,Y(0.62)+0.02,zOf(0.62),'dark');box(0.016,0.016,3.0,sd*0.71,Y(0.55)+0.03,zOf(0.55),'dark');}
   box(1.0,0.12,0.05,0,Y(0.355)+0.06,zOf(0.355),'cock');box(0.5,0.012,0.34,0,Y(0.27)+0.012,zOf(0.27),'dark');box(1.3,0.02,0.04,0,Y(0.9)+0.02,zOf(0.9),'dark');}
+
+/* ---------- Bahn selbst setzen: verschieben, drehen, nach Wind ausrichten ----------
+   Gespeichert je Revier (bei Küstenrevieren je Regattafeld) in echten Koordinaten: Mitte der Startlinie (E,N) und Drehung gegen den Wind.
+   Drehung > 0: Bahnachse im Uhrzeigersinn neben dem Wind → Pin-Ende bevorzugt, Kreuz schief (Trainingshilfe für Startlinien-Vorteile). */
+function bahnKey(){if(REVIERE_K[S.revier])return S.revier+'|'+(S.revKurs||'bb');if(typeof isGL==='function'&&isGL()&&GL())return 'gl|'+GL().name;return S.revier;}
+function bahnErlaubt(){return !(REVIERE_K[S.revier]&&REVX&&!revIsBahn())&&SHORE.kind!=='small';}
+function bahnGet(){const B=S.bahnPos;return B&&typeof B==='object'&&B[bahnKey()]||null;}
+function bahnRot(){if(REVIERE_K[S.revier]&&REVX&&!revIsBahn())return 0;const b=bahnGet();return b&&isFinite(b.rot)?clamp(b.rot,-60,60):0;}
+function bahnSig(){const b=bahnGet();return b&&isFinite(b.E)?Math.round(b.E)+','+Math.round(b.N):'';}
+function trapezD(lg){return Math.max(60,lg*0.55);}function trapezA(lg){return Math.max(25,lg*0.12);}
+function bahnGeom(ox,oy,rot){const U=dirv(rot),R=[U[1],-U[0]],n=Math.min(S.cpuCount+1,CL.gross?10:99),LL=Math.max(L,3.5),lineLen=lineLenFor(n,LL),lg=S.legLength,ct=S.courseType;
+  const P=(a,l)=>({x:ox+U[0]*a+R[0]*l,y:oy+U[1]*a+R[1]*l});const o={U,R,lineLen,pin:P(0,-lineLen/2),cb:P(0,lineLen/2),marks:[],weg:[]};
+  const wm=P(lg,0);o.marks.push({p:wm,n:'Luv'});let lee;
+  if(ct==='gate'){const hw=Math.max(10,L*2.2);o.marks.push({p:P(-75,-hw),n:'Leetor'},{p:P(-75,hw),n:''});lee=P(-75,0);}else{lee=P(-75,0);o.marks.push({p:lee,n:'Lee'});}
+  let after=wm;if(ct==='offset'){const om=P(lg-10,-Math.max(55,L*4));o.marks.push({p:om,n:'Ablauf'});after=om;}
+  if(ct==='trapez'){o.marks.pop();const D=trapezD(lg),hw=Math.max(10,L*2.2),t2=P(lg-trapezA(lg),-D),g3=P(-75,-D);o.marks[0].n='1';o.marks.push({p:t2,n:'2'},{p:P(-75,-D-hw),n:'Tor 3'},{p:P(-75,-D+hw),n:''});o.weg=[P(0,0),wm,t2,g3,t2,g3,P(0,0)];}
+  else if(ct==='tri'){const wg=P(lg*0.5,-lg*0.45);o.marks.push({p:wg,n:'Raum'});o.weg=[P(0,0),wm,wg,lee,wm];}else o.weg=[P(0,0),wm,after,lee,wm];
+  if(S.finishUp){const fc=P(lg-Math.max(35,L*2.5),Math.max(30,L*2.5)),hl=Math.max(20,L*2.2);o.fin=[{x:fc.x-R[0]*hl,y:fc.y-R[1]*hl},{x:fc.x+R[0]*hl,y:fc.y+R[1]*hl}];}
+  return o;}
+function bahnFrei(x,y){const r=clamp(Math.max(L,3.5)*9,45,90);try{if(!onWater(x,y))return 0;for(let k=0;k<12;k++){const a=k*Math.PI/6;if(!onWater(x+Math.cos(a)*r,y+Math.sin(a)*r)||!onWater(x+Math.cos(a)*r*0.5,y+Math.sin(a)*r*0.5))return 1;}}catch(e){return 2;}return 2;}
+const BN={dx:0,dy:0,rot:0,view:null,zoom:1,pan:[0,0],drag:null,ras:null,cov:false};
+function bahnOpen(){if(!bahnErlaubt()){msg(SHORE.kind==='small'?'Auf offenem Wasser ohne Ufer gibt es nichts zu verschieben – die Drehung stellst du hier trotzdem ein.':'Bei Langstrecken legt die Strecke den Kurs fest. Wähle ein Regattafeld, um die Bahn selbst zu setzen.','warn');if(SHORE.kind!=='small')return;}
+  hideAllOv();$('bnOv').hidden=false;BN.dx=0;BN.dy=0;BN.rot=G&&G.course&&G.course.rot||0;BN.zoom=1;BN.pan=[0,0];BN.ras=null;BN.cov=!!(S.abdeckKarte&&S.abdeckKarte!=='aus');
+  const nm={cospu:'Cospudener See',cospu_neu:'Cospudener See',rangs:'Rangsdorfer See'}[S.revier]||(REVIERE_K[S.revier]?(REVIERE_K[S.revier].name||S.revier)+' · '+(revKursName()||''):S.revier);$('bnRev').textContent='· '+nm;
+  bahnPanel();requestAnimationFrame(bahnDraw);}
+function bahnClose(){hideAllOv();toMenu();}
+function bahnUebernehmen(auto){const k=bahnKey();S.bahnPos=Object.assign({},S.bahnPos||{});
+  if(auto)delete S.bahnPos[k];else{let E=null,N=null;if(SHORE.realOf&&SHORE.kind!=='small'){[E,N]=SHORE.realOf(BN.dx,BN.dy);}S.bahnPos[k]={E,N,rot:Math.round(BN.rot*10)/10};if(E==null)S.bahnPos[k]={E:null,N:null,rot:S.bahnPos[k].rot};}
+  saveS();try{buildShore();}catch(e){console.error(e);}newRace(null);
+  msg(auto?'Bahn wird wieder automatisch gelegt.':'Bahn übernommen'+(Math.abs(BN.rot)>=0.5?' – '+Math.abs(BN.rot).toFixed(0)+'° gegen den Wind gedreht':' – genau im Wind'),'info');bahnClose();}
+function bahnView(cv){const W=cv.clientWidth,H=cv.clientHeight,o=bahnGeom(BN.dx,BN.dy,BN.rot);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const q of [o.pin,o.cb,...o.marks.map(m=>m.p)]){x0=Math.min(x0,q.x);x1=Math.max(x1,q.x);y0=Math.min(y0,q.y);y1=Math.max(y1,q.y);}
+  if(!BN.base){const m=Math.max(200,S.legLength*0.6);BN.base={cx:(x0+x1)/2,cy:(y0+y1)/2,w:x1-x0+2*m,h:y1-y0+2*m};}
+  const B=BN.base,k=Math.min(W/B.w,H/B.h)*BN.zoom,cx=B.cx+BN.pan[0],cy=B.cy+BN.pan[1];BN.view={k,ox:W/2-cx*k,oy:H/2+cy*k,W,H};}
+const bnS=(x,y)=>[BN.view.ox+x*BN.view.k,BN.view.oy-y*BN.view.k],bnW=(sx,sy)=>[(sx-BN.view.ox)/BN.view.k,(BN.view.oy-sy)/BN.view.k];
+/* Hintergrund: Land/Wasser (und auf Wunsch die Abdeckung durch das Ufer), schrittweise gerechnet */
+function bahnRaster(){const V=BN.view;if(!V)return;const [ax,ay]=bnW(0,V.H),[bx,by]=bnW(V.W,0),n=Math.round(clamp(Math.max(V.W,V.H)/3.2,120,260)),cs=Math.max(bx-ax,by-ay)/n,nx=Math.ceil((bx-ax)/cs),ny=Math.ceil((by-ay)/cs);
+  const key=[Math.round(ax/cs),Math.round(ay/cs),Math.round(cs*10),nx,ny,BN.cov,SHORE.key].join('|');let R=BN.ras;
+  if(!R||R.key!==key){const cv=document.createElement('canvas');cv.width=nx;cv.height=ny;R=BN.ras={key,cv,cx:cv.getContext('2d'),img:null,i:0,nx,ny,ax,ay,cs};R.img=R.cx.createImageData(nx,ny);}
+  if(R.i>=nx*ny)return;const D=R.img.data,t0=performance.now(),dir=G&&G.wind?Math.round(G.wind.cur/5)*5:0;
+  while(R.i<nx*ny&&performance.now()-t0<7){const i=R.i%nx,j=(R.i/nx)|0,x=R.ax+(i+0.5)*cs,y=R.ay+(ny-j-0.5)*cs,k=R.i*4;let v=null;
+    try{v=BN.cov?akZelle(x,y,0,dir):(onWater(x,y)?0:null);}catch(e){v=0;}
+    if(v===null){D[k]=46;D[k+1]=64;D[k+2]=48;D[k+3]=255;}else{D[k]=22;D[k+1]=74;D[k+2]=99;D[k+3]=255;if(BN.cov&&v>0.02){const tmp=[0,0,0,0];akFarbe(v,tmp,0);const a=tmp[3]/255;D[k]=D[k]*(1-a)+tmp[0]*a;D[k+1]=D[k+1]*(1-a)+tmp[1]*a;D[k+2]=D[k+2]*(1-a)+tmp[2]*a;}}R.i++;}
+  R.cx.putImageData(R.img,0,0);}
+function bahnDraw(){const cv=$('bnCv');if(!cv||$('bnOv').hidden)return;const dpr=Math.min(2,window.devicePixelRatio||1),W=cv.clientWidth,H=cv.clientHeight;if(!W)return;if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);}
+  bahnView(cv);bahnRaster();const c=cv.getContext('2d'),V=BN.view;c.setTransform(dpr,0,0,dpr,0,0);c.fillStyle='#10202a';c.fillRect(0,0,W,H);
+  const R=BN.ras;if(R){const [sx,sy]=bnS(R.ax,R.ay+R.ny*R.cs);c.imageSmoothingEnabled=true;c.drawImage(R.cv,sx,sy,R.nx*R.cs*V.k,R.ny*R.cs*V.k);}
+  const o=bahnGeom(BN.dx,BN.dy,BN.rot);
+  // Kurslinien
+  c.setLineDash([7,6]);c.strokeStyle='rgba(255,255,255,.5)';c.lineWidth=1.5;c.beginPath();o.weg.forEach((q,i)=>{const s=bnS(q.x,q.y);c[i?'lineTo':'moveTo'](s[0],s[1]);});c.stroke();c.setLineDash([]);
+  // Laylines ab Luvtonne (45° zum Wind) – zeigen, wie schief die Kreuz liegt
+  const wm=o.marks[0].p,sw=bnS(wm.x,wm.y),Lr=S.legLength*0.9*V.k;c.strokeStyle='rgba(255,210,63,.35)';c.lineWidth=1;c.beginPath();for(const a of [-135,135]){const d=dirv(a);c.moveTo(sw[0],sw[1]);c.lineTo(sw[0]+d[0]*Lr,sw[1]-d[1]*Lr);}c.stroke();
+  // Startlinie
+  const sp=bnS(o.pin.x,o.pin.y),sc=bnS(o.cb.x,o.cb.y);c.strokeStyle='#ff5a5a';c.lineWidth=2.5;c.beginPath();c.moveTo(sp[0],sp[1]);c.lineTo(sc[0],sc[1]);c.stroke();
+  c.fillStyle='#ff9a3c';c.beginPath();c.arc(sp[0],sp[1],5,0,7);c.fill();c.fillStyle='#e8eef2';c.fillRect(sc[0]-6,sc[1]-4,12,8);
+  if(o.fin){const a=bnS(o.fin[0].x,o.fin[0].y),b=bnS(o.fin[1].x,o.fin[1].y);c.strokeStyle='#5fb4ff';c.lineWidth=2;c.beginPath();c.moveTo(a[0],a[1]);c.lineTo(b[0],b[1]);c.stroke();}
+  // Tonnen (rot = an Land/zu nah am Ufer)
+  c.font='600 12px system-ui,sans-serif';c.textAlign='center';let schlecht=0;
+  for(const m of o.marks){const s=bnS(m.p.x,m.p.y),f=bahnFrei(m.p.x,m.p.y);if(f<2)schlecht++;c.beginPath();c.arc(s[0],s[1],7,0,7);c.fillStyle='#ff8c1a';c.fill();c.lineWidth=2.5;c.strokeStyle=f===2?'#7fe08a':f===1?'#ffd23f':'#ff4d4d';c.stroke();if(m.n){c.fillStyle='#fff';c.fillText(m.n,s[0],s[1]-12);}}
+  {const f=Math.min(bahnFrei(o.pin.x,o.pin.y),bahnFrei(o.cb.x,o.cb.y));if(f<2)schlecht++;}
+  BN.schlecht=schlecht;
+  // Drehgriff über der Luvtonne
+  const gh=[sw[0]+o.U[0]*46,sw[1]-o.U[1]*46];c.strokeStyle='rgba(255,210,63,.8)';c.lineWidth=2;c.beginPath();c.moveTo(sw[0],sw[1]);c.lineTo(gh[0],gh[1]);c.stroke();c.beginPath();c.arc(gh[0],gh[1],9,0,7);c.fillStyle='#ffd23f';c.fill();c.strokeStyle='#0c1820';c.lineWidth=1.8;c.beginPath();c.arc(gh[0],gh[1],4.5,-2.6,1.9);c.stroke();BN.griff=gh;
+  // Mitte der Startlinie (Anfasser zum Verschieben)
+  const m0=bnS(BN.dx,BN.dy);c.beginPath();c.arc(m0[0],m0[1],10,0,7);c.strokeStyle='#6fe3ff';c.lineWidth=2;c.stroke();c.beginPath();for(const [ax,ay] of [[1,0],[-1,0],[0,1],[0,-1]]){c.moveTo(m0[0]+ax*3,m0[1]+ay*3);c.lineTo(m0[0]+ax*7,m0[1]+ay*7);}c.stroke();
+  // Windpfeil und Nordpfeil
+  c.save();c.translate(34,40);c.fillStyle='rgba(12,24,32,.75)';c.beginPath();c.arc(0,0,26,0,7);c.fill();c.strokeStyle='#5fb4ff';c.fillStyle='#5fb4ff';c.lineWidth=3;c.beginPath();c.moveTo(0,-16);c.lineTo(0,10);c.stroke();c.beginPath();c.moveTo(0,17);c.lineTo(-6,7);c.lineTo(6,7);c.fill();c.restore();
+  c.fillStyle='#cfe6f2';c.font='600 11px system-ui';c.textAlign='left';c.fillText('Wind '+Math.round(((Number(S.windFrom)||0)%360+360)%360)+'°',8,82);
+  {const wf=(Number(S.windFrom)||0)*DEG,nx=-Math.sin(wf),ny=Math.cos(wf);c.save();c.translate(W-30,40);c.fillStyle='rgba(12,24,32,.75)';c.beginPath();c.arc(0,0,18,0,7);c.fill();c.strokeStyle='#fff';c.lineWidth=2;c.beginPath();c.moveTo(-nx*10,ny*10);c.lineTo(nx*12,-ny*12);c.stroke();c.fillStyle='#fff';c.textAlign='center';c.fillText('N',nx*12+(nx>0?6:-6)*0,-ny*12-4);c.restore();}
+  if(R&&R.i<R.nx*R.ny){c.fillStyle='rgba(255,255,255,.6)';c.textAlign='center';c.fillText('Karte wird berechnet … '+Math.round(R.i/(R.nx*R.ny)*100)+' %',W/2,H-10);}
+  bahnInfo();requestAnimationFrame(bahnDraw);}
+function bahnInfo(){const el=$('bnInfo');if(!el)return;const o=bahnGeom(0,0,BN.rot),r=BN.rot,adv=o.lineLen*Math.sin(Math.abs(r)*DEG),bl=adv/Math.max(L,1);
+  let t=Math.abs(r)<0.5?'Bahn liegt genau im Wind: Startlinie rechtwinklig, Kreuz symmetrisch.':(r>0?'Pin-Ende':'Startschiff-Ende')+' um '+Math.abs(r).toFixed(0)+'° bevorzugt – dort liegt man ca. '+adv.toFixed(0)+' m ('+bl.toFixed(1).replace('.',',')+' Bootslängen) weiter in Luv. Die Kreuz ist schief: '+(r>0?'Backbordbug':'Steuerbordbug')+' ist der längere Schlag.';
+  if(BN.schlecht)t+=' ⚠ Mindestens eine Tonne liegt an Land oder zu nah am Ufer (gelb/rot) – das Spiel würde die Kreuz kürzen.';el.textContent=t;}
+function bahnPanel(){const box=$('bnSide');const ct=SCHEMA.flatMap(g=>g.items||[]).find(i=>i.k==='courseType');
+  box.innerHTML='<div class="lvsec"><div class="lvh">Bahn</div><div class="lvl">Bahnform</div><select id="bnCt" class="bnsel">'+(ct?ct.options:[]).map(o=>'<option value="'+o[0]+'"'+(S.courseType===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>'+
+    '<div class="lvl">Kreuzlänge <b id="bnLgV">'+S.legLength+' m</b></div><input type="range" id="bnLg" min="200" max="4000" step="50" value="'+S.legLength+'" style="width:100%"></div>'+
+    '<div class="lvsec"><div class="lvh">Drehung gegen den Wind</div><div class="bnrot"><button type="button" class="optb" data-r="-5">−5°</button><input type="range" id="bnRot" min="-45" max="45" step="1" value="'+Math.round(BN.rot)+'"><button type="button" class="optb" data-r="5">+5°</button></div>'+
+    '<div class="lvl"><b id="bnRotV" style="color:var(--ink)">'+Math.round(BN.rot)+'°</b></div><div class="lvbtns"><button type="button" class="btn ghost" id="bnWind2">Nach Wind ausrichten (0°)</button><button type="button" class="btn ghost" id="bnZuf">Zufällig ±15°</button></div><div class="lvdim" id="bnInfo"></div></div>'+
+    '<div class="lvsec"><div class="lvh">Karte</div><label class="lvl"><input type="checkbox" id="bnCov"'+(BN.cov?' checked':'')+'> Abdeckung durch das Ufer zeigen (Ampel)</label><div class="lvdim">Ziehen: der <b style="color:#6fe3ff">blaue Kreis</b> (Mitte der Startlinie), die Startlinie oder eine Tonne verschiebt die ganze Bahn, der <b style="color:#ffd23f">gelbe Griff</b> über der Luvtonne dreht sie, leere Fläche verschiebt die Karte. Mausrad oder zwei Finger zoomen. Grüner Ring: Tonne liegt frei, gelb: nah am Ufer, rot: an Land.</div></div>';
+  $('bnCt').onchange=()=>{S.courseType=$('bnCt').value;saveS();};
+  $('bnLg').oninput=()=>{S.legLength=+$('bnLg').value;S._legUser=null;$('bnLgV').textContent=S.legLength+' m';BN.base=null;};$('bnLg').onchange=()=>saveS();
+  const setR=r=>{BN.rot=clamp(Math.round(r),-45,45);$('bnRot').value=BN.rot;$('bnRotV').textContent=BN.rot+'°';};
+  $('bnRot').oninput=()=>setR(+$('bnRot').value);box.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>setR(BN.rot+ +b.dataset.r));
+  $('bnWind2').onclick=()=>setR(0);$('bnZuf').onclick=()=>setR((Math.random()*2-1)*15);
+  $('bnCov').onchange=()=>{BN.cov=$('bnCov').checked;BN.ras=null;};BN.setR=setR;}
+function bahnInit(){const cv=$('bnCv'),PT=new Map();let pinch=null;const pos=ev=>{const r=cv.getBoundingClientRect();return [ev.clientX-r.left,ev.clientY-r.top];};
+  const segD=(p,a,b)=>{const dx=b[0]-a[0],dy=b[1]-a[1],t=clamp(((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1),0,1);return Math.hypot(a[0]+dx*t-p[0],a[1]+dy*t-p[1]);};
+  cv.onpointerdown=ev=>{PT.set(ev.pointerId,pos(ev));cv.setPointerCapture(ev.pointerId);if(PT.size===2){const a=[...PT.values()];pinch={d:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1])};BN.drag=null;return;}
+    const p=pos(ev),o=bahnGeom(BN.dx,BN.dy,BN.rot);if(BN.griff&&Math.hypot(p[0]-BN.griff[0],p[1]-BN.griff[1])<16){BN.drag={k:'rot'};return;}
+    const m0=bnS(BN.dx,BN.dy),sp=bnS(o.pin.x,o.pin.y),sc=bnS(o.cb.x,o.cb.y);
+    if(Math.hypot(p[0]-m0[0],p[1]-m0[1])<18||segD(p,sp,sc)<12||o.marks.some(m=>{const s=bnS(m.p.x,m.p.y);return Math.hypot(p[0]-s[0],p[1]-s[1])<16;})){const w=bnW(p[0],p[1]);BN.drag={k:'mv',w,d0:[BN.dx,BN.dy]};return;}
+    BN.drag={k:'pan',p,p0:BN.pan.slice()};};
+  cv.onpointermove=ev=>{if(!PT.has(ev.pointerId))return;PT.set(ev.pointerId,pos(ev));if(pinch&&PT.size===2){const a=[...PT.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);BN.zoom=clamp(BN.zoom*d/Math.max(1,pinch.d),0.25,12);pinch.d=d;return;}
+    const D=BN.drag;if(!D)return;const p=pos(ev);
+    if(D.k==='rot'){const w=bnW(p[0],p[1]),o=bahnGeom(BN.dx,BN.dy,BN.rot),wm=o.marks[0].p;const a=Math.atan2(w[0]-wm.x,w[1]-wm.y)/DEG;BN.setR(clamp(((a+540)%360)-180,-45,45));}
+    else if(D.k==='mv'){const w=bnW(p[0],p[1]);BN.dx=D.d0[0]+w[0]-D.w[0];BN.dy=D.d0[1]+w[1]-D.w[1];}
+    else if(D.k==='pan'){BN.pan=[D.p0[0]-(p[0]-D.p[0])/BN.view.k,D.p0[1]+(p[1]-D.p[1])/BN.view.k];}};
+  cv.onpointerup=cv.onpointercancel=ev=>{PT.delete(ev.pointerId);if(PT.size<2)pinch=null;BN.drag=null;};
+  cv.onwheel=ev=>{ev.preventDefault();const p=pos(ev),a=bnW(p[0],p[1]);BN.zoom=clamp(BN.zoom*(ev.deltaY<0?1.2:1/1.2),0.25,12);bahnView(cv);const b=bnW(p[0],p[1]);BN.pan[0]+=a[0]-b[0];BN.pan[1]+=a[1]-b[1];};
+  $('bnZin').onclick=()=>BN.zoom=clamp(BN.zoom*1.4,0.25,12);$('bnZout').onclick=()=>BN.zoom=clamp(BN.zoom/1.4,0.25,12);$('bnZfit').onclick=()=>{BN.zoom=1;BN.pan=[0,0];BN.base=null;};
+  $('bnOk').onclick=()=>bahnUebernehmen(false);$('bnStd').onclick=()=>{if(confirm('Eigene Bahn für dieses Revier löschen und wieder automatisch legen?'))bahnUebernehmen(true);};$('bnCancel').onclick=bahnClose;
+  $('bnWind').onclick=()=>BN.setR&&BN.setR(0);$('bahnBtn').onclick=bahnOpen;}
+
+/* ---------- Abdeckung durch Boote (Windschatten), im gleichen Modus wie die Abdeckungskarte ----------
+   Gleiche Kegel wie dirtyAir(): 7 Bootslängen lang, hinter dem scheinbaren Wind, bis 30 % weniger Wind. */
+function akBootKegel(o){const LIM=7*L,tow=dirv(o.h+o.awa+180),nrm=[tow[1],-tow[0]];return {LIM,tow,nrm};}
+function akBooteZeigen(){return akZeigen()&&S.dirtyAir&&G&&G.boats&&G.boats.length>1;}
+function akBootMap(x,mp){if(!akBooteZeigen())return;for(const o of G.boats){if(o.finished||o.rib||o.gone)continue;const {LIM,tow,nrm}=akBootKegel(o),w0=L*0.8,w1=L*2.0;
+  const p=(a,l)=>mp(o.x+tow[0]*a+nrm[0]*l,o.y+tow[1]*a+nrm[1]*l);const A=p(0,-w0),B=p(0,w0),Cc=p(LIM,w1),Dd=p(LIM,-w1),s0=p(0,0),s1=p(LIM,0);
+  const gr=x.createLinearGradient(s0[0],s0[1],s1[0],s1[1]);gr.addColorStop(0,'rgba(230,55,50,.55)');gr.addColorStop(0.45,'rgba(240,170,60,.35)');gr.addColorStop(1,'rgba(240,205,60,0)');
+  x.fillStyle=gr;x.beginPath();x.moveTo(A[0],A[1]);x.lineTo(B[0],B[1]);x.lineTo(Cc[0],Cc[1]);x.lineTo(Dd[0],Dd[1]);x.closePath();x.fill();}}
+const AKB={mesh:null};
+function akBooteWasser(){const an=akBooteZeigen()&&S.abdeckKarte==='wasser';if(!an){if(AKB.mesh)AKB.mesh.visible=false;return;}
+  const bs=G.boats.filter(o=>!o.finished&&!o.rib&&!o.gone),NA=9,per=NA*3,nv=bs.length*per;
+  if(!AKB.mesh||AKB.cap<nv){if(AKB.mesh){scene.remove(AKB.mesh);AKB.mesh.geometry.dispose();}const cap=Math.max(nv,per*12),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(cap*3),3));g.setAttribute('col',new THREE.BufferAttribute(new Float32Array(cap*4),4));
+    const ix=[];for(let b=0;b<cap/per;b++)for(let i=0;i<NA-1;i++)for(const s of [0,1]){const r0=b*per+i*3+s,r1=r0+3;ix.push(r0,r1,r0+1,r0+1,r1,r1+1);}g.setIndex(ix);
+    const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,vertexShader:'attribute vec4 col;varying vec4 vC;void main(){vC=col;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'varying vec4 vC;void main(){gl_FragColor=vC;}'});
+    AKB.mesh=new THREE.Mesh(g,m);AKB.mesh.renderOrder=7;AKB.mesh.frustumCulled=false;scene.add(AKB.mesh);AKB.cap=cap;}
+  const P=AKB.mesh.geometry.attributes.position,Cl=AKB.mesh.geometry.attributes.col,h=0.36;let v=0;
+  for(const o of bs){const {LIM,tow,nrm}=akBootKegel(o);for(let i=0;i<NA;i++){const a=i/(NA-1)*LIM,w=L*(0.8+a/LIM*1.2),k=1-a/LIM;
+    for(const l of [-1,0,1]){const x=o.x+tow[0]*a+nrm[0]*l*w,y=o.y+tow[1]*a+nrm[1]*l*w,kk=l===0?k:0,t=clamp(kk,0,1);P.setXYZ(v,x,h,-y);
+      let r,g2,b2;if(t<0.5){const u=t/0.5;r=60+u*180;g2=190+u*15;b2=90-u*30;}else{const u=(t-0.5)/0.5;r=240-u*10;g2=205-u*150;b2=60-u*10;}Cl.setXYZW(v,r/255,g2/255,b2/255,t*0.7);v++;}}}
+  for(;v<AKB.cap;v++)Cl.setW(v,0);P.needsUpdate=true;Cl.needsUpdate=true;AKB.mesh.geometry.setDrawRange(0,bs.length*(NA-1)*12);AKB.mesh.visible=true;}
 
 /* ---------- IMOCA: Vorsegelwahl wie an Bord ----------
    Am Wind: J2 (mittlerer Wind) oder J3 am Kutterstag (ab ca. 18 kn, nimmt Krängung weg). Mit Gennaker: Code 0 (FR0) zum Raumen,
@@ -10243,13 +10383,13 @@ function imoApply(b,g,m){const T=MODELS.imoca;if(!T){modelLoad('imoca');return;}
   if(m.jibR&&m.jibR.userData.furl)m.jibR.userData.furl.material=new THREE.MeshBasicMaterial({visible:false});
   if(m.spiG)for(const c of m.spiG.children)c.visible=false;   // Gennaker kommt aus dem Modell (Code 0 oder A3)
   const pal=imoPal(b),own=new Map();
-  const lv=b.isPlayer?(typeof livAktiv==='function'?livAktiv():null):(b.liv?livFix(b.liv):null),LX=lv?livCtx(T,lv):null;   // eigene Lackierung (Bootsdesigner → Lackierung): Rumpf, Deck, Segel, Anhänge
+  const lv=livFor(b,'imoca'),LX=lv?livCtx(T,lv):null;   // eigene Lackierung (Bootsdesigner → Lackierung): Rumpf, Deck, Segel, Anhänge
   const mat=LX?LX.mat:(n,mt)=>{if(!mt.map||!/^Rumpf/.test(mt.name))return null;if(!own.has(mt)){const k=mt.clone();k.map=imoLackTex(mt.map,pal);own.set(mt,k);}return own.get(mt);};
   const root=new THREE.Group();root.name='imoca';g.add(root);
   const grp={fS:{test:n=>n==='Foil Stb. (C-Form, Schwert nach Plan)',o:new THREE.Vector3()},fB:{test:n=>n==='Foil Bb. (C-Form, Schwert nach Plan)',o:new THREE.Vector3()}};
   if(T.ax.kiel)grp.kiel={test:n=>n.startsWith('Schwenkkiel')||n.startsWith('Kielbombe'),o:T.ax.kiel};
   if(T.ax.rS)grp.rS={test:n=>n==='Ruder Stb.'||n==='Pinne Stb.',o:T.ax.rS};if(T.ax.rB)grp.rB={test:n=>n==='Ruder Bb.'||n==='Pinne Bb.',o:T.ax.rB};
-  const S=mdlBuild(T,root,{piv:T.ax.piv,grp,mat,rig:IMO_RIG,hide:LX?LIV_DECK_HIDE:null});if(LX){LX.post(root,S);LX.paint(lv);}for(const n in S.piv)S.piv[n].g.userData.rig=1;
+  const S=mdlBuild(T,root,{piv:T.ax.piv,grp,mat,rig:IMO_RIG,hide:LX?LIV_DECK_HIDE:null});if(LX){LX.post(root,S);LX.paint(lv);m.lvX=LX;}for(const n in S.piv)S.piv[n].g.userData.rig=1;
   const by=n=>root.children.filter(o=>o.name===n),roll={J2:by(IMO_J2R),J3:by(IMO_J3),FR0:by(IMO_FR),A3:by(IMO_A3)};const a3=[];
   m.imo={S,a3,roll,lx:LX,cm:T.ax.cm,sgM:m.main?mdlMeanX(m.main.geometry):1,sgJ:m.fock?mdlMeanX(m.fock.geometry):1};}
 function imoUpd(b,m){const K=m.imo;if(!K)return;const S=K.S;
@@ -10282,14 +10422,24 @@ const LIV_ANH={foil:['Foils',n=>n.startsWith('Foil ')],kiel:['Kiel & Bombe',n=>n
   spriet:['Bugspriet',n=>n.startsWith('Bugspriet')&&!/Seitenstag/.test(n)],mast:['Mast & Deflektoren',n=>n.startsWith('Flügelmast')||n.startsWith('Deflektor')]};
 const LIV_ANH0={foil:'#cf2418',kiel:'#cf2418',ruder:'#cf2418',spriet:'#cf2418',mast:'#111316'};
 const LIV_DECK_HIDE=['Bugspitze Deck (schwarz)','Raute Vordeck (rot)','Mittelnaht Vordeck'];
-const LIV_SEGEL={gross:{n:'Großsegel',k:'Groß',node:'Großsegel (Square-Top, 2 Reffreihen)',W:512,H:2048},j2:{n:'Vorsegel J2',k:'J2',node:'Vorsegel J2 (Vorstag)',W:1024,H:2048},
+const LIV_SEGEL_IMO={gross:{n:'Großsegel',k:'Groß',node:'Großsegel (Square-Top, 2 Reffreihen)',W:512,H:2048},j2:{n:'Vorsegel J2',k:'J2',node:'Vorsegel J2 (Vorstag)',W:1024,H:2048},
   j3:{n:'Vorsegel J3',k:'J3',node:'Vorsegel J3 (Kutterstag, innen) · gesetzt',W:512,H:1536},fr0:{n:'Code 0 (FR0)',k:'Code 0',node:'FR0 – Fractional Code 0 (Bugspriet) · gesetzt',W:1024,H:2048},a3:{n:'A3-Gennaker',k:'A3',node:'A3 – Masttopp-Gennaker (Bugspriet) · gesetzt',W:1024,H:2048}};
+/* Bootsprofile: IMOCA hat gebackene Rumpftextur, die anderen bekommen Seitenriss-Texturen zur Laufzeit */
+const LIV_PROF={imoca:{key:'imoca',name:'IMOCA 60',model:'imoca',baked:true,deck:true,anh:true,base:'#17191d',segel:LIV_SEGEL_IMO},
+  zk10:{key:'zk10',name:'Kutter ZK 10',model:'zk',hullNode:'Rumpf',hullMat:mt=>!mt.map&&('#'+mt.color.getHexString())==='#ece8d9',base:'#ece8d9',rig:ZK_RIG,
+    over:[{key:'band',name:'Schwarzband',test:n=>n.startsWith('Schwarzband'),col:ZK_BAND}],
+    segel:{gross:{n:'Großsegel',k:'Groß',node:'Großsegel',W:512,H:1024},besan:{n:'Besan',k:'Besan',node:'Besan',W:512,H:1024},fock:{n:'Fock',k:'Fock',node:'Fock',W:512,H:1024}}},
+  ixylon:{key:'ixylon',name:'Ixylon',model:'ixy',hullNode:'Rumpf',hullMat:mt=>mt.name===IXY_HULL,base:IXY_HULL,rig:IXY_RIG,hide3d:IXY_HIDE,
+    segel:{gross:{n:'Großsegel',k:'Groß',node:IXY_GROSS,W:512,H:1024},fock:{n:'Fock',k:'Fock',node:IXY_FOCK,W:512,H:1024}}},
+  topcat:{key:'topcat',name:'Topcat K2',model:'skua',hullNode:'Rumpf',hullMat:mt=>mt.name==='Rumpf außen',base:'#f4f5f2',rig:['Mast','Großsegel','Fock','Vorstag'],hide3d:SKUA_HIDE,
+    segel:{gross:{n:'Großsegel',k:'Groß',node:'Großsegel',W:512,H:1024},fock:{n:'Fock',k:'Fock',node:'Fock',W:512,H:1024}}}};
+var LIV_SEGEL=LIV_SEGEL_IMO;
 const LIV_J2BAND=()=>[[3.0,7.4,'#2f9bd6'],[9.0,12.4,'#e8552d'],[15.6,19.4,'#d8342c'],[20.6,22.2,'#2f9b4a']].map(([a,b,c])=>({t:'rect',x:5,y:(a+b)/2,w:14,h:b-a,rot:-8,skew:0,col:c,side:'beide'}));
 const livDeck0=()=>({col:'#f2f3f2',kaj:'#f4f5f4',el:[
   {t:'poly',name:'Bugspitze',x:0.925,y:0,w:1,h:1,rot:0,col:'#17191d',side:'stb',pts:[[0.575,0],[-0.575,0.69],[-0.575,-0.69]]},
   {t:'raute',name:'Raute Vordeck',x:4.3,y:0,w:3.8,h:1.9,rot:0,col:'#cf2418',side:'stb'},
   {t:'rect',name:'Mittelnaht',x:4.25,y:0,w:5.5,h:0.04,rot:0,skew:0,col:'#17191d',side:'stb'}]});
-const livSegel0=()=>{const o={};for(const k in LIV_SEGEL)o[k]={on:false,base:'#1d1f23',latten:k==='gross',el:[]};return o;};
+const livSegel0=(P=LIV_PROF.imoca)=>{const o={};for(const k in P.segel)o[k]={on:false,base:P.baked?'#1d1f23':'#f3f1ea',latten:k==='gross',el:[]};return o;};
 const LIV_ORIG=()=>({on:true,base:'#17191d',bottom:'',el:[
   livPolyAus('Hellblaues Feld vorn','#2f9bd6',[[1554,1637],[8043,1632],[7403,-31],[5484,-31],[3656,400],[2194,864]]),
   livPolyAus('Gelbes Feld mittschiffs','#f4b400',[[8555,1632],[10145,1636],[11791,-31],[7897,-31]])],deck:livDeck0(),segel:livSegel0(),anh:Object.assign({},LIV_ANH0)});
@@ -10306,9 +10456,14 @@ const LIV_VORLAGEN={
 function livPolyAus(name,col,mm){const P=mm.map(q=>[-q[0]/1000,q[1]/1000]);let cx=0,cy=0;for(const q of P){cx+=q[0];cy+=q[1];}cx/=P.length;cy/=P.length;
   return {t:'poly',name,x:-cx,y:cy,w:1,h:1,rot:0,col,side:'beide',pts:P.map(q=>[q[0]-cx,q[1]-cy])};}
 /* fehlende Teile ergänzen (ältere gespeicherte Lackierungen) */
-function livFix(L){if(!L)return L;if(!Array.isArray(L.el))L.el=[];if(!L.deck||!Array.isArray(L.deck.el))L.deck=livDeck0();if(!L.segel)L.segel=livSegel0();
-  for(const k in LIV_SEGEL){const d=livSegel0()[k];if(!L.segel[k]||!Array.isArray(L.segel[k].el))L.segel[k]=d;}L.anh=Object.assign({},LIV_ANH0,L.anh||{});return L;}
-function livAktiv(){const L=DESIGN.liv;return L&&L.on&&Array.isArray(L.el)?livFix(L):null;}
+function livFix(L,P=LIV_PROF.imoca){if(!L)return L;if(!Array.isArray(L.el))L.el=[];if(!L.deck||!Array.isArray(L.deck.el))L.deck=livDeck0();if(!L.segel)L.segel=livSegel0(P);
+  for(const k in P.segel){const d=livSegel0(P)[k];if(!L.segel[k]||!Array.isArray(L.segel[k].el))L.segel[k]=d;}L.anh=Object.assign({},LIV_ANH0,L.anh||{});
+  L.over=L.over||{};for(const O of P.over||[])if(!L.over[O.key])L.over[O.key]={on:true,col:O.col};return L;}
+function livDataK(k,neu){if(k==='imoca'){if(!DESIGN.liv&&neu)DESIGN.liv=LIV_ORIG();return DESIGN.liv?livFix(DESIGN.liv):null;}const P=LIV_PROF[k];if(!P)return null;DESIGN.livs=DESIGN.livs||{};
+  if(!DESIGN.livs[k]&&neu)DESIGN.livs[k]={on:true,base:P.base,bottom:'',el:[],deck:livDeck0(),segel:livSegel0(P),anh:Object.assign({},LIV_ANH0)};return DESIGN.livs[k]?livFix(DESIGN.livs[k],P):null;}
+function livAktivK(k){const L=livDataK(k);return L&&L.on?L:null;}
+function livFor(b,k){if(b.isPlayer)return livAktivK(k);return b.liv&&(b.livCls||'imoca')===k?livFix(b.liv,LIV_PROF[k]):null;}
+function livAktiv(){return livAktivK('imoca');}
 /* ---------- Zeichnen eines Elements (Ansicht: X nach rechts = Richtung Bug, Y nach oben, Meter) ----------
    mir: 0 = wie gesetzt, 'x' = an der Senkrechten gespiegelt (Backbordseite), 'y' = an der Mittellinie gespiegelt (Deck symmetrisch).
    tf: Schrift seitenverkehrt malen (Segelrückseite, damit sie von dort lesbar ist). */
@@ -10357,17 +10512,47 @@ function livInfo(T){if(T.liv)return T.liv;const nd=T.nodes.find(n=>n.name==='Rum
   if(dk){const a=dk.g.attributes.position,hb=new Array(nb).fill(0);let Bm=0;for(let i=0;i<a.count;i++){const k=Math.round((a.getZ(i)-z0)/0.2),x=Math.abs(a.getX(i));hb[k]=Math.max(hb[k],x);Bm=Math.max(Bm,x);}
     const kj=new Array(nb).fill(0);for(const n of T.nodes)if(n.name.startsWith('Kajüte '))for(const q of n.prims){const b=q.g.attributes.position;for(let i=0;i<b.count;i++){const k=Math.round((b.getZ(i)-z0)/0.2);if(k>=0&&k<nb)kj[k]=Math.max(kj[k],Math.abs(b.getX(i)));}}
     const B2=Bm+0.05;deck={p:dk,B:B2,W:2048,H:Math.round(2048*2*B2/L/8)*8,prof:hb.map((v,k)=>[k*0.2,v]).filter(q=>q[1]>0),kaj:kj.map((v,k)=>[k*0.2,v]).filter(q=>q[1]>0)};}
-  // Segel: Lage, Umriss (konvexe Hülle in der Seitenansicht), welche Flächenseite nach Steuerbord zeigt
-  const segel={};for(const k in LIV_SEGEL){const sd=LIV_SEGEL[k],sn=T.nodes.find(n=>n.name===sd.node);if(!sn)continue;const q=sn.prims.find(x=>x.mat.map)||sn.prims[0];const a=q.g.attributes.position;
+  const segel=livSegelInfo(T,LIV_SEGEL_IMO,z0);
+  return T.liv={p,lack,W,H,ch,z0,L,prof,deck,segel};}
+function livSegelInfo(T,DEF,z0){const A=new THREE.Vector3(),B=new THREE.Vector3(),C=new THREE.Vector3(),N=new THREE.Vector3();
+  const segel={};for(const k in DEF){const sd=DEF[k],sn=T.nodes.find(n=>n.name===sd.node);if(!sn)continue;const q=sn.prims.find(x=>x.mat.map)||sn.prims[0];const a=q.g.attributes.position;
     let zs0=1e9,zs1=-1e9,ys0=1e9,ys1=-1e9,nx=0;const pts=[];for(let i=0;i<a.count;i++){const z=a.getZ(i),y=a.getY(i);zs0=Math.min(zs0,z);zs1=Math.max(zs1,z);ys0=Math.min(ys0,y);ys1=Math.max(ys1,y);pts.push([-(z-z0),y]);}
     const ix2=q.g.index?q.g.index.array:null,n2=(ix2?ix2.length:a.count)/3;for(let t=0;t<n2;t++){const id=[0,1,2].map(j=>ix2?ix2[3*t+j]:3*t+j);A.fromBufferAttribute(a,id[0]);B.fromBufferAttribute(a,id[1]);C.fromBufferAttribute(a,id[2]);nx+=N.subVectors(B,A).cross(C.clone().sub(A)).x;}
     pts.sort((u,v)=>u[0]-v[0]||u[1]-v[1]);const cr=(o,u,v)=>(u[0]-o[0])*(v[1]-o[1])-(u[1]-o[1])*(v[0]-o[0]);const lo=[],hi=[];for(const p2 of pts){while(lo.length>1&&cr(lo[lo.length-2],lo[lo.length-1],p2)<=0)lo.pop();lo.push(p2);}
     for(let i=pts.length-1;i>=0;i--){const p2=pts[i];while(hi.length>1&&cr(hi[hi.length-2],hi[hi.length-1],p2)<=0)hi.pop();hi.push(p2);}
     segel[k]={node:sd.node,p:q,W:sd.W,H:sd.H,zs0,zs1,ys0,ys1,plusX:nx>=0,hull:lo.slice(0,-1).concat(hi.slice(0,-1))};}
-  return T.liv={p,lack,W,H,ch,z0,L,prof,deck,segel};}
+  return segel;}
+/* Rümpfe ohne Textur (ZK 10, Ixylon, Topcat): Dreiecke nach Seite einteilen und als Seitenriss in eine neue Textur legen.
+   Außenseite Stb → Karte 0, Außenseite Bb → Karte 1 (beim Kat je Rumpf die äußere Seite), Unterwasser-Boden → Kachel 3, Rest → Grundfarbe. */
+function livInfoGen(T,P){const ck='livG_'+P.key;if(T[ck])return T[ck];const nd=T.nodes.find(n=>n.name===P.hullNode);if(!nd)return null;const hp=nd.prims.filter(p=>P.hullMat(p.mat));if(!hp.length)return null;
+  const A=new THREE.Vector3(),B=new THREE.Vector3(),C=new THREE.Vector3(),N=new THREE.Vector3(),Pm=[];let z0=1e9,z1=-1e9;const ext={0:[1e9,1e9,-1e9,-1e9],1:[1e9,1e9,-1e9,-1e9]};
+  for(const p of hp){const g=p.g.index?p.g.toNonIndexed():p.g,pa=g.attributes.position,nt=pa.count/3;let cx0=0;for(let i=0;i<pa.count;i++){cx0+=pa.getX(i);z0=Math.min(z0,pa.getZ(i));z1=Math.max(z1,pa.getZ(i));}cx0/=pa.count;
+    const mono=Math.abs(cx0)<0.3,cls=new Int8Array(nt);let corr=0;const nx=new Float32Array(nt),cxs=new Float32Array(nt),cys=new Float32Array(nt),dom=new Int8Array(nt);
+    for(let t=0;t<nt;t++){A.fromBufferAttribute(pa,3*t);B.fromBufferAttribute(pa,3*t+1);C.fromBufferAttribute(pa,3*t+2);N.subVectors(B,A).cross(C.clone().sub(A));const ax=Math.abs(N.x),ay=Math.abs(N.y),az=Math.abs(N.z);
+      nx[t]=N.x;cxs[t]=(A.x+B.x+C.x)/3;cys[t]=(A.y+B.y+C.y)/3;dom[t]=ax>=ay&&ax>=az?0:ay>=az?1:2;if(dom[t]===0)corr+=Math.sign(N.x)*Math.sign(cxs[t]-cx0);}
+    const fl=corr<0?-1:1;
+    for(let t=0;t<nt;t++){let c=-1;if(dom[t]===0){const f=Math.sign(nx[t]*fl),side=mono?Math.sign(cxs[t]):Math.sign(cx0);if(f>0&&side>0)c=0;else if(f<0&&side<0)c=1;}
+      if(c<0)c=cys[t]<0&&dom[t]===1?3:4;cls[t]=c;if(c<2)for(let k=0;k<3;k++){const z=pa.getZ(3*t+k),y=pa.getY(3*t+k),E=ext[c];E[0]=Math.min(E[0],z);E[1]=Math.min(E[1],y);E[2]=Math.max(E[2],z);E[3]=Math.max(E[3],y);}}
+    Pm.push({p,g,cls,fl});}
+  if(ext[0][0]>1e8||ext[1][0]>1e8)return null;
+  const W=2048,H=1024,pad=10,h0=ext[0][3]-ext[0][1],h1=ext[1][3]-ext[1][1],lz=Math.max(ext[0][2]-ext[0][0],ext[1][2]-ext[1][0]),s=Math.min((W-2*pad)/lz,(H-3*pad-40)/(h0+h1));
+  const pl={0:[pad,pad],1:[pad,2*pad+h0*s]},ch={};for(const k of [0,1])ch[k]={a:s,b:pl[k][0]-ext[k][0]*s,c:s,d:pl[k][1]-ext[k][1]*s,r:[pl[k][0],pl[k][1],pl[k][0]+(ext[k][2]-ext[k][0])*s,pl[k][1]+(ext[k][3]-ext[k][1])*s]};
+  ch[3]={r:[W-60,H-30,W-40,H-10]};const tb=[W-28,H-30,W-8,H-10];
+  const genGeo=new Map(),genFl=new Map();
+  for(const q of Pm){const pa=q.g.attributes.position,uv=new Float32Array(pa.count*2);for(let t=0;t<q.cls.length;t++){const c=q.cls[t];for(let k=0;k<3;k++){const i=3*t+k;let u,v;
+      if(c<2){u=(ch[c].a*pa.getZ(i)+ch[c].b)/W;v=(ch[c].c*pa.getY(i)+ch[c].d)/H;}else{const r=c===3?ch[3].r:tb;u=(r[0]+r[2])/2/W;v=(r[1]+r[3])/2/H;}uv[2*i]=u;uv[2*i+1]=v;}}
+    const g2=q.g===q.p.g?q.g.clone():q.g;g2.setAttribute('uv',new THREE.BufferAttribute(uv,2));if(!g2.attributes.normal)g2.computeVertexNormals();genGeo.set(q.p.g,g2);genFl.set(q.p.g,q.fl);}
+  const L=z1-z0,bin=Math.max(0.05,L/90),nb=Math.ceil(L/bin)+1,top=new Array(nb).fill(-1e9),bot=new Array(nb).fill(1e9);
+  for(const q of Pm){const a=q.g.attributes.position;for(let i=0;i<a.count;i++){const k=Math.round((a.getZ(i)-z0)/bin);top[k]=Math.max(top[k],a.getY(i));bot[k]=Math.min(bot[k],a.getY(i));}}
+  const prof=[];for(let k=0;k<nb;k++)if(top[k]>-1e8)prof.push([k*bin,top[k],bot[k]]);
+  const over={};for(const O of P.over||[]){const tp=new Array(nb).fill(-1e9),bt=new Array(nb).fill(1e9);for(const n2 of T.nodes)if(O.test(n2.name))for(const q of n2.prims){const a=q.g.attributes.position;for(let i=0;i<a.count;i++){if(a.getX(i)<0)continue;const k=Math.round((a.getZ(i)-z0)/bin);if(k<0||k>=nb)continue;tp[k]=Math.max(tp[k],a.getY(i));bt[k]=Math.min(bt[k],a.getY(i));}}
+    const pr=[];for(let k=0;k<nb;k++)if(tp[k]>-1e8)pr.push([k*bin,tp[k],bt[k]]);if(pr.length>2)over[O.key]=pr;}
+  return T[ck]={gen:true,P,over,genGeo,genFl,genMats:new Set(hp.map(p=>p.mat)),W,H,ch,z0,L,prof,deck:null,segel:livSegelInfo(T,P.segel,z0)};}
+function livInfoP(P){const T=MODELS[P.model];if(!T)return null;return P.baked?livInfo(T):livInfoGen(T,P);}
 /* ---------- Texturen malen ---------- */
 const LIV_BASE={};
-function livBasis(I,base,bottom){const key=I.p.mat.map.uuid+'|'+base+'|'+bottom;if(LIV_BASE.key===key)return LIV_BASE.cv;
+function livBasis(I,base,bottom){const key=(I.gen?'gen'+I.P.key:I.p.mat.map.uuid)+'|'+base+'|'+bottom;if(LIV_BASE.key===key)return LIV_BASE.cv;
+  if(I.gen){const cv=document.createElement('canvas');cv.width=I.W;cv.height=I.H;const cx=cv.getContext('2d');cx.fillStyle=base;cx.fillRect(0,0,I.W,I.H);if(bottom){const r=I.ch[3].r;cx.fillStyle=bottom;cx.fillRect(r[0]-3,r[1]-3,r[2]-r[0]+6,r[3]-r[1]+6);}LIV_BASE.key=key;LIV_BASE.cv=cv;return cv;}
   const img=I.p.mat.map.image,cv=document.createElement('canvas');cv.width=I.W;cv.height=I.H;const cx=cv.getContext('2d');cx.drawImage(img,0,0);
   const id=cx.getImageData(0,0,I.W,I.H),d=id.data,from=IMO_LACK.map(h=>new THREE.Color(h)).map(c=>[c.r*255,c.g*255,c.b*255]),bc=new THREE.Color(base),to=[bc.r*255,bc.g*255,bc.b*255];
   for(let i=0;i<d.length;i+=4)for(const f of from)if(Math.abs(d[i]-f[0])<7&&Math.abs(d[i+1]-f[1])<7&&Math.abs(d[i+2]-f[2])<7){d[i]=to[0];d[i+1]=to[1];d[i+2]=to[2];break;}
@@ -10389,29 +10574,36 @@ function livSegelMalen(cv,I,k,sg,tf){const Sg=I.segel[k],c=cv.getContext('2d'),W
   for(const e of sg.el)livDraw(c,e,0,tf);return cv;}
 /* ---------- Anwendung auf ein Modell (Spiel und 3D-Vorschau) ----------
    livCtx(T,lv) liefert mat(n,mt) für mdlBuild, post(root,S) danach, paint(lv) zum Neumalen und upd() je Bild (Segelseiten tauschen) */
-function livCtx(T,lv){const I=livInfo(T);if(!I)return null;const X={I,cv:{},tx:{},mats:{},rest:[],sails:[]};
+function livCtx(T,lv,P=LIV_PROF.imoca){const I=P.baked?livInfo(T):livInfoGen(T,P);if(!I)return null;const X={I,P,cv:{},tx:{},mats:{},rest:[],sails:[],inner:[]};
+  X.hid=new THREE.MeshBasicMaterial({visible:false});X.hid.name='Lack versteckt';
   const tex=(k,W,H)=>{if(!X.tx[k]){const cv=document.createElement('canvas');cv.width=W;cv.height=H;const t=new THREE.CanvasTexture(cv);t.flipY=false;t.anisotropy=8;X.cv[k]=cv;X.tx[k]=t;}return X.tx[k];};
   const col=(k,mt,c)=>{if(!X.mats[k]){const m=mt.clone();m.color=new THREE.Color(c);m.map=null;X.mats[k]=m;}return X.mats[k];};
-  X.sig=Object.keys(LIV_SEGEL).map(k=>lv.segel&&lv.segel[k]&&lv.segel[k].on?1:0).join('');
+  X.sig=P.key+Object.keys(P.segel).map(k=>lv.segel&&lv.segel[k]&&lv.segel[k].on?1:0).join('')+Object.keys(lv.over||{}).map(k=>lv.over[k].on===false?0:1).join('');
   X.mat=(n,mt)=>{const L=X.lv;
+    if(I.gen&&n===P.hullNode&&I.genMats.has(mt)){if(!X.mats.hull){const m=mt.clone();m.color=new THREE.Color(0xffffff);m.map=tex('hull',I.W,I.H);m.userData.lvHull=1;m.name='Lack Rumpf';X.mats.hull=m;}return X.mats.hull;}
+    for(const k in I.segel){const Sg=I.segel[k];if(n!==Sg.node||!L.segel[k]||!L.segel[k].on)continue;if(mt===Sg.p.mat){const kk='s_'+k;if(!X.mats[kk]){const m=mt.clone();m.side=THREE.FrontSide;m.transparent=false;m.opacity=1;m.color=new THREE.Color(0xffffff);m.name='Lack Segel';
+      m.map=tex(kk+'A',Sg.W,Sg.H);tex(kk+'B',Sg.W,Sg.H);m.userData.lvSail=k;X.mats[kk]=m;}return X.mats[kk];}if(mt.map)return X.hid;}
+    for(const O of P.over||[])if(O.test(n)){const o=L.over&&L.over[O.key];if(o&&o.on===false)return X.hid;if(o&&o.col)return col('o_'+O.key,mt,o.col);}
+    if(!P.baked)return null;
     if(n==='Rumpf'){if(mt===I.p.mat){if(!X.mats.hull){const m=mt.clone();m.map=tex('hull',I.W,I.H);X.mats.hull=m;}return X.mats.hull;}
       if(mt.map&&/Lack/.test(mt.name||'')){const m=mt.clone();m.userData.src=mt.map;X.rest.push(m);return m;}
       if(I.deck&&mt===I.deck.p.mat){if(!X.mats.deck){const m=mt.clone();m.color=new THREE.Color(0xffffff);m.map=tex('deck',I.deck.W,I.deck.H);m.userData.lvDeck=1;X.mats.deck=m;}return X.mats.deck;}return null;}
     if(n.startsWith('Kajüte '))return col('kaj',mt,L.deck.kaj);
     if(n.startsWith('Cockpit-Gänge'))return col('cock',mt,L.deck.col);
     for(const k in LIV_ANH)if(LIV_ANH[k][1](n))return col('a_'+k,mt,L.anh[k]);
-    for(const k in I.segel){const Sg=I.segel[k];if(n===Sg.node&&mt===Sg.p.mat&&L.segel[k]&&L.segel[k].on){const kk='s_'+k;if(!X.mats[kk]){const m=mt.clone();m.side=THREE.FrontSide;m.transparent=false;m.opacity=1;m.color=new THREE.Color(0xffffff);
-      m.map=tex(kk+'A',Sg.W,Sg.H);tex(kk+'B',Sg.W,Sg.H);m.userData.lvSail=k;X.mats[kk]=m;}return X.mats[kk];}}
     return null;};
   X.post=(root,S)=>{const add=[];root.traverse(o=>{if(!o.isMesh)return;const u=o.material.userData;
+      // gemalter Rumpf: neue Geometrie mit Seitenriss-UV; außen die Lackierung, innen einfarbig (offene Boote)
+      if(u.lvHull&&!o.userData.lvUv){const g2=I.genGeo.get(o.geometry);if(g2){const fl=I.genFl.get(o.geometry)<0;o.geometry=g2;o.userData.lvUv=1;const fm=o.material.clone();fm.side=fl?THREE.BackSide:THREE.FrontSide;o.material=fm;X.inner.push(fm);
+        const im=fm.clone();im.map=null;im.side=fl?THREE.FrontSide:THREE.BackSide;im.userData={};const inn=new THREE.Mesh(g2,im);inn.name=o.name;inn.position.copy(o.position);inn.userData.lvUv=1;inn.castShadow=o.castShadow;add.push([o.parent,inn]);X.rest.push(im);im.userData.inner=1;}}
       if(u.lvDeck&&!o.userData.lvUv){const D=I.deck,g=o.geometry.clone(),a=g.attributes.position,uv=new Float32Array(a.count*2);for(let i=0;i<a.count;i++){uv[2*i]=(a.getZ(i)-I.z0)/I.L;uv[2*i+1]=(a.getX(i)+D.B)/(2*D.B);}g.setAttribute('uv',new THREE.BufferAttribute(uv,2));o.geometry=g;o.userData.lvUv=1;}
       if(u.lvSail&&!o.userData.lvUv){const Sg=I.segel[u.lvSail],g=o.geometry.clone(),a=g.attributes.position,uv=new Float32Array(a.count*2);for(let i=0;i<a.count;i++){uv[2*i]=(a.getZ(i)-Sg.zs0)/(Sg.zs1-Sg.zs0);uv[2*i+1]=(a.getY(i)-Sg.ys0)/(Sg.ys1-Sg.ys0);}
         g.setAttribute('uv',new THREE.BufferAttribute(uv,2));o.geometry=g;o.userData.lvUv=1;const bm=o.material.clone();bm.side=THREE.BackSide;const back=new THREE.Mesh(g,bm);back.name=o.name;back.position.copy(o.position);back.userData.lvUv=1;add.push([o.parent,back]);
         X.sails.push({k:u.lvSail,f:o.material,b:bm,g:o.parent,cur:null});}});
     for(const [p,m] of add)p.add(m);};
-  X.paint=L=>{X.lv=L;X.mats.hull&&livMalen(X.cv.hull,I,L);X.tx.hull&&(X.tx.hull.needsUpdate=true);const bc=L.base;for(const m of X.rest){m.map=imoLackTex(m.userData.src,[bc,bc,bc]);}
+  X.paint=L=>{X.lv=L;X.mats.hull&&livMalen(X.cv.hull,I,L);X.tx.hull&&(X.tx.hull.needsUpdate=true);const bc=L.base;for(const m of X.rest){if(m.userData.inner)m.color.set(bc);else m.map=imoLackTex(m.userData.src,[bc,bc,bc]);}for(const m of X.inner)m.map=X.tx.hull;
     if(X.cv.deck){livDeckMalen(X.cv.deck,I,L.deck);X.tx.deck.needsUpdate=true;}
-    if(X.mats.kaj)X.mats.kaj.color.set(L.deck.kaj);if(X.mats.cock)X.mats.cock.color.set(L.deck.col).multiplyScalar(0.96);for(const k in LIV_ANH)if(X.mats['a_'+k])X.mats['a_'+k].color.set(L.anh[k]);
+    if(X.mats.kaj)X.mats.kaj.color.set(L.deck.kaj);if(X.mats.cock)X.mats.cock.color.set(L.deck.col).multiplyScalar(0.96);for(const k in LIV_ANH)if(X.mats['a_'+k])X.mats['a_'+k].color.set(L.anh[k]);for(const O of P.over||[])if(X.mats['o_'+O.key]&&L.over[O.key])X.mats['o_'+O.key].color.set(L.over[O.key].col);
     for(const k in I.segel){const kk='s_'+k;if(X.cv[kk+'A']&&L.segel[k]){livSegelMalen(X.cv[kk+'A'],I,k,L.segel[k],false);livSegelMalen(X.cv[kk+'B'],I,k,L.segel[k],true);X.tx[kk+'A'].needsUpdate=true;X.tx[kk+'B'].needsUpdate=true;}}
     for(const s of X.sails)s.cur=null;X.upd();};
   // Vorderseite zeigt nach Stb (plusX) – bei gespiegeltem Segel (andere Wölbung) Bilder tauschen, damit Schrift von beiden Seiten lesbar bleibt
@@ -10426,37 +10618,48 @@ function livSan(L){if(!L||typeof L!=='object'||!Array.isArray(L.el))return null;
     if(e.t==='poly'){if(!Array.isArray(e.pts))return null;o.pts=e.pts.slice(0,32).filter(q=>Array.isArray(q)).map(q=>[n(q[0],-40,40,0),n(q[1],-30,30,0)]);if(o.pts.length<3)return null;}
     return o;}).filter(Boolean);
   const D=L.deck&&typeof L.deck==='object'?L.deck:{},Sg=L.segel&&typeof L.segel==='object'?L.segel:{},A=L.anh&&typeof L.anh==='object'?L.anh:{},seg={};
-  for(const k in LIV_SEGEL){const s=Sg[k]||{};seg[k]={on:!!s.on,base:mpHex(s.base)||'#1d1f23',latten:!!s.latten,el:els(s.el)};}
+  for(const k of Object.keys(Sg).slice(0,8)){if(!/^[a-z0-9]{1,8}$/.test(k))continue;const s=Sg[k]||{};seg[k]={on:!!s.on,base:mpHex(s.base)||'#1d1f23',latten:!!s.latten,el:els(s.el)};}
   const anh={};for(const k in LIV_ANH0)anh[k]=mpHex(A[k])||LIV_ANH0[k];
-  return {on:true,base:mpHex(L.base)||'#17191d',bottom:mpHex(L.bottom)||'',el:els(L.el),deck:Array.isArray(D.el)?{col:mpHex(D.col)||'#f2f3f2',kaj:mpHex(D.kaj)||'#f4f5f4',el:els(D.el)}:livDeck0(),segel:seg,anh};}
+  const over={};if(L.over&&typeof L.over==='object')for(const k of Object.keys(L.over).slice(0,4))if(/^[a-z]{1,8}$/.test(k))over[k]={on:L.over[k]&&L.over[k].on!==false,col:mpHex(L.over[k]&&L.over[k].col)||'#15171b'};
+  return {on:true,over,base:mpHex(L.base)||'#17191d',bottom:mpHex(L.bottom)||'',el:els(L.el),deck:Array.isArray(D.el)?{col:mpHex(D.col)||'#f2f3f2',kaj:mpHex(D.kaj)||'#f4f5f4',el:els(D.el)}:livDeck0(),segel:seg,anh};}
 
 /* ---------- Editor ---------- */
-const LV={zoom:1,pan:[0,0],area:'rumpf',side:'stb',sail:'gross',sel:-1,pt:-1,undo:[],redo:[],drag:null,view:null,p3:null,t3:0};
+const LV={cls:'imoca',zoom:1,pan:[0,0],area:'rumpf',side:'stb',sail:'gross',sel:-1,pt:-1,undo:[],redo:[],drag:null,view:null,p3:null,t3:0};
 const LIV_AREA={rumpf:'Rumpf',deck:'Deck',segel:'Segel'};
-function livOpen(){hideAllOv();$('lvOv').hidden=false;if(!DESIGN.liv)DESIGN.liv=LIV_ORIG();livFix(DESIGN.liv);DESIGN.liv.on=true;saveDesign();LV.sel=-1;LV.undo=[];LV.redo=[];
-  $('lvMsg').textContent='Bootsmodell wird geladen …';modelLoad('imoca').then(T=>{if(!T||!livInfo(T)){$('lvMsg').textContent='Das IMOCA-Modell (imoca.glb) konnte nicht geladen werden.';return;}$('lvMsg').textContent='';livRender(true);});livRender(true);}
+function livSetD(o){const P=LVP();if(LV.cls==='imoca')DESIGN.liv=livFix(o,P);else{DESIGN.livs=DESIGN.livs||{};DESIGN.livs[LV.cls]=livFix(o,P);}}
+function LVP(){return LIV_PROF[LV.cls]||LIV_PROF.imoca;}
+function LVD(){return livDataK(LV.cls,true);}
+function LVI(){return livInfoP(LVP());}
+function livOpen(cls){hideAllOv();$('lvOv').hidden=false;LV.cls=cls&&LIV_PROF[cls]?cls:LIV_PROF[S.boatClass]?S.boatClass:(LV.cls||'imoca');livKlasse(LV.cls,true);}
+function livKlasse(k,erst){LV.cls=k;const P=LVP();LVP().segel=P.segel;if(!P.segel[LV.sail])LV.sail=Object.keys(P.segel)[0];if(!P.deck&&LV.area==='deck')LV.area='rumpf';
+  const L=LVD();L.on=true;saveDesign();LV.sel=-1;LV.pt=-1;LV.undo=[];LV.redo=[];LV.zoom=1;LV.pan=[0,0];
+  $('lvSegelW').innerHTML=Object.keys(P.segel).map(q=>'<button type="button" class="optb" data-s="'+q+'">'+P.segel[q].k+'</button>').join('');
+  $('lvSegelW').querySelectorAll('button').forEach(x=>x.onclick=()=>{LV.sail=x.dataset.s;LV.sel=-1;LV.zoom=1;LV.pan=[0,0];livRender(true);});
+  $('lvAd').hidden=!P.deck;$('lvKl').value=k;$('lvTitel').textContent='· '+P.name;
+  $('lvMsg').textContent='Bootsmodell wird geladen …';modelLoad(P.model).then(T=>{if(LV.cls!==k)return;if(!T||!LVI()){$('lvMsg').textContent='Das Bootsmodell konnte nicht geladen werden.';return;}$('lvMsg').textContent='';livRender(true);});livRender(true);}
 function livClose(){saveDesign();hideAllOv();$('dsOv').hidden=false;renderDesigner();}
-function livSnap(){LV.undo.push(JSON.stringify(DESIGN.liv));if(LV.undo.length>80)LV.undo.shift();LV.redo=[];}
-function livUndo(r){const A=r?LV.redo:LV.undo,B=r?LV.undo:LV.redo;if(!A.length)return;B.push(JSON.stringify(DESIGN.liv));DESIGN.liv=livFix(JSON.parse(A.pop()));if(LV.sel>=livEls().length)LV.sel=-1;saveDesign();livRender(true);}
-function livEls(){const L=DESIGN.liv;return LV.area==='deck'?L.deck.el:LV.area==='segel'?L.segel[LV.sail].el:L.el;}
-function livSel(){return DESIGN.liv&&livEls()[LV.sel]||null;}
+function livSnap(){LV.undo.push(JSON.stringify(LVD()));if(LV.undo.length>80)LV.undo.shift();LV.redo=[];}
+function livUndo(r){const A=r?LV.redo:LV.undo,B=r?LV.undo:LV.redo;if(!A.length)return;B.push(JSON.stringify(LVD()));livSetD(JSON.parse(A.pop()));if(LV.sel>=livEls().length)LV.sel=-1;saveDesign();livRender(true);}
+function livEls(){const L=LVD();return LV.area==='deck'?L.deck.el:LV.area==='segel'?L.segel[LV.sail].el:L.el;}
+function livSel(){return LVD()&&livEls()[LV.sel]||null;}
 const livMir=()=>LV.area==='rumpf'&&LV.side==='bb'?'x':0;
 const livVis=e=>LV.area!=='rumpf'||!(e.side==='stb'||e.side==='bb')||e.side===LV.side;
-function livNeu(t){livSnap();const I=MODELS.imoca&&livInfo(MODELS.imoca),els=livEls();let cx=I?I.L*0.5:9,cy=0.75,w=2,h=0.8;
+function livNeu(t){livSnap();const I=LVI(),els=livEls();let cx=I?I.L*0.5:9,cy=0.75,w=2,h=0.8;
+  const fk=I&&!LVP().baked?I.L/18.28*1.6:1;if(LV.area==='rumpf'&&fk!==1){w*=fk;h*=fk;cy=Math.max(...I.prof.map(q=>q[1]))*0.55;}
   if(LV.area==='deck'){cx=I?I.L*0.3:5;cy=0;w=1.6;h=0.8;}
-  if(LV.area==='segel'){const S=I&&I.segel[LV.sail];if(S){cx=(S.zs0+S.zs1)/2-I.z0;cy=S.ys0+(S.ys1-S.ys0)*0.4;}w=3;h=1.5;const sg=DESIGN.liv.segel[LV.sail];if(!sg.on)sg.on=true;}
-  const L0=DESIGN.liv,bg=LV.area==='deck'?L0.deck.col:LV.area==='segel'?L0.segel[LV.sail].base:L0.base,hell=new THREE.Color(bg).getHSL({}).l>0.5;   // Schrift hebt sich vom Untergrund ab
+  if(LV.area==='segel'){const S=I&&I.segel[LV.sail];if(S){cx=(S.zs0+S.zs1)/2-I.z0;cy=S.ys0+(S.ys1-S.ys0)*0.4;}w=3*fk/1.6||3;h=1.5*fk/1.6||1.5;if(fk===1){w=3;h=1.5;}const sg=LVD().segel[LV.sail];if(!sg.on)sg.on=true;}
+  const L0=LVD(),bg=LV.area==='deck'?L0.deck.col:LV.area==='segel'?L0.segel[LV.sail].base:L0.base,hell=new THREE.Color(bg).getHSL({}).l>0.5;   // Schrift hebt sich vom Untergrund ab
   const e={t,x:cx,y:cy,w,h,rot:0,col:t==='text'?(hell?'#17191d':'#f4f5f2'):LIV_COLS[(els.length+2)%LIV_COLS.length],side:LV.area==='deck'?'stb':'beide'};
   if(t==='streifen'){e.w=w*4;e.h=h*0.4;e.skew=-30;}if(t==='rect')e.skew=0;if(t==='ring'||t==='pfeil')e.d=h*0.3;if(t==='welle'){e.w=w*5;e.h=h*0.75;e.d=h*0.25;e.n=2;}if(t==='kreis'||t==='ring'||t==='stern'){e.w=e.h=h*1.2;}
-  if(t==='text'){e.txt=(DESIGN.name||'HEXE');e.h=LV.area==='segel'?1.2:0.6;e.font='sport';}
+  if(t==='text'){e.txt=(DESIGN.name||'HEXE');e.h=(LV.area==='segel'?1.2:0.6)*(fk!==1?fk/1.6:1);e.font='sport';}
   if(t==='poly'){const s=LV.area==='segel'?2:1;e.pts=[[-1.5*s,-0.5*s],[1.5*s,-0.5*s],[1*s,0.5*s],[-1*s,0.5*s]];}
   els.push(e);LV.sel=els.length-1;LV.pt=-1;saveDesign();livRender(true);}
 /* Ansicht */
 function livBounds(I){if(!I)return {x0:-19,x1:0.5,y0:-0.8,y1:2.2};const L=I.L;
   if(LV.area==='deck'){const B=I.deck?I.deck.B:3;return {x0:-L-0.5,x1:0.5,y0:-B-0.4,y1:B+0.4};}
-  if(LV.area==='segel'){let x0=1e9,x1=-1e9;for(const k in I.segel)for(const q of I.segel[k].hull){x0=Math.min(x0,q[0]);x1=Math.max(x1,q[0]);}return {x0:Math.min(x0,-L)-0.8,x1:Math.max(x1,0)+0.8,y0:-0.6,y1:30};}
+  if(LV.area==='segel'){let x0=1e9,x1=-1e9;for(const k in I.segel)for(const q of I.segel[k].hull){x0=Math.min(x0,q[0]);x1=Math.max(x1,q[0]);}let y1=0;for(const k in I.segel)y1=Math.max(y1,I.segel[k].ys1);return {x0:Math.min(x0,-L)-0.8,x1:Math.max(x1,0)+0.8,y0:-0.6,y1:y1+1};}
   const y0=Math.min(...I.prof.map(q=>q[2]))-0.35,y1=Math.max(...I.prof.map(q=>q[1]))+0.5;return LV.side==='stb'?{x0:-L-0.6,x1:0.6,y0,y1}:{x0:-0.6,x1:L+0.6,y0,y1};}
-function livViewSetup(cv){const I=MODELS.imoca&&livInfo(MODELS.imoca),b=livBounds(I),W=cv.clientWidth,H=cv.clientHeight,k=Math.min((W-24)/(b.x1-b.x0),(H-16)/(b.y1-b.y0))*LV.zoom;
+function livViewSetup(cv){const I=LVI(),b=livBounds(I),W=cv.clientWidth,H=cv.clientHeight,k=Math.min((W-24)/(b.x1-b.x0),(H-16)/(b.y1-b.y0))*LV.zoom;
   const Cx=(b.x0+b.x1)/2+LV.pan[0],Cy=(b.y0+b.y1)/2+LV.pan[1];LV.view={k,ox:W/2-Cx*k,oy:H/2+Cy*k,L:I?I.L:18.3};}
 function livZoom(f,sx,sy){const cv=$('lvCv');if(sx==null){sx=cv.clientWidth/2;sy=cv.clientHeight/2;}const a=livW(sx,sy);LV.zoom=clamp(LV.zoom*f,1,12);if(LV.zoom===1)LV.pan=[0,0];livViewSetup(cv);const b=livW(sx,sy);
   if(LV.zoom>1){LV.pan[0]+=a[0]-b[0];LV.pan[1]+=a[1]-b[1];}livDraw2D();}
@@ -10466,12 +10669,13 @@ function livHullPath(c,I,st){c.beginPath();I.prof.forEach((q,i)=>{const X=st?-q[
 function livDeckPath(c,P){c.beginPath();P.forEach((q,i)=>c[i?'lineTo':'moveTo'](-q[0],q[1]));for(let i=P.length-1;i>=0;i--)c.lineTo(-P[i][0],-P[i][1]);c.closePath();}
 function livPolyPath(c,P){c.beginPath();P.forEach((q,i)=>c[i?'lineTo':'moveTo'](q[0],q[1]));c.closePath();}
 function livDraw2D(){const cv=$('lvCv');if(!cv)return;const dpr=Math.min(2,window.devicePixelRatio||1),W=cv.clientWidth,H=cv.clientHeight;if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);}
-  livViewSetup(cv);const c=cv.getContext('2d'),V=LV.view,lv=DESIGN.liv;c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
+  livViewSetup(cv);const c=cv.getContext('2d'),V=LV.view,lv=LVD();c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
   c.strokeStyle='rgba(255,255,255,.06)';c.lineWidth=1;c.beginPath();const step=LV.area==='segel'?2:1;for(let m=-40;m<=40;m+=step){const [sx]=livS(m,0);if(sx<0||sx>W)continue;c.moveTo(sx,0);c.lineTo(sx,H);}c.stroke();
-  const I=MODELS.imoca&&livInfo(MODELS.imoca);if(!I)return;const lw=1/V.k;
+  const I=LVI();if(!I)return;const lw=1/V.k;
   c.save();c.setTransform(dpr*V.k,0,0,-dpr*V.k,dpr*V.ox,dpr*V.oy);
   if(LV.area==='rumpf'){const st=LV.side==='stb';livHullPath(c,I,st);c.fillStyle=lv.base;c.fill();c.save();c.clip();if(lv.bottom){c.fillStyle=lv.bottom;c.fillRect(-60,-8,120,8);}
-    for(const e of lv.el)if(livVis(e))livDrawEl(c,e,LV.side);c.globalAlpha=0.22;for(const e of lv.el)if(!livVis(e))livDrawEl(c,e,LV.side);c.globalAlpha=1;c.restore();
+    for(const e of lv.el)if(livVis(e))livDrawEl(c,e,LV.side);c.globalAlpha=0.22;for(const e of lv.el)if(!livVis(e))livDrawEl(c,e,LV.side);c.globalAlpha=1;
+    if(I.over)for(const k in I.over){const o=lv.over&&lv.over[k];if(!o||o.on===false)continue;livHullPath(c,{prof:I.over[k]},st);c.globalAlpha=0.92;c.fillStyle=o.col;c.fill();c.globalAlpha=1;}c.restore();
     livHullPath(c,I,st);c.lineWidth=1.5*lw;c.strokeStyle='rgba(255,255,255,.55)';c.stroke();c.setLineDash([0.25,0.18]);c.beginPath();c.moveTo(-40,0);c.lineTo(40,0);c.strokeStyle='rgba(120,200,255,.6)';c.lineWidth=lw;c.stroke();c.setLineDash([]);}
   else if(LV.area==='deck'&&I.deck){const D=I.deck,dl=lv.deck;livDeckPath(c,D.prof);c.fillStyle=dl.col;c.fill();c.save();c.clip();for(const e of dl.el){livDraw(c,e,0);if(e.side==='beide'){c.globalAlpha=0.85;livDraw(c,e,'y');c.globalAlpha=1;}}c.restore();
     livDeckPath(c,D.prof);c.lineWidth=1.5*lw;c.strokeStyle='rgba(255,255,255,.55)';c.stroke();
@@ -10486,7 +10690,7 @@ function livDraw2D(){const cv=$('lvCv');if(!cv)return;const dpr=Math.min(2,windo
     c.beginPath();c.moveTo(-(1.52-I.z0),1.6);c.lineTo(-(1.52-I.z0),29);c.strokeStyle='#888';c.lineWidth=2*lw;c.stroke();}
   c.restore();
   c.fillStyle='rgba(255,255,255,.55)';c.font='600 12px system-ui,sans-serif';c.textAlign='center';
-  const lab=LV.area==='rumpf'?(LV.side==='stb'?'Steuerbord (rechte Seite) · Bug rechts':'Backbord (linke Seite) · Bug links'):LV.area==='deck'?'Deck von oben · Bug rechts, Backbord oben':(LIV_SEGEL[LV.sail].n+' von Steuerbord'+(lv.segel[LV.sail].on?'':' · Original – Element hinzufügen oder „eigenes Design“ einschalten'));
+  const lab=LV.area==='rumpf'?(LV.side==='stb'?'Steuerbord (rechte Seite) · Bug rechts':'Backbord (linke Seite) · Bug links'):LV.area==='deck'?'Deck von oben · Bug rechts, Backbord oben':(LVP().segel[LV.sail].n+' von Steuerbord'+(lv.segel[LV.sail].on?'':' · Original – Element hinzufügen oder „eigenes Design“ einschalten'));
   if(c.measureText(lab).width>W-16){const t=lab.split(' · ');c.fillText(t[0],W/2,14);c.fillText(t.slice(1).join(' · '),W/2,29);}else c.fillText(lab,W/2,14);
   const e=livSel();if(!e)return;const mir=livMir(),box=livBox(e);c.save();c.setTransform(dpr,0,0,dpr,0,0);
   const sp=box.map(q=>livS(...livL2V(e,mir,q[0],q[1])));c.strokeStyle='#6fe3ff';c.lineWidth=1.5;c.setLineDash([5,4]);c.beginPath();sp.forEach((q,i)=>c[i?'lineTo':'moveTo'](q[0],q[1]));c.closePath();c.stroke();c.setLineDash([]);
@@ -10524,14 +10728,15 @@ function livPtr(){const cv=$('lvCv');const pos=ev=>{const r=cv.getBoundingClient
     for(let i=0;i<e.pts.length;i++){const a=e.pts[i],b=e.pts[(i+1)%e.pts.length],dx=b[0]-a[0],dy=b[1]-a[1],t=clamp(((lx-a[0])*dx+(ly-a[1])*dy)/(dx*dx+dy*dy||1),0,1),d=Math.hypot(a[0]+dx*t-lx,a[1]+dy*t-ly);if(d<bd){bd=d;best=i;}}
     livSnap();e.pts.splice(best+1,0,[lx,ly]);LV.pt=best+1;saveDesign();livRender(true);};}
 /* Seitenleiste */
-function livPanel(){const lv=DESIGN.liv,box=$('lvSide');if(!box)return;const esc=s=>String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));const els=livEls();
+function livPanel(){const lv=LVD(),box=$('lvSide');if(!box)return;const esc=s=>String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));const els=livEls();
   const sw=(k,cur)=>'<div class="lvsw">'+LIV_COLS.map(c=>'<button type="button" class="swb'+(cur===c?' sel':'')+'" data-c="'+c+'" data-k="'+k+'" style="background:'+c+'" aria-label="Farbe '+c+'"></button>').join('')+'<input type="color" data-k="'+k+'" value="'+(cur||'#888888')+'" aria-label="eigene Farbe"></div>';
-  let h='<div class="lvsec"><div class="lvh">Neues Element · '+LIV_AREA[LV.area]+(LV.area==='segel'?' ('+LIV_SEGEL[LV.sail].n+')':'')+'</div><div class="lvadd">'+Object.keys(LIV_TYPEN).map(t=>'<button type="button" data-add="'+t+'" title="'+LIV_TYPEN[t]+'"><span>'+LIV_ICON[t]+'</span>'+LIV_TYPEN[t]+'</button>').join('')+'</div></div>';
+  let h='<div class="lvsec"><div class="lvh">Neues Element · '+LIV_AREA[LV.area]+(LV.area==='segel'?' ('+LVP().segel[LV.sail].n+')':'')+'</div><div class="lvadd">'+Object.keys(LIV_TYPEN).map(t=>'<button type="button" data-add="'+t+'" title="'+LIV_TYPEN[t]+'"><span>'+LIV_ICON[t]+'</span>'+LIV_TYPEN[t]+'</button>').join('')+'</div></div>';
   if(LV.area==='rumpf'){h+='<div class="lvsec"><div class="lvh">Rumpf</div><div class="lvl">Grundfarbe</div>'+sw('base',lv.base)+'<div class="lvl">Unterwasserschiff <button type="button" class="lvmini" data-k="bottomAus">'+(lv.bottom?'aus':'wie Rumpf')+'</button></div>'+sw('bottom',lv.bottom)+'</div>';
-    h+='<div class="lvsec"><div class="lvh">Anhänge & Rigg</div>'+Object.keys(LIV_ANH).map(k=>'<div class="lvl">'+LIV_ANH[k][0]+'</div>'+sw('anh.'+k,lv.anh[k])).join('')+'</div>';}
+    for(const O of LVP().over||[]){const o=lv.over[O.key];h+='<div class="lvsec"><div class="lvh">'+O.name+'</div><label class="lvl"><input type="checkbox" data-over="'+O.key+'"'+(o.on!==false?' checked':'')+'> zeigen (liegt über der Lackierung – ausschalten, damit deine Elemente zu sehen sind)</label>'+(o.on!==false?sw('over.'+O.key,o.col):'')+'</div>';}
+    if(LVP().anh)h+='<div class="lvsec"><div class="lvh">Anhänge & Rigg</div>'+Object.keys(LIV_ANH).map(k=>'<div class="lvl">'+LIV_ANH[k][0]+'</div>'+sw('anh.'+k,lv.anh[k])).join('')+'</div>';}
   else if(LV.area==='deck')h+='<div class="lvsec"><div class="lvh">Deck</div><div class="lvl">Deckfarbe (auch Cockpit-Gänge)</div>'+sw('deck.col',lv.deck.col)+'<div class="lvl">Kajüte & Aufbau</div>'+sw('deck.kaj',lv.deck.kaj)+
     '<div class="lvbtns"><button type="button" class="btn ghost" data-act="deck0">Original-Deck</button></div></div>';
-  else{const sg=lv.segel[LV.sail];h+='<div class="lvsec"><div class="lvh">'+LIV_SEGEL[LV.sail].n+'</div><div class="lvopt"><button type="button" class="optb'+(sg.on?'':' sel')+'" data-son="0">Original</button><button type="button" class="optb'+(sg.on?' sel':'')+'" data-son="1">eigenes Design</button></div>';
+  else{const sg=lv.segel[LV.sail];h+='<div class="lvsec"><div class="lvh">'+LVP().segel[LV.sail].n+'</div><div class="lvopt"><button type="button" class="optb'+(sg.on?'':' sel')+'" data-son="0">Original</button><button type="button" class="optb'+(sg.on?' sel':'')+'" data-son="1">eigenes Design</button></div>';
     if(sg.on){h+='<div class="lvl">Segelfarbe</div>'+sw('segel.base',sg.base);if(LV.sail==='gross')h+='<label class="lvl"><input type="checkbox" data-latten="1"'+(sg.latten?' checked':'')+'> Latten zeigen</label>';
 }
     else h+='<div class="lvdim" style="margin-top:6px">Im Rennen fährt das Original-Segel. Mit „eigenes Design“ oder einem neuen Element gestaltest du es selbst – Schrift ist dann von beiden Seiten lesbar.</div>';
@@ -10558,11 +10763,12 @@ function livPanel(){const lv=DESIGN.liv,box=$('lvSide');if(!box)return;const esc
   box.innerHTML=h;
   box.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>livNeu(b.dataset.add));
   box.querySelectorAll('.lvrow').forEach(r=>r.onclick=()=>{LV.sel=+r.dataset.i;LV.pt=-1;livRender();});
-  const setK=(k,c)=>{if(k==='base'||k==='bottom')lv[k]=c;else if(k.startsWith('anh.'))lv.anh[k.slice(4)]=c;else if(k.startsWith('deck.'))lv.deck[k.slice(5)]=c;else if(k==='segel.base')lv.segel[LV.sail].base=c;else{const s=livSel();if(s)s[k]=c;}};
+  const setK=(k,c)=>{if(k.startsWith('over.'))lv.over[k.slice(5)].col=c;else if(k==='base'||k==='bottom')lv[k]=c;else if(k.startsWith('anh.'))lv.anh[k.slice(4)]=c;else if(k.startsWith('deck.'))lv.deck[k.slice(5)]=c;else if(k==='segel.base')lv.segel[LV.sail].base=c;else{const s=livSel();if(s)s[k]=c;}};
   box.querySelectorAll('.swb').forEach(b=>b.onclick=()=>{livSnap();setK(b.dataset.k,b.dataset.c);saveDesign();livRender(true);});
   box.querySelectorAll('input[type=color]').forEach(i=>{i.onfocus=()=>livSnap();i.onchange=()=>{setK(i.dataset.k,i.value);saveDesign();livRender(true);};i.oninput=()=>{setK(i.dataset.k,i.value);livDraw2D();livQueue3D();};});
   const bA=box.querySelector('[data-k=bottomAus]');if(bA)bA.onclick=()=>{livSnap();lv.bottom=lv.bottom?'':'#17191d';saveDesign();livRender(true);};
   box.querySelectorAll('[data-son]').forEach(b=>b.onclick=()=>{livSnap();lv.segel[LV.sail].on=b.dataset.son==='1';saveDesign();livRender(true);});
+  box.querySelectorAll('[data-over]').forEach(i=>i.onchange=()=>{livSnap();lv.over[i.dataset.over].on=i.checked;saveDesign();livRender(true);});
   const lt=box.querySelector('[data-latten]');if(lt)lt.onchange=()=>{livSnap();lv.segel.gross.latten=lt.checked;saveDesign();livRender(true);};
   box.querySelectorAll('[data-n]').forEach(i=>{i.onfocus=()=>livSnap();i.oninput=()=>{const s=livSel(),v=parseFloat(i.value);if(!s||!isFinite(v))return;s[i.dataset.n]=v;saveDesign();livDraw2D();livQueue3D();};i.onchange=()=>livQueue3D(true);});
   const tx=box.querySelector('[data-txt]');if(tx){tx.onfocus=()=>livSnap();tx.oninput=()=>{const s=livSel();if(!s)return;s.txt=tx.value;saveDesign();livDraw2D();livQueue3D();const r=box.querySelector('.lvrow.sel .lvn');if(r)r.textContent=LIV_ICON.text+' „'+tx.value+'“';};}
@@ -10570,7 +10776,7 @@ function livPanel(){const lv=DESIGN.liv,box=$('lvSide');if(!box)return;const esc
   box.querySelectorAll('[data-side]').forEach(b=>b.onclick=()=>{livSnap();const s=livSel();s.side=b.dataset.side;if(LV.area==='rumpf'&&s.side!=='beide'&&LV.side!==s.side){LV.side=s.side;LV.pan[0]=-LV.pan[0];}saveDesign();livRender(true);});
   box.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>livAct(b.dataset.act));}
 function livPanelVals(){const e=livSel(),box=$('lvSide');if(!e||!box)return;box.querySelectorAll('[data-n]').forEach(i=>{if(document.activeElement===i)return;const st=parseFloat(i.step);i.value=(+(e[i.dataset.n]??0)).toFixed(st<0.1?2:st<1?1:0);});}
-function livAct(a){const lv=DESIGN.liv;
+function livAct(a){const lv=LVD();
   if(a==='deck0'){livSnap();lv.deck=livDeck0();LV.sel=-1;saveDesign();livRender(true);return;}
   if(a==='j2band'){livSnap();const sg=lv.segel.j2;sg.on=true;sg.base='#1d1f23';sg.el=LIV_J2BAND().concat(sg.el.filter(x=>x.t==='text'));LV.sel=-1;saveDesign();livRender(true);return;}
   const els=livEls(),e=livSel();if(!e)return;livSnap();const i=LV.sel;
@@ -10586,28 +10792,29 @@ function livRender(full){const wr=document.querySelector('.lvwrap');if(wr){const
   $('lvSeite').hidden=LV.area!=='rumpf';$('lvSegelW').hidden=LV.area!=='segel';if(full)livQueue3D(true);}
 /* ---------- 3D-Vorschau ---------- */
 function livQueue3D(now){clearTimeout(LV.t3);LV.t3=setTimeout(liv3D,now?30:180);}
-function liv3D(){const T=MODELS.imoca;const cv=$('lv3d');if(!T||!cv||$('lvOv').hidden)return;const I=livInfo(T);if(!I)return;const lv=livFix(DESIGN.liv);
+function liv3D(){const T=MODELS[LVP().model];const cv=$('lv3d');if(!T||!cv||$('lvOv').hidden)return;const I=LVI();if(!I)return;const lv=LVD();
   if(!LV.p3){let r;try{r=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});}catch(e){cv.replaceWith(Object.assign(document.createElement('div'),{className:'lvdim',textContent:'3D-Vorschau auf diesem Gerät nicht verfügbar.'}));return;}
     const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(30,1,0.5,400);sc.add(new THREE.HemisphereLight(0xdfefff,0x30404a,0.9));const dl=new THREE.DirectionalLight(0xffffff,0.9);dl.position.set(8,14,6);sc.add(dl);
     const wl=new THREE.Mesh(new THREE.PlaneGeometry(80,80),new THREE.MeshBasicMaterial({color:0x1d5a72,transparent:true,opacity:0.35,depthWrite:false}));wl.rotation.x=-Math.PI/2;wl.position.y=0.01;sc.add(wl);
     LV.p3={r,sc,cam,root:null,X:null,yaw:1.2,pit:0.16,dist:24,auto:true,area:null};
     let dr=null;cv.onpointerdown=e=>{dr=[e.clientX,e.clientY];LV.p3.auto=false;cv.setPointerCapture(e.pointerId);};cv.onpointermove=e=>{if(!dr)return;LV.p3.yaw-=(e.clientX-dr[0])*0.01;LV.p3.pit=clamp(LV.p3.pit+(e.clientY-dr[1])*0.006,-0.15,1.4);dr=[e.clientX,e.clientY];};cv.onpointerup=()=>dr=null;
-    cv.onwheel=e=>{e.preventDefault();LV.p3.dist=clamp(LV.p3.dist*(e.deltaY>0?1.1:0.9),8,120);};}
-  const P3=LV.p3,sig=Object.keys(LIV_SEGEL).map(k=>lv.segel[k].on?1:0).join('');
-  if(!P3.root||P3.X.sig!==sig){if(P3.root)P3.sc.remove(P3.root);const root=new THREE.Group();P3.sc.add(root);const X=livCtx(T,lv);mdlBuild(T,root,{hide:LIV_DECK_HIDE.concat(['Seezaun (Relingsdrähte)']),mat:X.mat});X.post(root);P3.root=root;P3.X=X;}
+    cv.onwheel=e=>{e.preventDefault();LV.p3.dist=clamp(LV.p3.dist*(e.deltaY>0?1.1:0.9),2,140);};}
+  const P3=LV.p3,PP=LVP(),sig=PP.key+Object.keys(PP.segel).map(k=>lv.segel[k].on?1:0).join('')+Object.keys(lv.over||{}).map(k=>lv.over[k].on===false?0:1).join('');
+  if(!P3.root||!P3.X||P3.X.sig!==sig){if(P3.root)P3.sc.remove(P3.root);const root=new THREE.Group();P3.sc.add(root);const X=livCtx(T,lv,PP);if(!X)return;mdlBuild(T,root,{hide:PP.baked?LIV_DECK_HIDE.concat(['Seezaun (Relingsdrähte)']):(PP.hide3d||[]),mat:X.mat});X.post(root);P3.root=root;P3.X=X;P3.area=null;P3.sail=null;}
   P3.X.paint(lv);
-  if(P3.area!==LV.area||P3.sail!==LV.sail){const seg=LV.area==='segel',akt=LIV_SEGEL[LV.sail]?LIV_SEGEL[LV.sail].node:'',vs=['j2','j3','fr0','a3'].map(k=>LIV_SEGEL[k].node),vsAkt=vs.includes(akt)?akt:LIV_SEGEL.j2.node;
-    const rollOf={[LIV_SEGEL.j2.node]:'Vorsegel J2 (Vorstag) · eingerollt',[LIV_SEGEL.j3.node]:'Vorsegel J3 (Kutterstag, innen)',[LIV_SEGEL.fr0.node]:'FR0 – Fractional Code 0 (Bugspriet)',[LIV_SEGEL.a3.node]:'A3 – Masttopp-Gennaker (Bugspriet)'};
-    P3.root.traverse(o=>{if(!o.isMesh||!IMO_RIG.includes(o.name))return;let v=seg;if(vs.includes(o.name))v=seg&&o.name===vsAkt;else for(const n in rollOf)if(rollOf[n]===o.name)v=seg&&n!==vsAkt;o.visible=v;});
-    const ch=P3.area!==LV.area;P3.sail=LV.sail;if(ch){P3.area=LV.area;P3.dist=seg?78:LV.area==='deck'?22:24;P3.pit=seg?0.12:LV.area==='deck'?0.75:0.16;P3.look=seg?12:0.4;}}
+  if(P3.area!==LV.area||P3.sail!==LV.sail){const seg=LV.area==='segel',akt=LVP().segel[LV.sail]?LVP().segel[LV.sail].node:'',vs=PP.baked?['j2','j3','fr0','a3'].map(k=>LVP().segel[k].node):[],vsAkt=vs.includes(akt)?akt:(PP.baked?LVP().segel.j2.node:'');
+    const rollOf=!PP.baked?{}:{[LVP().segel.j2.node]:'Vorsegel J2 (Vorstag) · eingerollt',[LVP().segel.j3.node]:'Vorsegel J3 (Kutterstag, innen)',[LVP().segel.fr0.node]:'FR0 – Fractional Code 0 (Bugspriet)',[LVP().segel.a3.node]:'A3 – Masttopp-Gennaker (Bugspriet)'};
+    const RIGN=PP.baked?IMO_RIG:(PP.rig||[]).concat(Object.values(PP.segel).map(q=>q.node));P3.root.traverse(o=>{if(!o.isMesh||!RIGN.includes(o.name))return;let v=seg;if(PP.baked){if(vs.includes(o.name))v=seg&&o.name===vsAkt;else for(const n in rollOf)if(rollOf[n]===o.name)v=seg&&n!==vsAkt;}o.visible=v;});
+    const ch=P3.area!==LV.area;P3.sail=LV.sail;if(ch){P3.area=LV.area;const LL=I.L;P3.dist=seg?LL*4.3:LV.area==='deck'?LL*1.2:LL*1.3+1;P3.pit=seg?0.12:LV.area==='deck'?0.75:0.16;P3.look=seg?LL*0.66:Math.min(0.4,LL*0.05);}}
   if(!P3.loop){P3.loop=true;const tick=()=>{if($('lvOv').hidden){P3.loop=false;return;}const W=cv.clientWidth,H=cv.clientHeight;if(W&&H){P3.r.setPixelRatio(Math.min(2,window.devicePixelRatio||1));P3.r.setSize(W,H,false);P3.cam.aspect=W/H;P3.cam.updateProjectionMatrix();}
     if(P3.auto)P3.yaw+=0.004;const d=P3.dist;P3.cam.position.set(Math.sin(P3.yaw)*Math.cos(P3.pit)*d,(P3.look||0.4)+Math.sin(P3.pit)*d,Math.cos(P3.yaw)*Math.cos(P3.pit)*d);P3.cam.lookAt(0,P3.look||0.4,0);P3.X&&P3.X.upd();P3.r.render(P3.sc,P3.cam);requestAnimationFrame(tick);};tick();}}
-function livVorlage(k){const V=LIV_VORLAGEN[k];if(!V)return;livSnap();Object.assign(DESIGN.liv,V.f());livFix(DESIGN.liv);if(LV.area==='rumpf')LV.sel=-1;saveDesign();livRender(true);}
+function livVorlage(k){const V=LIV_VORLAGEN[k];if(!V)return;livSnap();const D=LVD(),P=LVP();let o=V.f();if(!P.baked){if(k==='orig')o={base:P.base,bottom:'',el:[]};else{const I=LVI(),f=I?I.L/18.28:0.3;o.el=o.el.map(e=>{const c=Object.assign({},e);for(const q of ['x','y','w','h','d'])if(c[q]!=null)c[q]*=f;if(c.pts)c.pts=c.pts.map(p=>[p[0]*f,p[1]*f]);return c;});}}Object.assign(D,o);livFix(D,P);if(LV.area==='rumpf')LV.sel=-1;saveDesign();livRender(true);}
 function livArea(a){if(LV.area===a)return;LV.area=a;LV.sel=-1;LV.pt=-1;LV.zoom=1;LV.pan=[0,0];livRender(true);}
-function livInit(){const sel=$('lvTpl');sel.innerHTML='<option value="">Rumpf-Vorlage …</option>'+Object.entries(LIV_VORLAGEN).map(([k,v])=>'<option value="'+k+'">'+v.n+'</option>').join('');
-  sel.onchange=()=>{const k=sel.value;sel.value='';if(k&&(!DESIGN.liv.el.length||confirmLv())){livArea('rumpf');livVorlage(k);}};
+function livInit(){$('lvKl').innerHTML=Object.values(LIV_PROF).map(P=>'<option value="'+P.key+'">'+P.name+'</option>').join('');$('lvKl').onchange=()=>{if(LV.p3){LV.p3.X=null;}livKlasse($('lvKl').value);};
+  const sel=$('lvTpl');sel.innerHTML='<option value="">Rumpf-Vorlage …</option>'+Object.entries(LIV_VORLAGEN).map(([k,v])=>'<option value="'+k+'">'+v.n+'</option>').join('');
+  sel.onchange=()=>{const k=sel.value;sel.value='';if(k&&(!LVD().el.length||confirmLv())){livArea('rumpf');livVorlage(k);}};
   const seite=sd=>{if(LV.side!==sd){LV.side=sd;LV.pan[0]=-LV.pan[0];}livRender();};$('lvSb').onclick=()=>seite('stb');$('lvBb').onclick=()=>seite('bb');
-  $('lvSegelW').innerHTML=Object.keys(LIV_SEGEL).map(k=>'<button type="button" class="optb" data-s="'+k+'">'+LIV_SEGEL[k].k+'</button>').join('');
+  $('lvSegelW').innerHTML=Object.keys(LVP().segel).map(k=>'<button type="button" class="optb" data-s="'+k+'">'+LVP().segel[k].k+'</button>').join('');
   $('lvSegelW').querySelectorAll('button').forEach(x=>x.onclick=()=>{LV.sail=x.dataset.s;LV.sel=-1;LV.zoom=1;LV.pan=[0,0];livRender(true);});
   $('lvAr').onclick=()=>livArea('rumpf');$('lvAd').onclick=()=>livArea('deck');$('lvAs').onclick=()=>livArea('segel');
   $('lvZin').onclick=()=>livZoom(1.4);$('lvZout').onclick=()=>livZoom(1/1.4);$('lvZfit').onclick=()=>{LV.zoom=1;LV.pan=[0,0];livDraw2D();};
@@ -10623,7 +10830,7 @@ function livInit(){const sel=$('lvTpl');sel.innerHTML='<option value="">Rumpf-Vo
     if(ev.key==='Escape'){LV.sel=-1;livRender();}});}
 function confirmLv(){return window.confirm('Aktuelle Rumpf-Lackierung durch die Vorlage ersetzen? (Rückgängig geht mit ↶)');}
 
-livInit();
+livInit();bahnInit();
 hbInitUi();
 newRace(null);applyGfx();renderBest();updateTouch();
 requestAnimationFrame(loop);
